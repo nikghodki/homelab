@@ -25,7 +25,10 @@ restic_backup_sqlite:
 # Cisco AIBOM (runbooks/aibom.md); DefenseClaw's own AIBOM above keeps running next to it
 cisco_aibom_enabled: true
 cisco_aibom_memory_max: 3G
-cisco_aibom_time: "*-*-* 04:50:00"
+# Each Hermes checkout is ~8,000 Python files: over an hour per install on the Orin, so start early
+cisco_aibom_time: "*-*-* 01:30:00"
+cisco_aibom_timeout_s: 10800
+cisco_aibom_unit_timeout: 10h
 cisco_aibom_dirs:
   - {name: hermes-agent, path: /home/nikjetson/.hermes/hermes-agent}
   - {name: hermes-agent-hermes-nikhil, path: /home/hermes-nikhil/.hermes/hermes-agent}
