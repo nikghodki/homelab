@@ -46,31 +46,62 @@ KServe pilot (parallel, optional)        ░░░░░░░░
 | Pi backup | Running → `~/backups/nikraspberry-2026-11-14/pi-full.tar.zst` on dgx-1 |
 | Pi 1 TB card | Being flashed with Raspberry Pi OS Lite (64-bit) in Raspberry Pi Imager |
 
-## 2a. Status on 2026-11-15
+## 2a. Status on 2026-11-15 (end of day)
 
+Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started · 🔁 changed
+
+### Phase 0
 | ID | Status | Notes |
 |---|---|---|
-| P0.1 | ✅ done | Pi backup on dgx-1, `~/backups/nikraspberry-2026-11-14/` (6.0 GB) |
-| P0.2 | ✅ done | Fresh Pi OS on the 1 TB card; user `nikghodki-raspberry-1`; picoclaw, ROS envs, LiDAR and camera restored; same Tailscale node. Still the desktop OS. |
-| P0.3 | 🟡 mostly | Jetson: DefenseClaw 1.0.9, Hermes in action mode, fail closed, gateway started at boot; doctor 0 failures. The `nikghodki` Hermes profile moved to `~/hermes-homes/nikhil-ghodki` and is unprotected until P0.15. |
-| P0.4 | ⬜ | Pi Edge Connector |
-| P0.5 | 🔁 changed | The work-managed DefenseClaw enterprise install and `dcsidecar` were **uninstalled** from dgx-1. dgx-1 has no coding agents yet; install open-source DefenseClaw for AI discovery and AIBOM, then add connectors when agents appear. |
-| P0.6 | ✅ done | LiteLLM Postgres and Redis listen on 127.0.0.1 only |
-| P0.7 | 🔁 changed | `nginx-gateway` is **not** removable: it fronts `model.nghodki.ai`, `voice-agent` and `ha`. Its crash loop (missing `kokoro-tts` upstream) is fixed with runtime upstream resolution. The dead LiteLLM routes are still to remove. |
-| P0.8 | ⬜ | LiveKit secret out of argv |
-| P0.9 | ⬜ | IP reservations (you, Google Wifi app) |
-| P0.10 | ⬜ | Omarchy: Tailscale isn't installed; needs a full system update (stale pacman database) |
+| P0.1 | ✅ | Pi backup on dgx-1 |
+| P0.2 | ✅ | Fresh Pi OS on the 1 TB card, user `nikghodki-raspberry-1`, restored; same Tailscale node |
+| P0.3 | 🟡 | Jetson: DefenseClaw 1.0.9, Hermes in action mode, fail closed, gateway at boot. Second Hermes profile moved to `~/hermes-homes/nikhil-ghodki`, unprotected until P0.15 |
+| P0.4 | ⏸️ | Edge Connector 1.0.9 built and tested on the Pi (dev 15/15, prod 13/15 = the 2 expected test-key refusals) but not installed: without Fleet (P1.12) it blocks every picoclaw call |
+| P0.5 | 🔁 ✅ | Work-managed DefenseClaw + dcsidecar uninstalled; OSS 1.0.9 installed on dgx-1 (no agents there yet) |
+| P0.6 | ✅ | LiteLLM Postgres/Redis on 127.0.0.1 |
+| P0.7 | 🔁 🟡 | `nginx-gateway` fixed (missing kokoro upstream) and kept; dead LiteLLM routes still to remove |
+| P0.8 | ✅ | LiveKit key in a 0600 key file |
+| P0.9 | ⬜ | IP reservations (you) |
+| P0.10 | 🟡 | Omarchy fully updated (`omarchy update`), Tailscale installed; **needs your login** (URL from the update) and a re-login for Hyprland |
 | P0.11 | ⬜ | Ethernet for the Sparks (you) |
-| P0.12 | ⬜ | Jetson `companion-agent.service` |
-| P0.13 | ✅ done | LiteLLM 1.109.1, pinned by digest (fixes GHSA-7hp6-4w63-5g45); rollback image and DB backup kept |
-| P0.14 | ⬜ new | Rotate the LiteLLM master key and salt key (salt key is the placeholder `sk-litellm-salt-key`); move both into SOPS. After the DGXMM work. |
-| P0.15 | ⬜ new | Hermes `nikghodki` profile as its own Linux user with its own DefenseClaw install |
-| P0.16 | ⬜ new | Home Assistant trusted proxies for `ha.nghodki.ai`: HA 2026.11 keeps HTTP settings in the UI, not YAML (you, in the HA UI) |
-| P0.17 | ⬜ new | LiteLLM key review: 13 keys, none expires, few have model limits; prune unused keys. picoclaw now has its own `picoclaw-pi` key (its old key was invalid). |
-| P1.1 | ✅ done | `nikghodki/homelab` |
-| P1.2 | ✅ done | SOPS + age; key saved offline |
-| P1.3 | ✅ done | Ansible baseline applied on all 5 hosts; second check-mode run shows 0 changes |
-| P1.8 | ✅ done | GitHub Actions (hash-locked tools, scoped OSV exceptions), Renovate installed, repo settings hardened |
+| P0.12 | ✅ | `companion-agent` retired (code removed 28 Aug); no failed user units |
+| P0.13 | ✅ | LiteLLM 1.109.1 pinned by digest |
+| P0.14 | ⬜ | LiteLLM master + salt key rotation, after the DGXMM session |
+| P0.15 | ⬜ | Hermes second profile as its own Linux user |
+| P0.16 | ⏸️ | Home Assistant trusted proxies: HA 2026.11 needs this in its UI (you) |
+| P0.17 | 🟡 | picoclaw now has its own scoped key (`picoclaw-pi`, in `.security.yml`); key review/prune still to do |
+
+### Phase 1
+| ID | Status | Notes |
+|---|---|---|
+| P1.1 | ✅ | `nikghodki/homelab`, hardened repo settings, squash-only |
+| P1.2 | ✅ | SOPS + age; key saved offline |
+| P1.3 | ✅ | Ansible baseline applied on all 5 hosts, idempotent |
+| P1.4 | ⏸️ | `policies/tailscale/policy.hujson` with tests; apply in the admin console after tagging (you) |
+| P1.5 | ✅ | NATS 2.15.3 on dgx-1 (TLS, MQTT over TLS, deny-by-default users); homelab CA trusted on all hosts; picoclaw connected as `picoclaw`. End-to-end reply pending the qwen3.8 engine (busy in the DGXMM session) |
+| P1.6 | ✅ | dgx-2: VictoriaMetrics, Loki, Tempo, Grafana (19 DefenseClaw dashboards + Fleet Home), vmalert, Alertmanager, Gatus, ntfy; host collectors + fleet-metrics (now in the repo, Prometheus endpoint) on all 5 hosts; DefenseClaw OTLP from Jetson and dgx-1, redaction `sensitive` |
+| P1.7 | ✅ | Alerts → ntfy tested end to end (Gatus and Alertmanager) |
+| P1.8 | ✅ | CI with hash-locked tools, unit tests, Renovate |
+| P1.9 | ⬜ | GitHub Pro decision (you) |
+| P1.10 | ⏸️ | Backups merged (#17) but **not deployed**, at your request |
+| P1.11 | 🟡 | AI discovery on; nightly AIBOM on the Jetson; OTLP + redaction done; DefenseClaw webhooks and policies-in-Git still to do |
+| P1.12 | ⬜ | Edge Connector Fleet (needs a TLS proxy for the Fleet API; NATS MQTT is ready) |
+| P1.13 | ⏸️ | Pocket ID: needs HTTPS. Enable **HTTPS Certificates** in the Tailscale admin console (DNS page) (you) |
+| P1.14 | ✅ | One Alertmanager for vmalert alerts; Gatus posts to ntfy directly |
+| P1.15 | ✅ | Fleet Home dashboard (home page), grafana/status/ntfy/phoenix.nghodki.ai |
+
+### Phase 2
+| ID | Status | Notes |
+|---|---|---|
+| P2.0 | ⬜ | Models and aliases (your decision) |
+| P2.4 | 🟡 | DefenseClaw guardrail plugin for LiteLLM written, tested (8 tests, CI) and loads in LiteLLM 1.109.1; enabled in the P0.14 window |
+| P2.6 | 🟡 | Phoenix on dgx-2 (`phoenix.nghodki.ai`, login on); LiteLLM to be connected in the P0.14 window |
+| P2.1-P2.3, P2.5, P2.7, P2.8 | ⬜ | DGXMM work, after the DGXMM session |
+
+### Findings to report upstream
+- Edge Connector 1.0.9 doesn't build against mbedTLS 3.6 (deprecated API + -Werror).
+- `cisco-ai-mcp-scanner` 4.8.7 pins `litellm==1.93.2` (GHSA-7hp6-4w63-5g45).
+- DefenseClaw's Hermes connector supports one HERMES_HOME; a second profile stops the gateway from starting.
 
 ## 3. Phase 0: Urgent fixes (week 1)
 
