@@ -123,6 +123,21 @@ services:
     ports:
       - "8085:80"
 
+  # LLM and agent traces (plan P2.6). OTLP over HTTP at :6006/v1/traces; UI at phoenix.nghodki.ai.
+  phoenix:
+    <<: *restart
+    image: arizephoenix/phoenix:version-21.1.0@sha256:09ec48906c054a27dd09a88c8e6bcc24fe89649d3ecc94d3a8ed394e21279b31
+    environment:
+      PHOENIX_WORKING_DIR: /data
+      PHOENIX_ENABLE_AUTH: "true"
+      PHOENIX_SECRET: ${PHOENIX_SECRET:?set in .env}
+      PHOENIX_DEFAULT_ADMIN_INITIAL_PASSWORD: ${PHOENIX_ADMIN_PASSWORD:?set in .env}
+      PHOENIX_TELEMETRY_ENABLED: "false"
+    volumes:
+      - phoenix-data:/data
+    ports:
+      - "6006:6006"
+
 volumes:
   vm-data:
   am-data:
@@ -131,3 +146,4 @@ volumes:
   grafana-data:
   gatus-data:
   ntfy-data:
+  phoenix-data:
