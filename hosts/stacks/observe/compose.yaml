@@ -166,6 +166,7 @@ services:
       PHOENIX_OAUTH2_POCKETID_OIDC_CONFIG_URL: https://id.nghodki.ai/.well-known/openid-configuration
       PHOENIX_OAUTH2_POCKETID_USE_PKCE: "true"
       PHOENIX_OAUTH2_POCKETID_ALLOW_SIGN_UP: "true"
+      PHOENIX_OAUTH2_POCKETID_SCOPES: groups   # Pocket ID only sends the groups claim when asked
       PHOENIX_OAUTH2_POCKETID_GROUPS_ATTRIBUTE_PATH: groups
       PHOENIX_OAUTH2_POCKETID_ALLOWED_GROUPS: admins
       PHOENIX_OAUTH2_POCKETID_ROLE_ATTRIBUTE_PATH: "contains(groups, 'admins') && 'ADMIN' || 'VIEWER'"

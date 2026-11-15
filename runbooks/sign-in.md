@@ -32,7 +32,7 @@ homelab web CA (`http://ca.nghodki.ai`) and add a passkey. Ask for a second pass
 |---|---|---|
 | Grafana | Generic OAuth (PKCE); `admins` group → Grafana Admin | admins |
 | Gatus (status page) | `security.oidc` (no PKCE: Gatus 5.38 doesn't send it) | admins |
-| Phoenix | `PHOENIX_OAUTH2_POCKETID_*` (PKCE); `admins` → ADMIN | admins |
+| Phoenix | `PHOENIX_OAUTH2_POCKETID_*` (PKCE); `admins` → ADMIN. Needs `..._SCOPES: groups`, or Pocket ID sends no groups claim and Phoenix answers "authentication failed" | admins |
 
 Containers that talk to Pocket ID get `extra_hosts: id.nghodki.ai:192.168.86.44` and the host's CA bundle, which includes the
 web CA.
