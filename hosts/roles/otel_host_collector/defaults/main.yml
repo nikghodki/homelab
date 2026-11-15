@@ -1,0 +1,9 @@
+otel_host_collector_version: 0.165.0
+otel_host_collector_memory_max: 256M
+otel_host_collector_endpoint: ""
+# Scrape the local fleet-metrics exporter when the host runs it.
+otel_host_collector_scrape_fleet_metrics: true
+otel_host_collector_fleet_metrics_port: "{{ fleet_metrics_port | default(9109) }}"
+otel_host_collector_release_url: >-
+  https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{{ otel_host_collector_version }}
+otel_host_collector_tarball: "otelcol-contrib_{{ otel_host_collector_version }}_linux_{{ otel_host_collector_arch }}.tar.gz"

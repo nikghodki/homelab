@@ -1,0 +1,23 @@
+# Observability stack on dgx-2 (plan P1.6). Always --check --diff first.
+- name: Observability stack
+  hosts: observe
+  become: true
+  pre_tasks:
+    - name: Load stack secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/observe.enc.yaml"
+        name: observe_secrets
+      no_log: true
+  vars:
+    # Used by the stack's templates (alertmanager, ntfy, gatus)
+    ntfy_alerts_password: "{{ observe_secrets.ntfy_alerts_password }}"
+    ntfy_alerts_password_hash: "{{ observe_secrets.ntfy_alerts_password_hash }}"
+    ntfy_alerts_token: "{{ observe_secrets.ntfy_alerts_token }}"
+    ntfy_phone_password_hash: "{{ observe_secrets.ntfy_phone_password_hash }}"
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: observe
+        compose_stack_src: "{{ playbook_dir }}/../stacks/observe"
+        compose_stack_env:
+          GRAFANA_ADMIN_PASSWORD: "{{ observe_secrets.grafana_admin_password }}"

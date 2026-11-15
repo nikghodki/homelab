@@ -1,0 +1,54 @@
+# Managed by homelab Ansible (roles/otel_host_collector)
+receivers:
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu: {}
+      load: {}
+      memory: {}
+      paging: {}
+      network: {}
+      processes: {}
+      disk: {}
+      filesystem:
+        exclude_fs_types:
+          fs_types: [tmpfs, devtmpfs, overlay, squashfs, nsfs, autofs, efivarfs, proc, sysfs, cgroup2, fuse.portal, tracefs, debugfs, securityfs, pstore, bpf, configfs, binfmt_misc, mqueue, hugetlbfs, ramfs, fusectl]
+          match_type: strict
+  journald:
+    priority: info
+{% if otel_host_collector_scrape_fleet_metrics %}
+  prometheus/fleet-metrics:
+    config:
+      scrape_configs:
+        - job_name: fleet-metrics
+          scrape_interval: 30s
+          static_configs:
+            - targets: ["127.0.0.1:{{ otel_host_collector_fleet_metrics_port }}"]
+{% endif %}
+processors:
+  memory_limiter: {check_interval: 2s, limit_percentage: 80, spike_limit_percentage: 20}
+  resourcedetection:
+    detectors: [system]
+    system: {hostname_sources: [os]}
+  resource:
+    attributes:
+      - {key: fleet.host, value: "{{ inventory_hostname }}", action: upsert}
+  batch: {timeout: 10s}
+exporters:
+  otlp:
+    endpoint: "{{ otel_host_collector_endpoint }}"
+    tls: {insecure: true}
+    sending_queue: {enabled: true, queue_size: 2000}
+    retry_on_failure: {enabled: true, max_elapsed_time: 30m}
+service:
+  telemetry:
+    metrics: {level: none}
+  pipelines:
+    metrics:
+      receivers: [hostmetrics{% if otel_host_collector_scrape_fleet_metrics %}, prometheus/fleet-metrics{% endif %}]
+      processors: [memory_limiter, resourcedetection, resource, batch]
+      exporters: [otlp]
+    logs:
+      receivers: [journald]
+      processors: [memory_limiter, resourcedetection, resource, batch]
+      exporters: [otlp]

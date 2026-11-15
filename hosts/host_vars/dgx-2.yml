@@ -1,0 +1,2 @@
+# fleet-metrics is not installed here yet
+otel_host_collector_scrape_fleet_metrics: false

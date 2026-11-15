@@ -1,0 +1,22 @@
+# Managed by homelab Ansible (roles/otel_host_collector)
+[Unit]
+Description=OpenTelemetry Collector (host metrics, journal, fleet-metrics -> {{ otel_host_collector_endpoint }})
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=otelcol
+Group=otelcol
+SupplementaryGroups=systemd-journal
+ExecStart=/usr/local/bin/otelcol-contrib --config=/etc/otelcol-contrib/config.yaml
+Restart=always
+RestartSec=5
+MemoryMax={{ otel_host_collector_memory_max }}
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+StateDirectory=otelcol-contrib
+
+[Install]
+WantedBy=multi-user.target

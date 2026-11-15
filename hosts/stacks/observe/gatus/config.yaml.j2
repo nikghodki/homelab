@@ -1,0 +1,22 @@
+# Uptime checks (plan P1.7). Failures post to ntfy.
+storage: {type: sqlite, path: /data/gatus.db}
+alerting:
+  ntfy:
+    url: http://ntfy
+    topic: fleet-alerts
+    priority: 4
+    token: "{{ ntfy_alerts_token }}"
+    default-alert: {enabled: true, failure-threshold: 3, success-threshold: 2, send-on-resolved: true}
+x-web: &web {interval: 1m, conditions: ["[STATUS] < 400"], alerts: [{type: ntfy}]}
+endpoints:
+  - {name: model.nghodki.ai (LiteLLM), group: web, url: "http://192.168.86.44/health/liveliness", headers: {Host: model.nghodki.ai}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
+  - {name: webui.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: webui.nghodki.ai}, <<: *web}
+  - {name: dgxmanager.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: dgxmanager.nghodki.ai}, <<: *web}
+  - {name: ha.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: ha.nghodki.ai}, <<: *web}
+  - {name: Home Assistant (direct), group: home, url: "http://192.168.86.211:8123/", <<: *web}
+  - {name: Grafana, group: observe, url: "http://grafana:3000/api/health", <<: *web}
+  - {name: dgx-1 ssh, group: hosts, url: "tcp://192.168.86.44:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: dgx-2 ssh, group: hosts, url: "tcp://192.168.86.36:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: jetson ssh, group: hosts, url: "tcp://192.168.86.211:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: omarchy ssh, group: hosts, url: "tcp://192.168.86.49:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: pi ssh, group: hosts, url: "tcp://192.168.86.39:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}

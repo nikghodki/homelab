@@ -1,1 +1,2 @@
 base_journald_max_use: 300M
+otel_host_collector_memory_max: 128M

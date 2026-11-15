@@ -1,0 +1,85 @@
+- name: Stack folder exists
+  ansible.builtin.file:
+    path: "{{ compose_stack_root }}/{{ compose_stack_name }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Find the stack's plain files
+  ansible.builtin.find:
+    paths: "{{ compose_stack_src }}"
+    recurse: true
+    file_type: file
+    excludes: ["*.j2"]
+  delegate_to: localhost
+  become: false
+  register: compose_stack_files
+
+- name: Find the stack's templates
+  ansible.builtin.find:
+    paths: "{{ compose_stack_src }}"
+    recurse: true
+    patterns: ["*.j2"]
+  delegate_to: localhost
+  become: false
+  register: compose_stack_templates
+
+- name: Sub-folders exist
+  ansible.builtin.file:
+    path: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  vars:
+    compose_stack_all_paths: "{{ (compose_stack_files.files + compose_stack_templates.files) | map(attribute='path') }}"
+  loop: "{{ compose_stack_all_paths | map('relpath', compose_stack_src) | map('dirname') | reject('equalto', '') | unique }}"
+
+- name: Copy plain files
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item.path | relpath(compose_stack_src) }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ compose_stack_files.files }}"
+  loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
+
+- name: Render templates (secrets come from SOPS)
+  ansible.builtin.template:
+    src: "{{ item.path }}"
+    dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item.path | relpath(compose_stack_src) | regex_replace('\\.j2$', '') }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ compose_stack_templates.files }}"
+  loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
+  no_log: true
+
+- name: Environment file
+  ansible.builtin.copy:
+    dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/.env"
+    content: |
+      {% for k, v in compose_stack_env.items() %}
+      {{ k }}={{ v }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Is the stack already deployed
+  ansible.builtin.stat:
+    path: "{{ compose_stack_root }}/{{ compose_stack_name }}/compose.yaml"
+  register: compose_stack_deployed
+
+- name: Stack is up
+  # In check mode on a first deployment the files are not there yet, so compose cannot be checked.
+  when: not (ansible_check_mode and not compose_stack_deployed.stat.exists)
+  community.docker.docker_compose_v2:
+    project_src: "{{ compose_stack_root }}/{{ compose_stack_name }}"
+    state: present
+    pull: missing
+    remove_orphans: true
+  register: compose_stack_result

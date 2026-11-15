@@ -1,0 +1,16 @@
+# ntfy for fleet alerts (backup channel to WhatsApp). Nobody can read or post without an account.
+base-url: http://ntfy.nghodki.ai
+behind-proxy: true
+cache-file: /var/lib/ntfy/cache.db
+auth-file: /var/lib/ntfy/user.db
+auth-default-access: deny-all
+enable-signup: false
+enable-login: true
+auth-users:
+  - "alerts:{{ ntfy_alerts_password_hash }}:user"
+  - "nikhil:{{ ntfy_phone_password_hash }}:user"
+auth-access:
+  - "alerts:fleet-alerts:rw"
+  - "nikhil:fleet-alerts:ro"
+auth-tokens:
+  - "alerts:{{ ntfy_alerts_token }}:gatus"

@@ -1,0 +1,4 @@
+compose_stack_name: ""
+compose_stack_src: ""          # folder in hosts/stacks/
+compose_stack_root: /opt/homelab
+compose_stack_env: {}          # rendered to .env (mode 0600)
