@@ -68,7 +68,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P0.13 | ✅ | LiteLLM 1.109.1 pinned by digest |
 | P0.14 | ⬜ | LiteLLM master + salt key rotation, after the DGXMM session |
 | P0.15 | ✅ | Profile nikhil-ghodki runs as Linux user `hermes-nikhil` with its own Hermes runtime and DefenseClaw (action, fail closed, `homelab` policy, OTLP to dgx-2). Its picoclaw MCP now reaches NATS as `hermes`. Chat test after DGXMM. runbooks/hermes-profiles.md |
-| P0.16 | ⏸️ | Home Assistant trusted proxies: HA 2026.11 needs this in its UI (you) |
+| P0.16 | ⏸️ | Home Assistant reverse-proxy setting in its UI (you): Use X-Forwarded-For on, trusted proxy 192.168.86.44 |
 | P0.17 | 🟡 | picoclaw now has its own scoped key (`picoclaw-pi`, in `.security.yml`); key review/prune still to do |
 
 ### Phase 1
@@ -82,8 +82,8 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P1.6 | ✅ | dgx-2: VictoriaMetrics, Loki, Tempo, Grafana (19 DefenseClaw dashboards + Fleet Home), vmalert, Alertmanager, Gatus, ntfy; host collectors + fleet-metrics (now in the repo, Prometheus endpoint) on all 5 hosts; DefenseClaw OTLP from Jetson and dgx-1, redaction `sensitive`; GPU: dcgm-exporter on both Sparks (util, temp, power, clock, energy) and thermal + INA3221 power rails from fleet-metrics on every host |
 | P1.7 | ✅ | Alerts → ntfy tested end to end (Gatus and Alertmanager) |
 | P1.8 | ✅ | CI with hash-locked tools, unit tests, Renovate |
-| P1.9 | ⬜ | GitHub Pro decision (you) |
-| P1.10 | ⏸️ | Backups merged (#17) but **not deployed**, at your request |
+| P1.9 | ✅ | GitHub Free (decisions/0001); merge only when `gh pr checks --watch` passes |
+| P1.10 | ⏸️ | Backups merged (#17), **kept off** by decision (decisions/0002) |
 | P1.11 | 🟡 | AI discovery on; nightly AIBOM on the Jetson; OTLP + redaction done; policy `homelab` in Git (`policies/defenseclaw/`, CI tests) and active on dgx-1 and the Jetson. Webhooks dropped: DefenseClaw refuses private receivers, and high-severity events already reach ntfy through its vmalert rules. Release refresh: Renovate bumps `defenseclaw-bundle.yaml`, CI compares dashboards and rules with that release, `defenseclaw-bundle.py sync` refreshes them. Still to do: LLM judge via LiteLLM (after DGXMM) |
 | P1.12 | 🟡 | Fleet live: gateway on dgx-1 (role `defenseclaw_fleet`), `fleet` stack (Mosquitto TLS + per-device ACLs, Caddy TLS API proxy; D24), Pi daemon (production mbedTLS build, role `edge_connector`, device 1/1/1 **online**), signed policy v1 applied, signed verdict round-trip ~30 ms. picoclaw stays on its in-process hook: OSS 1.0.9 Fleet denies every escalated hash and the C tool table lacks picoclaw's message/i2c/serial/spawn/cron (runbooks/edge-connector.md). Upstream issues to file |
 | P1.13 | 🟡 | Pocket ID 2.19.2 on dgx-2 at `id.nghodki.ai`, contents in Git (`identity/`, sync script with tests). Grafana, Gatus and Phoenix sign in with it (admins only). HA keeps its own login (phone app). LiteLLM UI, DGXMM UI and Open WebUI after the DGXMM session. See runbooks/sign-in.md |
@@ -280,8 +280,7 @@ See design §10 (R1–R10). Plan-specific risks:
 |---|---|---|
 | 0 | Models and alias names (D4) | P2.0 |
 | 0a | Fleet Console UI/UX design | P4.11 |
-| 1 | GitHub Pro | P1.9 |
-| 2 | Off-site backup target (**on hold**, 2026-11-14) | P1.10 |
+| 2 | Backups on, and the off-site target (**off/on hold**, decisions/0002) | P1.10 |
 | 3 | CopilotKit Intelligence licensing path | P4.1 |
 | 4 | When to bring back vision | after M5 |
 
