@@ -1,0 +1,18 @@
+# Managed by homelab Ansible (role ros_zenoh_router).
+[Unit]
+Description=ROS 2 {{ ros_zenoh_router_distro | capitalize }} Zenoh router (rmw_zenohd, tcp/{{ ros_zenoh_router_port }}) in Docker
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/docker rm -f {{ ros_zenoh_router_container }}
+ExecStart=/usr/bin/docker run --rm --name {{ ros_zenoh_router_container }} --network host --init \
+  --log-opt max-size=5m --log-opt max-file=2 {{ ros_zenoh_router_image_tag }} ros2 run rmw_zenoh_cpp rmw_zenohd
+ExecStop=/usr/bin/docker stop -t 10 {{ ros_zenoh_router_container }}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

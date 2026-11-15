@@ -1,0 +1,56 @@
+---
+- name: Is the build folder there
+  ansible.builtin.stat:
+    path: "{{ ros_zenoh_router_dir }}"
+  register: ros_zenoh_router_dir_stat
+
+- name: Build folder
+  ansible.builtin.file:
+    path: "{{ ros_zenoh_router_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Dockerfile
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ ros_zenoh_router_dir }}/Dockerfile"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Image is built (only when the tag is missing; bump the tag to rebuild)
+  community.docker.docker_image_build:
+    name: "{{ ros_zenoh_router_image_tag.split(':') | first }}"
+    tag: "{{ ros_zenoh_router_image_tag.split(':') | last }}"
+    path: "{{ ros_zenoh_router_dir }}"
+    rebuild: never
+  notify: Restart ros-zenoh-router
+  # A first deployment cannot be simulated in check mode (the build folder does not exist yet).
+  when: not (ansible_check_mode and not ros_zenoh_router_dir_stat.stat.exists)
+
+- name: ROS 2 CLI wrapper
+  ansible.builtin.template:
+    src: ros2-kilted.j2
+    dest: "/usr/local/bin/ros2-{{ ros_zenoh_router_distro }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Unit
+  ansible.builtin.template:
+    src: ros-zenoh-router.service.j2
+    dest: /etc/systemd/system/ros-zenoh-router.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ros-zenoh-router
+
+- name: Router is enabled and running
+  ansible.builtin.systemd_service:
+    name: ros-zenoh-router
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode

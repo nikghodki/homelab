@@ -1,0 +1,13 @@
+# ROS 2 + rmw_zenoh for the robot (plan P5.1): Zenoh router on the Jetson, LiDAR driver on the Pi.
+# Always --check --diff first. The Pi's RoboStack env is a one-time manual step (runbooks/robot-ros.md).
+- name: Zenoh router
+  hosts: jetson_group
+  become: true
+  roles:
+    - role: ros_zenoh_router
+
+- name: LiDAR driver
+  hosts: edge
+  become: true
+  roles:
+    - role: ros_lidar

@@ -1,0 +1,19 @@
+# Managed by homelab Ansible (role ros_lidar).
+[Unit]
+Description=Oradar MS200 LiDAR -> ROS 2 /{{ ros_lidar_scan_topic }} (rmw_zenoh, router {{ ros_lidar_zenoh_router }})
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile={{ ros_lidar_config_dir }}/zenoh.env
+ExecStart={{ ros_lidar_micromamba }} run -p {{ ros_lidar_env }} \
+  sh -c '. {{ ros_lidar_ws }}/install/setup.sh && exec ros2 launch {{ ros_lidar_config_dir }}/ms200.launch.py'
+KillSignal=SIGINT
+TimeoutStopSec=15
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

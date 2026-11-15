@@ -1,0 +1,7 @@
+---
+- name: Restart ros-zenoh-router
+  ansible.builtin.systemd_service:
+    name: ros-zenoh-router
+    state: restarted
+    daemon_reload: true
+  when: not ansible_check_mode
