@@ -1,19 +1,24 @@
-- name: Homelab CA in the Debian/Ubuntu trust store
+---
+- name: Homelab CAs in the Debian/Ubuntu trust store
   ansible.builtin.copy:
-    src: "{{ homelab_ca_cert }}"
-    dest: /usr/local/share/ca-certificates/homelab-ca.crt
+    src: "{{ item.src }}"
+    dest: "/usr/local/share/ca-certificates/{{ item.name }}.crt"
     owner: root
     group: root
     mode: "0644"
+  loop: "{{ homelab_ca_certs }}"
+  loop_control: {label: "{{ item.name }}"}
   when: ansible_facts['os_family'] == 'Debian'
   notify: Update CA trust (Debian)
 
-- name: Homelab CA in the Arch trust store
+- name: Homelab CAs in the Arch trust store
   ansible.builtin.copy:
-    src: "{{ homelab_ca_cert }}"
-    dest: /etc/ca-certificates/trust-source/anchors/homelab-ca.crt
+    src: "{{ item.src }}"
+    dest: "/etc/ca-certificates/trust-source/anchors/{{ item.name }}.crt"
     owner: root
     group: root
     mode: "0644"
+  loop: "{{ homelab_ca_certs }}"
+  loop_control: {label: "{{ item.name }}"}
   when: ansible_facts['os_family'] == 'Archlinux'
   notify: Update CA trust (Arch)
