@@ -26,6 +26,32 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.host_name }} has under 2 GB free memory"
+  - name: fleet-thermal
+    rules:
+      - alert: FleetGpuHot
+        expr: max by (fleet_host) (DCGM_FI_DEV_GPU_TEMP) > 85
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.fleet_host }} GPU at {{ $value | humanize }}°C for 10 minutes"
+      - alert: FleetHostHot
+        expr: max by (fleet_host) (fleet_temperature_celsius) > 85
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.fleet_host }} hottest sensor at {{ $value | humanize }}°C for 10 minutes"
+      - alert: FleetPiHot
+        expr: max(fleet_temperature_celsius{fleet_host="pi"}) > 78
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Pi at {{ $value | humanize }}°C; it throttles from 80°C"
+      - alert: FleetGpuMetricsMissing
+        expr: count by (fleet_host) (fleet_gpu_percent{fleet_host=~"dgx-.*"}) unless count by (fleet_host) (DCGM_FI_DEV_GPU_TEMP)
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.fleet_host }} reports host metrics but no DCGM GPU metrics (gpu stack down?)"
   - name: fleet-stack
     rules:
       - alert: ObservabilityComponentDown

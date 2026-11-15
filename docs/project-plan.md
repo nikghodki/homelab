@@ -61,15 +61,15 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P0.6 | ✅ | LiteLLM Postgres/Redis on 127.0.0.1 |
 | P0.7 | 🔁 🟡 | `nginx-gateway` fixed (missing kokoro upstream) and kept; dead LiteLLM routes still to remove |
 | P0.8 | ✅ | LiveKit key in a 0600 key file; **rotated 2026-11-15** (old key rejected, checked); new key in `secrets/voice.enc.yaml`, used by `livekit-server` and the control-center backend on the Jetson |
-| P0.9 | ⬜ | IP reservations (you) |
+| P0.9 | ✅ | DHCP reservations on the Nest Wifi Pro for dgx-1 .44, dgx-2 .36, Jetson .211, Omarchy .49, Pi .39 (Wi-Fi MACs; wired MACs after P0.11) |
 | P0.10 | ✅ | Omarchy fully updated and back on Tailscale (`nikghodki-omarchy`, tag:agent) |
 | P0.11 | ⬜ | Ethernet for the Sparks (you) |
 | P0.12 | ✅ | `companion-agent` retired (code removed 28 Aug); no failed user units; Jetson `nvidia-cdi-refresh` fixed (CSV mode, retry; role `jetson_cdi`) |
 | P0.13 | ✅ | LiteLLM 1.109.1 pinned by digest |
 | P0.14 | ⬜ | LiteLLM master + salt key rotation, after the DGXMM session |
 | P0.15 | ✅ | Profile nikhil-ghodki runs as Linux user `hermes-nikhil` with its own Hermes runtime and DefenseClaw (action, fail closed, `homelab` policy, OTLP to dgx-2). Its picoclaw MCP now reaches NATS as `hermes`. Chat test after DGXMM. runbooks/hermes-profiles.md |
-| P0.16 | ⏸️ | Home Assistant reverse-proxy setting in its UI (you): Use X-Forwarded-For on, trusted proxy 192.168.86.44 |
-| P0.17 | 🟡 | picoclaw now has its own scoped key (`picoclaw-pi`, in `.security.yml`); key review/prune still to do |
+| P0.16 | ✅ | Home Assistant reverse proxy set in its UI (X-Forwarded-For, trusted 192.168.86.44 and 100.65.137.82); `ha.nghodki.ai` returns 200 |
+| P0.17 | ✅ | Keys reviewed 2026-11-15: all 13 kept by decision; narrow `hermes` and `claude-code` (all models) with the aliases in P2.0 |
 
 ### Phase 1
 | ID | Status | Notes |
