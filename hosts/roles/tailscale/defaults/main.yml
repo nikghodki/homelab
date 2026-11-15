@@ -1,1 +1,3 @@
 tailscale_enabled: true
+# false: do not install or start Tailscale, only report its state
+tailscale_install: true
