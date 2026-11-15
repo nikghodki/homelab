@@ -1,3 +1,5 @@
+# Two per-user DefenseClaw installs: the main Hermes profile and nikhil-ghodki's own user (P0.15).
+defenseclaw_policy_users: [nikjetson, hermes-nikhil]
 # Hermes is connected to DefenseClaw here, so the AIBOM has content
 defenseclaw_aibom_enabled: true
 restic_backup_paths:
