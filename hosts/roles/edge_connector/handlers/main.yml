@@ -1,0 +1,14 @@
+---
+- name: Restart edge-connector
+  ansible.builtin.systemd_service:
+    name: edge-connector
+    state: restarted
+    daemon_reload: true
+  when: not ansible_check_mode
+
+# The agent runs as a systemd user service; its manager only gains the new group when restarted.
+- name: Restart agent user manager
+  ansible.builtin.systemd_service:
+    name: "user@{{ ansible_facts.getent_passwd[edge_connector_ipc_user][1] }}.service"
+    state: restarted
+  when: not ansible_check_mode

@@ -9,3 +9,5 @@ restic_backup_paths:
   - /home/nikghodki-raspberry-1/.config/defenseclaw-edge
 restic_backup_excludes:
   - /home/nikghodki-raspberry-1/.picoclaw/logs
+edge_connector_device_id: 1
+edge_connector_ipc_user: nikghodki-raspberry-1

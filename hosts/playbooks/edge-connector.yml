@@ -1,0 +1,6 @@
+# DefenseClaw Edge Connector daemons (plan P1.12). Always --check --diff first.
+- name: Edge Connector
+  hosts: edge
+  become: true
+  roles:
+    - role: edge_connector

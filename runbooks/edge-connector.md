@@ -1,0 +1,61 @@
+# DefenseClaw Edge Connector and Fleet
+
+The Pi's Edge Connector daemon reports to the Fleet gateway in dgx-1's DefenseClaw (plan P1.12, decision D24).
+
+| Piece | Where | Managed by |
+|---|---|---|
+| Fleet gateway (`fleet.*` config, `.env` secrets) | dgx-1 `~/.defenseclaw` | role `defenseclaw_fleet` |
+| MQTT broker `fleet.nghodki.ai:8884` and Fleet API proxy `:8971` | dgx-1 `/opt/homelab/fleet` | `playbooks/fleet.yml` |
+| Device daemon `edge-connector.service` (tenant 1 / fleet 1 / device 1) | Pi | role `edge_connector` |
+| Device policy | `policies/defenseclaw/edge/fleet-1-1.yaml` | pushed by hand (below) |
+| Secrets | `secrets/fleet.enc.yaml`, `pki_fleet_key` in `secrets/pki.enc.yaml` | SOPS |
+
+Fleet CLI calls need the homelab CA: `export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt`.
+
+## Build and install the daemon on a device
+
+The production build needs mbedTLS 3 (`libmbedtls-dev`). Debian's 3.6 marks APIs the engine uses as deprecated, so `-Wno-error=deprecated-declarations` is needed until upstream fixes it.
+
+```bash
+cd ~/src/defenseclaw-<version>      # same version as the gateway
+cmake -S edge-connector -B edge-connector/build-prod -DCMAKE_BUILD_TYPE=Release \
+  -DDCLAW_PROFILE=STANDARD -DDCLAW_DEV_MODE=OFF -DDCLAW_ALLOW_HMAC_OTA=ON \
+  -DCMAKE_C_FLAGS=-Wno-error=deprecated-declarations
+cmake --build edge-connector/build-prod -j4
+ctest --test-dir edge-connector/build-prod --output-on-failure   # needs /var/lib/defenseclaw
+sudo cmake --install edge-connector/build-prod && sudo ldconfig
+```
+
+Then run `ansible-playbook playbooks/edge-connector.yml` from dgx-1. It creates the `defenseclaw` account and the `dclaw-ipc` socket group, writes `/etc/defenseclaw/edge-connector.env` and the raw `device.key`, and installs and starts the unit. Upgrade the gateway and the devices together: the signed heartbeat format changes between releases.
+
+## Add a device
+
+1. Pick IDs. The composite ID the gateway shows is `tenant<<48 | fleet<<32 | device`.
+2. Generate a Mosquitto password and hash into `secrets/fleet.enc.yaml` (`mosquitto_dclaw_device_T_F_D_password(_hash)`, PBKDF2-SHA512 `$7$` format). Then add the user and its exact-topic ACL to `hosts/stacks/fleet/mosquitto/{passwd,acl}.j2`.
+3. Register over HTTPS on dgx-1. Do this once only: registering again replaces the key.
+   `defenseclaw edge-connector register D --tenant-id T --fleet-id F --json`
+   Store `device_key` as `dclaw_device_key_T_F_D` and the device's audit key as `dclaw_audit_key_<host>` in `secrets/fleet.enc.yaml`. Never print either.
+4. Set `edge_connector_device_id` and `edge_connector_ipc_user` in the host's `host_vars`, then apply `fleet.yml` and `edge-connector.yml`.
+5. Check: `defenseclaw edge-connector devices` should show the device. It reports `degraded` until its first Fleet verdict sets its clock, then `online`.
+
+## Push a policy
+
+```bash
+defenseclaw edge-connector policy push policies/defenseclaw/edge/fleet-1-1.yaml --tenant-id 1 --fleet-id 1
+```
+
+The device log should show `Policy tables reloaded from flash`, and `policy_version` should go up. Each device runs a 10-minute canary and rolls back on its own; a rollback shows as `CANARY_ROLLBACK` in its heartbeats.
+
+If the push returns `HTTP 500 compile/sign failed: trusted policy compiler Python interpreter unavailable`, the gateway has refused a group-writable interpreter path. dgx-1's umask is 002, and uv's Python tree inherits it. Fix it with `chmod -R go-w ~/.local/share/uv ~/.defenseclaw/.venv ~/.defenseclaw/installer`, and check again after uv installs a new Python.
+
+## Emergency commands
+
+`defenseclaw edge-connector policy emergency {block-all|enter-lockdown|release-lockdown|revoke-sessions|force-sync} --tenant-id 1 --fleet-id 1`
+
+## Known limits (DefenseClaw 1.0.9)
+
+- The OSS Fleet gateway denies every escalated tool hash (`sidecar.go`: "Default-deny ... when no cloud inspection pipeline is configured"). It has no API to allow a hash; `threat-intel/push` only revokes. With `DCLAW_STRICT_MODE=1`, any call the device can't decide locally is blocked.
+- The C engine has a fixed tool table. picoclaw's `message`, `i2c`, `serial`, `spawn`, `cron` (and other non-file, non-shell, non-web tools) fail closed with `INVALID_INPUT`.
+- The shipped `picoclaw_hook.py` loads the engine in-process (FFI). It never uses the daemon, so picoclaw's calls never reach Fleet through it.
+
+Because of these limits, picoclaw keeps its in-process hook (`~/.defenseclaw/bin/picoclaw_hook.py`). The daemon and Fleet are live for registration, signed heartbeats, signed policy, emergency commands and audit. The `dclaw-ipc` group is ready for a daemon-backed hook when upstream gains an allow path and picoclaw tool mappings.

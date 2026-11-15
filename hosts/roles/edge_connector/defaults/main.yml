@@ -1,0 +1,11 @@
+---
+# DefenseClaw Edge Connector daemon (plan P1.12). The binary is built on the device
+# (runbooks/edge-connector.md); this role manages its account, secrets and service.
+edge_connector_tenant_id: 1
+edge_connector_fleet_id: 1
+edge_connector_device_id: 0          # set per host; the SOPS keys are named after tenant/fleet/device
+edge_connector_broker_url: mqtts://fleet.nghodki.ai:8884
+edge_connector_ca_cert: /usr/local/share/ca-certificates/homelab-ca.crt
+edge_connector_ipc_user: ""          # local agent account allowed to use the IPC socket
+edge_connector_log_level: 2
+edge_connector_strict_mode: 1        # an undecided call waits for Fleet and stays blocked without it
