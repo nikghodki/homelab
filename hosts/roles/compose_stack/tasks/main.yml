@@ -1,102 +1,109 @@
-- name: Stack folder exists
-  ansible.builtin.file:
-    path: "{{ compose_stack_root }}/{{ compose_stack_name }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0750"
-
-- name: Find the stack's plain files
-  ansible.builtin.find:
-    paths: "{{ compose_stack_src }}"
-    recurse: true
-    file_type: file
-    excludes: ["*.j2"]
-  delegate_to: localhost
-  become: false
-  register: compose_stack_files
-
-- name: Find the stack's templates
-  ansible.builtin.find:
-    paths: "{{ compose_stack_src }}"
-    recurse: true
-    patterns: ["*.j2"]
-  delegate_to: localhost
-  become: false
-  register: compose_stack_templates
-
-- name: Sub-folders exist
-  ansible.builtin.file:
-    path: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  vars:
-    compose_stack_all_paths: "{{ (compose_stack_files.files + compose_stack_templates.files) | map(attribute='path') }}"
-  loop: "{{ compose_stack_all_paths | map('relpath', compose_stack_src) | map('dirname') | reject('equalto', '') | unique }}"
-
-- name: Copy plain files
-  ansible.builtin.copy:
-    src: "{{ item.path }}"
-    dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item.path | relpath(compose_stack_src) }}"
-    owner: root
-    group: root
-    mode: "0644"
-  loop: "{{ compose_stack_files.files }}"
-  loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
-  register: compose_stack_copied
-
-- name: Render templates (secrets come from SOPS)
-  ansible.builtin.template:
-    src: "{{ item.path }}"
-    dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item.path | relpath(compose_stack_src) | regex_replace('\\.j2$', '') }}"
-    owner: root
-    group: root
-    mode: "0644"
-  loop: "{{ compose_stack_templates.files }}"
-  loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
-  no_log: true
-  register: compose_stack_rendered
-
-- name: Environment file
-  ansible.builtin.copy:
-    dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/.env"
-    content: |
-      {% for k, v in compose_stack_env.items() %}
-      {{ k }}={{ v }}
-      {% endfor %}
-    owner: root
-    group: root
-    mode: "0600"
-  no_log: true
-
 - name: Is the stack already deployed
   ansible.builtin.stat:
     path: "{{ compose_stack_root }}/{{ compose_stack_name }}/compose.yaml"
   register: compose_stack_deployed
 
-- name: Stack is up
-  # In check mode on a first deployment the files are not there yet, so compose cannot be checked.
-  when: not (ansible_check_mode and not compose_stack_deployed.stat.exists)
-  community.docker.docker_compose_v2:
-    project_src: "{{ compose_stack_root }}/{{ compose_stack_name }}"
-    state: present
-    pull: missing
-    remove_orphans: true
-  register: compose_stack_result
+- name: First deployment in check mode
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: would deploy stack {{ compose_stack_name }} to {{ compose_stack_root }}/{{ compose_stack_name }}"
+  when: ansible_check_mode and not compose_stack_deployed.stat.exists
 
-- name: Restart services whose config changed (a sub-folder is named after its service)
-  vars:
-    compose_stack_changed_dirs: >-
-      {{ ((compose_stack_copied.results | default([])) + (compose_stack_rendered.results | default([])))
-         | selectattr('changed') | map(attribute='item.path') | map('relpath', compose_stack_src)
-         | map('dirname') | reject('equalto', '') | map('split', '/') | map('first') | unique }}
-  community.docker.docker_compose_v2:
-    project_src: "{{ compose_stack_root }}/{{ compose_stack_name }}"
-    services: "{{ compose_stack_changed_dirs }}"
-    state: restarted
-  when:
-    - compose_stack_changed_dirs | length > 0
-    - not compose_stack_result is changed
-    - not ansible_check_mode
+- name: Deploy the stack
+  # A first deployment cannot be simulated in check mode (its folders do not exist yet).
+  when: not (ansible_check_mode and not compose_stack_deployed.stat.exists)
+  block:
+    - name: Stack folder exists
+      ansible.builtin.file:
+        path: "{{ compose_stack_root }}/{{ compose_stack_name }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Find the stack's plain files
+      ansible.builtin.find:
+        paths: "{{ compose_stack_src }}"
+        recurse: true
+        file_type: file
+        excludes: ["*.j2"]
+      delegate_to: localhost
+      become: false
+      register: compose_stack_files
+
+    - name: Find the stack's templates
+      ansible.builtin.find:
+        paths: "{{ compose_stack_src }}"
+        recurse: true
+        patterns: ["*.j2"]
+      delegate_to: localhost
+      become: false
+      register: compose_stack_templates
+
+    - name: Sub-folders exist
+      ansible.builtin.file:
+        path: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      vars:
+        compose_stack_all_paths: "{{ (compose_stack_files.files + compose_stack_templates.files) | map(attribute='path') }}"
+      loop: "{{ compose_stack_all_paths | map('relpath', compose_stack_src) | map('dirname') | reject('equalto', '') | unique }}"
+
+    - name: Copy plain files
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item.path | relpath(compose_stack_src) }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ compose_stack_files.files }}"
+      loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
+      register: compose_stack_copied
+
+    - name: Render templates (secrets come from SOPS)
+      ansible.builtin.template:
+        src: "{{ item.path }}"
+        dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item.path | relpath(compose_stack_src) | regex_replace('\\.j2$', '') }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ compose_stack_templates.files }}"
+      loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
+      no_log: true
+      register: compose_stack_rendered
+
+    - name: Environment file
+      ansible.builtin.copy:
+        dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/.env"
+        content: |
+          {% for k, v in compose_stack_env.items() %}
+          {{ k }}={{ v }}
+          {% endfor %}
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Stack is up
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_stack_root }}/{{ compose_stack_name }}"
+        state: present
+        pull: missing
+        remove_orphans: true
+      register: compose_stack_result
+
+    - name: Restart services whose config changed (a sub-folder is named after its service)
+      vars:
+        compose_stack_changed_dirs: >-
+          {{ ((compose_stack_copied.results | default([])) + (compose_stack_rendered.results | default([])))
+             | selectattr('changed') | map(attribute='item.path') | map('relpath', compose_stack_src)
+             | map('dirname') | reject('equalto', '') | map('split', '/') | map('first') | unique }}
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_stack_root }}/{{ compose_stack_name }}"
+        services: "{{ compose_stack_changed_dirs }}"
+        state: restarted
+      when:
+        - compose_stack_changed_dirs | length > 0
+        - not compose_stack_result is changed
+        - not ansible_check_mode

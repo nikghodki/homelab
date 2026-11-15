@@ -1,0 +1,26 @@
+# Message bus on dgx-1 (plan P1.5). Always --check --diff first.
+- name: Message bus
+  hosts: bus
+  become: true
+  pre_tasks:
+    - name: Load bus secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/bus.enc.yaml"
+        name: bus_secrets
+      no_log: true
+    - name: Load PKI secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/pki.enc.yaml"
+        name: pki_secrets
+      no_log: true
+  vars:
+    nats_admin_password_hash: "{{ bus_secrets.nats_admin_password_hash }}"
+    nats_picoclaw_password_hash: "{{ bus_secrets.nats_picoclaw_password_hash }}"
+    nats_hermes_password_hash: "{{ bus_secrets.nats_hermes_password_hash }}"
+    nats_sys_password_hash: "{{ bus_secrets.nats_sys_password_hash }}"
+    pki_nats_key: "{{ pki_secrets.pki_nats_key }}"
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: bus
+        compose_stack_src: "{{ playbook_dir }}/../stacks/bus"

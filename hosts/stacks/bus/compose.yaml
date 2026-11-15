@@ -1,0 +1,19 @@
+# Message bus on dgx-1 (plan P1.5): NATS with JetStream and MQTT over TLS. Deployed by playbooks/bus.yml.
+# One node for now; it becomes a 3-node cluster with k3s (plan phase 3).
+name: bus
+
+services:
+  nats:
+    image: nats:2.15.3-alpine@sha256:558394a23dd3c36f2d3a64b51865fd09908010e80a542cea5e75c2af543ed62a
+    restart: unless-stopped
+    command: ["-c", "/etc/nats/nats.conf"]
+    volumes:
+      - ./nats:/etc/nats:ro
+      - nats-data:/data
+    ports:
+      - "4222:4222"   # NATS clients (TLS)
+      - "8883:8883"   # MQTT clients (TLS): picoclaw, Home Assistant
+      - "127.0.0.1:8222:8222"   # monitoring, local only
+
+volumes:
+  nats-data:

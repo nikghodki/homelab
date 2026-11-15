@@ -1,0 +1,51 @@
+# Managed by homelab Ansible (stacks/bus). Passwords are bcrypt hashes rendered from SOPS.
+server_name: homelab-bus-1
+listen: 0.0.0.0:4222
+http: 0.0.0.0:8222
+max_payload: 1MB
+
+tls {
+  cert_file: "/etc/nats/certs/nats.crt"
+  key_file: "/etc/nats/certs/nats.key"
+  timeout: 2
+}
+
+jetstream {
+  store_dir: "/data"
+  max_memory_store: 256MB
+  max_file_store: 20GB
+}
+
+mqtt {
+  port: 8883
+  tls {
+    cert_file: "/etc/nats/certs/nats.crt"
+    key_file: "/etc/nats/certs/nats.key"
+    timeout: 2
+  }
+}
+
+accounts {
+  FLEET: {
+    jetstream: enabled
+    users: [
+      {user: admin, password: "{{ nats_admin_password_hash }}"}
+      # picoclaw (Pi) over MQTT. MQTT topic /picoclaw/... is the NATS subject /.picoclaw...
+      {user: picoclaw, password: "{{ nats_picoclaw_password_hash }}",
+       permissions: {
+         publish: {allow: ["/.picoclaw.>", "robot.pi.>", "$MQTT.>"]},
+         subscribe: {allow: ["/.picoclaw.>", "robot.pi.cmd.>", "robot.pi.safety.>", "$MQTT.>", "_INBOX.>"]}
+       }}
+      # Hermes (Jetson): may command the robot and use its own subjects
+      {user: hermes, password: "{{ nats_hermes_password_hash }}",
+       permissions: {
+         publish: {allow: ["/.picoclaw.>", "robot.>", "agents.hermes.>", "home.>", "$MQTT.>", "_INBOX.>"]},
+         subscribe: {allow: ["/.picoclaw.>", "robot.>", "agents.hermes.>", "home.>", "$MQTT.>", "_INBOX.>"]}
+       }}
+    ]
+  }
+  SYS: {
+    users: [{user: sys, password: "{{ nats_sys_password_hash }}"}]
+  }
+}
+system_account: SYS
