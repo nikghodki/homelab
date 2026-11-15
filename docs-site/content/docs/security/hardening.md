@@ -102,4 +102,4 @@ commands and the old defaults: runbooks/hardening.md.
 | kube-bench | not set up |
 | CrowdSec on the front door | not deployed |
 | SSH password auth off | waiting (see above) |
-| Memory guards on the Sparks | `earlyoom` and `gpu-oom-guard` run, but are not in the repo ([discrepancies](../decisions/discrepancies.md)) |
+| Memory guards on the Sparks | `earlyoom` and `gpu-oom-guard`, `roles/memory_guard` (playbooks/gpu.yml) |

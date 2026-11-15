@@ -21,7 +21,7 @@ has `NVRM: ... Out of memory [NV_ERR_NO_MEMORY]` and then system OOM-killer line
 5. The k3s API stays up if the other Spark and the Jetson are fine. If both Sparks went down, the API returns once
    one Spark is back.
 6. Prevention: memory caps on our jobs (AIBOM 6 GiB, sims 16 GiB, JAX 15%), DGXMM reserves (P2.7, pending), `earlyoom`
-   and `gpu-oom-guard` (live but not in the repo).
+   and `gpu-oom-guard` (`roles/memory_guard`).
 
 ## The front door is down (`edge` in k3s)
 

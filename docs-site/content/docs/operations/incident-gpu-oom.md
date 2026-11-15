@@ -59,6 +59,6 @@ Decision 0006 speaks of "two GPU/unified-memory OOMs"; the journals show two NVR
 | AIBOM capped at 6G on the Sparks, skip image scans under 20 GiB free | done (#60) |
 | Sim jobs capped (16 GiB cgroup, JAX 15%, `measure.sh` watchdog at 8 GiB) | done (#48) |
 | Platform pods kept small; Kyverno first with failurePolicy Ignore (#57), then 2 admission replicas, one per Spark, before Enforce (#65) | done |
-| `earlyoom` and `gpu-oom-guard` on both Sparks | live, **not in the repo** (the unit names a role `memory_guard` that doesn't exist on any branch); bring it into Git |
+| `earlyoom` and `gpu-oom-guard` on both Sparks | done 2026-11-16: `roles/memory_guard` (SIGTERM at 8 GiB, SIGKILL at 6 GiB; earlyoom avoids k3s, containerd, sshd, Tailscale, kube-vip, Caddy, CoreDNS) |
 | DGXMM memory reserves (P2.7) | pending (DGXMM session) |
 | Revisit a services box if it happens again | decision 0009 |

@@ -1,0 +1,53 @@
+# GB10 unified memory: CUDA allocations are not charged to cgroups and do not
+# show in RSS, so Docker --memory caps and the kernel/earlyoom victim choice
+# both miss the process that is actually eating memory. The guard asks
+# nvidia-smi instead.
+# SIGTERM the largest GPU user below 8 GiB MemAvailable (DGXMM's safety margin; vmalert FleetMemoryLow warns at 12),
+# SIGKILL it after the grace period or below 6 GiB.
+memory_guard_term_below_mib: 8192
+memory_guard_term_grace_s: 20
+memory_guard_kill_below_mib: 6144
+memory_guard_interval_s: 1
+memory_guard_cooldown_s: 15
+# earlyoom is the last resort for CPU-side runaways, after the guard: SIGTERM at 4 % available (4.9 GiB), SIGKILL at
+# 2 %. -s 100,100 ignores swap: pinned GPU memory cannot be swapped, so waiting on swap only means thrashing.
+# Not at 8 GiB: earlyoom ranks by the kernel's oom_score, and kubelet gives every k3s pod oom_score_adj 999 (score
+# 1332), above an engine even with --prefer (about 980). It would restart pods instead of freeing GPU memory.
+# Process names (/proc/<pid>/comm, at most 15 characters) earlyoom avoids (earlyoom 1.7 subtracts 300 from their score;
+# those with oom_score_adj -999/-1000, like k3s-server, containerd, kube-vip and sshd's listener, can't be picked
+# before anything else; memory_guard_protect below takes the rest to -900): the k3s server/agent (etcd lives in
+# k3s-server), both containerds and their shims, sshd, systemd and journald, Docker, Tailscale, kube-vip, Caddy (the
+# edge pods and the Docker ones), CoreDNS (the front door's DNS), the guard itself (it names itself gpu-oom-guard) and earlyoom.
+memory_guard_earlyoom_avoid:
+  - sshd
+  - sshd-session
+  - systemd
+  - systemd-journal
+  - systemd-logind
+  - dockerd
+  - containerd
+  - containerd-shim
+  - k3s
+  - k3s-server
+  - k3s-agent
+  - kube-vip
+  - caddy
+  - coredns
+  - tailscaled
+  - gpu-oom-guard
+  - earlyoom
+# Processes the guard keeps at oom_score_adj -900 or lower (checked every 30 s), so earlyoom and the kernel never pick
+# them: host daemons and the front door's pods. Not sshd sessions or shells (children would inherit it) and nothing
+# that runs workloads.
+memory_guard_protect: [k3s-server, k3s-agent, containerd, dockerd, tailscaled, kube-vip, caddy, coredns]
+memory_guard_protect_adj: -900
+# ...and picks first: the model engines (vLLM's engine core and API server, llama.cpp's server and RPC worker).
+memory_guard_earlyoom_prefer:
+  - "VLLM::EngineCor"
+  - vllm
+  - llama-server
+  - rpc-server
+memory_guard_earlyoom_args: >-
+  -m 4,2 -s 100,100 -r 3600
+  --avoid '^({{ memory_guard_earlyoom_avoid | join('|') }})$'
+  --prefer '^({{ memory_guard_earlyoom_prefer | join('|') }})$'

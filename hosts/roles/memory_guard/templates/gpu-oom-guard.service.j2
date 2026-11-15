@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (roles/memory_guard)
+[Unit]
+Description=Stop the largest GPU-memory process before unified memory runs out
+After=nvidia-persistenced.service
+
+[Service]
+ExecStart=/usr/local/sbin/gpu-oom-guard
+Restart=always
+RestartSec=2
+OOMScoreAdjust=-1000
+Nice=-10
+
+[Install]
+WantedBy=multi-user.target

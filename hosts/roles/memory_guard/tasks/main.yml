@@ -1,0 +1,42 @@
+- name: Install earlyoom
+  ansible.builtin.package:
+    name: earlyoom
+    state: present
+
+- name: earlyoom settings
+  ansible.builtin.template:
+    src: earlyoom.default.j2
+    dest: /etc/default/earlyoom
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart earlyoom
+
+- name: GPU OOM guard
+  ansible.builtin.template:
+    src: gpu-oom-guard.py.j2
+    dest: /usr/local/sbin/gpu-oom-guard
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart gpu-oom-guard
+
+- name: GPU OOM guard unit
+  ansible.builtin.template:
+    src: gpu-oom-guard.service.j2
+    dest: /etc/systemd/system/gpu-oom-guard.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: [Reload systemd, Restart gpu-oom-guard]
+
+- name: Flush handlers before enabling the services
+  ansible.builtin.meta: flush_handlers
+
+- name: Services are enabled and running
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: [earlyoom, gpu-oom-guard]
+  when: not ansible_check_mode
