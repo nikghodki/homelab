@@ -7,10 +7,12 @@ are services of `hosts/stacks/sim/compose.yaml` in the `jobs` profile: they neve
 | Service | Image | What |
 |---|---|---|
 | `isaaclab` | `nvcr.io/nvidia/isaac-lab:3.0.0-kitless@sha256:d47169952b55effb46dba8f79761d381532b521561ecba38a3019adc7648884b` (NGC, multi-arch) | Isaac Lab 3.0.0, Newton physics, headless, no Isaac Sim ([README](../robots/sim/isaaclab/README.md)) |
-| `mujoco` | `homelab/mujoco-playground:0.2.0-jax0.9.2`, built locally from `robots/sim/mujoco` ([README](../robots/sim/mujoco/README.md)) | MuJoCo 3.6 + MJX + Playground 0.2.0, JAX 0.9.2 on CUDA 13, Brax PPO |
+| `mujoco` | `homelab/mujoco-playground:0.2.0-jax0.9.2-mlflow3.18.0`, built locally from `robots/sim/mujoco` ([README](../robots/sim/mujoco/README.md)) | MuJoCo 3.6 + MJX + Playground 0.2.0, JAX 0.9.2 on CUDA 13, Brax PPO |
 
 Images live only in dgx-2's local Docker; nothing is pushed. Local image ID of the build measured below:
-`homelab/mujoco-playground:0.2.0-jax0.9.2` = `sha256:e094ad5add01c7365722508a2467b0afa50cedcdabd71b114e48850bc61a038e`
+`homelab/mujoco-playground:0.2.0-jax0.9.2` = `sha256:e094ad5add01c7365722508a2467b0afa50cedcdabd71b114e48850bc61a038e`.
+The current tag adds the MLflow client (`mlflow-skinny` 3.18.0, its own layer on top; only additions in `pip freeze`):
+`homelab/mujoco-playground:0.2.0-jax0.9.2-mlflow3.18.0` = `sha256:65713a88e6ca8f9dfc961107c3f921665af1e8f74dd7a35e4f9f821a22c99719`
 (base `python:3.12.16-slim-trixie@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b`; the full
 `pip freeze` is in the image at `/opt/pip-freeze.txt`). Pip resolves unpinned transitive dependencies at build time,
 so a rebuild can produce a different ID; compare `/opt/pip-freeze.txt` if results change.
@@ -38,6 +40,9 @@ robots/sim/measure.sh isaaclab train --rl_library rsl_rl --task Isaac-Velocity-F
 robots/sim/measure.sh mujoco                                   # Go1JoystickFlatTerrain, MJX warp backend, ~26M steps
 robots/sim/measure.sh mujoco --impl jax --timesteps 10000000   # same task, pure-JAX MJX
 ```
+
+MuJoCo jobs log to MLflow (params, eval reward, steps/s, the policy) when `/etc/homelab/mlflow-client.env` exists on
+dgx-2, which `playbooks/ml.yml` writes; see [mlflow.md](mlflow.md). `-e MLFLOW_TRACKING_URI=` turns it off for one run.
 
 Logs and 2-second samples go to `/tmp/sim-<service>-<epoch>.{log,samples.csv}`. Isaac Lab checkpoints are in the
 `sim_isaaclab-logs` volume. Without `measure.sh`:
@@ -90,8 +95,8 @@ After these tests the root disk was 15% used.
 
 ## Next
 
-- P6.5: MLflow on dgx-2; log the metrics `measure.sh` and the trainers print, plus a policy video
-  (`MUJOCO_GL=egl` is set in the MuJoCo image).
+- P6.5: MLflow is up ([mlflow.md](mlflow.md)) and `train_ppo.py` logs to it. Still to do: Isaac Lab runs (RSL-RL has an
+  MLflow logger), `measure.sh`'s GPU/memory samples, and a policy video (`MUJOCO_GL=egl` is set in the MuJoCo image).
 - P6.6: sim jobs in the GPU queue with these footprints (Isaac Lab ~3 GiB + 0.4–1.2 GiB GPU; Playground Go1
   ~3 GiB + 2.5 GiB GPU at 8192 envs); DGXMM budget; Temporal train → eval → export → register → PR.
 - P6.3: pull `isaac-sim:6.2.0` and test camera/LiDAR rendering; P6.12: Trivy-scan both images and block egress

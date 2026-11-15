@@ -33,6 +33,14 @@ RUN pip install \
       "warp-lang==${WARP_VERSION}" \
  && pip freeze > /opt/pip-freeze.txt
 
+# MLflow client (plan P6.5): train_ppo.py logs runs when MLFLOW_TRACKING_URI is set. A separate layer, so the
+# JAX/MuJoCo layer above stays cached; the skinny client has no server or UI. pip check guards against a dependency
+# it would downgrade.
+ARG MLFLOW_VERSION=3.18.0
+RUN pip install "mlflow-skinny==${MLFLOW_VERSION}" \
+ && pip check \
+ && pip freeze > /opt/pip-freeze.txt
+
 # Fetch Menagerie into the package now, so jobs need no egress for robot assets (plan P6.12).
 RUN JAX_PLATFORMS=cpu python -c "from mujoco_playground._src import mjx_env; mjx_env.ensure_menagerie_exists()"
 

@@ -34,6 +34,7 @@ homelab web CA (`http://ca.nghodki.ai`) and add a passkey. Ask for a second pass
 | Gatus (status page) | `security.oidc` (no PKCE: Gatus 5.38 doesn't send it) | admins |
 | Phoenix | `PHOENIX_OAUTH2_POCKETID_*` (PKCE); `admins` → ADMIN. Needs `..._SCOPES: groups`, or Pocket ID sends no groups claim and Phoenix answers "authentication failed" | admins |
 | Homepage (`https://ops.nghodki.ai`) | oauth2-proxy in front (client `ops`, PKCE S256, `--allowed-group=admins`); Homepage itself has no login | admins |
+| MLflow (`https://mlflow.nghodki.ai`) | oauth2-proxy in front (client `mlflow`, same recipe, `hosts/stacks/ml`); jobs use a separate basic-auth API port ([mlflow.md](mlflow.md)) | admins |
 
 Containers that talk to Pocket ID get `extra_hosts: id.nghodki.ai:192.168.86.44` and the host's CA bundle, which includes the
 web CA.
