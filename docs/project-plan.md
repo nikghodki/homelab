@@ -60,7 +60,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P0.5 | 🔁 ✅ | Work-managed DefenseClaw + dcsidecar uninstalled; OSS 1.0.9 installed on dgx-1 (no agents there yet) |
 | P0.6 | ✅ | LiteLLM Postgres/Redis on 127.0.0.1 |
 | P0.7 | 🔁 🟡 | `nginx-gateway` fixed (missing kokoro upstream) and kept; dead LiteLLM routes still to remove |
-| P0.8 | ✅ | LiveKit key in a 0600 key file |
+| P0.8 | ✅ | LiveKit key in a 0600 key file; **rotated 2026-11-15** (old key rejected, checked); new key in `secrets/voice.enc.yaml`, used by `livekit-server` and the control-center backend on the Jetson |
 | P0.9 | ⬜ | IP reservations (you) |
 | P0.10 | ✅ | Omarchy fully updated and back on Tailscale (`nikghodki-omarchy`, tag:agent) |
 | P0.11 | ⬜ | Ethernet for the Sparks (you) |
