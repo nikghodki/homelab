@@ -8,7 +8,7 @@ secrets. Decision: decisions/0003-cisco-ai-defense-tools.md.
 |---|---|---|
 | Version pin (hash-locked, universal: x86_64 CI and aarch64 hosts, Python 3.12/3.13) | `.github/requirements-aibom.in` / `.txt` | Renovate (pip-compile) |
 | CI scan of this repo, JSON as the `aibom` artifact (30 days) | `pr-checks.yml` job `aibom` (~1.5 min) | — |
-| Nightly fleet scan | systemd `cisco-aibom.timer` (system unit, ~04:20; Jetson 04:50) on dgx-1, dgx-2, Jetson, Pi | role `cisco_aibom`, `playbooks/aibom.yml`, `host_vars/*` |
+| Nightly fleet scan | systemd `cisco-aibom.timer` (system unit, ~04:20; Jetson 01:30) on dgx-1, dgx-2, Jetson, Pi | role `cisco_aibom`, `playbooks/aibom.yml`, `host_vars/*` |
 | Full reports | `/var/lib/cisco-aibom/<host>-<date>.json` on each host, root only, 30 days | the job |
 | Summary and diff | journal (`SyslogIdentifier=cisco-aibom`) → host collector → Loki on dgx-2 | — |
 | Dashboard | Grafana → Fleet → **AI inventory** | `hosts/stacks/observe/grafana/dashboards/fleet/ai-inventory.json` |
@@ -45,6 +45,8 @@ created (never started) container and scans that folder (`"method": "docker-cp-f
 The unit runs as root (to read every user's code and reach the Docker socket) but read-only: only
 `CAP_DAC_READ_SEARCH`, `ProtectSystem=strict`, `ProtectHome=read-only`, its own `/tmp`, `Nice=19`, idle I/O,
 `MemoryMax` per host (dgx-1 16G for the Open WebUI image, which takes about 25 min and 13 GB; Jetson 3G; Pi 1500M).
+Each Hermes checkout on the Jetson is about 8,000 Python files and takes over an hour on the Orin, so the Jetson
+starts at 01:30 with a 3 h limit per target.
 
 **No LLM.** `cisco-aibom analyze` requires `--llm-model`; its agentic stage confirms or drops each candidate and adds
 identifiers. The job points it at a closed port, so it falls back to its deterministic scanners (`agentic_status:
@@ -59,7 +61,7 @@ needs a dedicated LiteLLM virtual key for AIBOM (owned by the LiteLLM session) a
 | Question | What has this agent **connected**? | What do the **code and images** contain? |
 | Source | `defenseclaw aibom scan --json`: the running connector's inventory (Hermes skills, plugins, MCP servers, memory, rules) | Static analysis of directories and container images |
 | Hosts | Jetson (needs a connected agent) | dgx-1, dgx-2, Jetson, Pi |
-| Unit | user unit `homelab-aibom.timer` (03:15), `SyslogIdentifier=homelab-aibom` | system unit `cisco-aibom.timer` (04:50 on the Jetson), `SyslogIdentifier=cisco-aibom` |
+| Unit | user unit `homelab-aibom.timer` (03:15), `SyslogIdentifier=homelab-aibom` | system unit `cisco-aibom.timer` (01:30 on the Jetson), `SyslogIdentifier=cisco-aibom` |
 | Reports | `~/.local/state/homelab-aibom/` | `/var/lib/cisco-aibom/` |
 
 Both stay. The AI inventory dashboard shows both; they do not share names or files.
