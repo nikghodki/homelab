@@ -22,6 +22,8 @@ endpoints:
   - {name: webui.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: webui.nghodki.ai}, <<: *web}
   - {name: dgxmanager.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: dgxmanager.nghodki.ai}, <<: *web}
   - {name: ha.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: ha.nghodki.ai}, <<: *web}
+  # Homepage behind oauth2-proxy (P1.15). Signed out, oauth2-proxy answers 302 to Pocket ID; ignore-redirect checks that 302.
+  - {name: ops.nghodki.ai (Homepage), group: web, url: "https://192.168.86.44/", headers: {Host: ops.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
   - {name: Home Assistant (direct), group: home, url: "http://192.168.86.211:8123/", <<: *web}
   - {name: Phoenix, group: observe, url: "http://phoenix:6006/healthz", <<: *web}
   - {name: Grafana, group: observe, url: "http://grafana:3000/api/health", <<: *web}

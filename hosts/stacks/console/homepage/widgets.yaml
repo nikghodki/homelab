@@ -1,0 +1,9 @@
+# Header widgets: none that need credentials.
+- datetime:
+    text_size: md
+    format:
+      dateStyle: long
+      timeStyle: short
+- search:
+    provider: duckduckgo
+    target: _blank

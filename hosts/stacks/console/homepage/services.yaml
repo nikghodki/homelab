@@ -1,0 +1,66 @@
+# Launcher entries (plan P1.15). siteMonitor checks run from the homepage container through the front door
+# (dgx-1 Caddy) and need no credentials. Don't put API keys or passwords in this file.
+- Observe:
+    - Grafana:
+        href: https://grafana.nghodki.ai
+        description: Dashboards, logs, traces
+        icon: grafana.svg
+        siteMonitor: https://grafana.nghodki.ai/api/health
+    - Status:
+        href: https://status.nghodki.ai
+        description: Gatus uptime checks
+        icon: gatus.svg
+        siteMonitor: https://status.nghodki.ai/health
+    - Phoenix:
+        href: https://phoenix.nghodki.ai
+        description: LLM traces
+        icon: mdi-fire
+        siteMonitor: https://phoenix.nghodki.ai/healthz
+    - ntfy:
+        href: https://ntfy.nghodki.ai
+        description: Alerts and notifications
+        icon: ntfy.svg
+        siteMonitor: https://ntfy.nghodki.ai/v1/health
+
+- Models:
+    - Open WebUI:
+        href: https://webui.nghodki.ai
+        description: Chat with the fleet models
+        icon: open-webui.svg
+        siteMonitor: https://webui.nghodki.ai/health
+    - LiteLLM:
+        href: https://model.nghodki.ai
+        description: Model gateway (OpenAI-compatible API)
+        icon: mdi-api
+        siteMonitor: https://model.nghodki.ai/health/liveliness
+    - DGXMM:
+        href: https://dgxmanager.nghodki.ai
+        description: DGX Model Manager
+        icon: mdi-chip
+        siteMonitor: https://dgxmanager.nghodki.ai/dgxmm/
+
+- Home:
+    - Home Assistant:
+        href: https://ha.nghodki.ai
+        description: Home automation
+        icon: home-assistant.svg
+        siteMonitor: https://ha.nghodki.ai/
+
+- Security & Identity:
+    - Pocket ID:
+        href: https://id.nghodki.ai
+        description: Sign-in, passkeys, OIDC clients
+        icon: mdi-account-key
+        siteMonitor: https://id.nghodki.ai/healthz
+    - CA install page:
+        href: https://ca.nghodki.ai
+        description: Homelab web CA for phones and laptops
+        icon: mdi-certificate
+        siteMonitor: https://ca.nghodki.ai/
+
+- Fleet:
+    - Fleet API health:
+        # Link only: it needs a token (401 without one) and uses the internal homelab CA.
+        href: https://fleet.nghodki.ai:8971/api/v1/fleet/health
+        description: DefenseClaw Fleet API (needs a token)
+        icon: mdi-server-network
