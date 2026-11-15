@@ -1,1 +1,6 @@
-homelab_ca_cert: "{{ playbook_dir }}/../files/pki/homelab-ca.crt"
+---
+# CAs every fleet host trusts: the internal homelab CA (NATS, Fleet, backups) and the
+# name-constrained web CA for *.nghodki.ai (D25).
+homelab_ca_certs:
+  - {name: homelab-ca, src: "{{ playbook_dir }}/../files/pki/homelab-ca.crt"}
+  - {name: nghodki-web-ca, src: "{{ playbook_dir }}/../files/pki/web-ca.crt"}

@@ -13,6 +13,12 @@ can issue for it, and the sites use the **homelab web CA** instead:
 This is separate from the internal homelab CA (`homelab-ca.crt`, used for NATS, Fleet and backups and trusted by the fleet
 hosts). That CA has no name constraint, so it must never be installed on phones or family devices.
 
+## Devices
+
+- Fleet hosts (dgx-1, dgx-2, Jetson, Omarchy, Pi): role `homelab_ca` (`playbooks/pki.yml`) installs both CAs in the system
+  store. On Omarchy, browsers pick it up through p11-kit.
+- Phones, Macs and Windows PCs: install it once from `http://ca.nghodki.ai`. Never install the internal homelab CA on them.
+
 ## Front door (dgx-1 `~/edge-gateway`, not in this repo yet)
 
 - `conf/Caddyfile`: every route lives in the `(nghodki_routes)` snippet, imported by `:80` and by `:443`
