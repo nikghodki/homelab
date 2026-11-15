@@ -111,6 +111,8 @@ jobs:
           python-version: "3.12"
       - name: Install scanners
         run: pip install --require-hashes -r .github/requirements-ci.txt
+      - name: MCP tool definitions match their reviewed hashes
+        run: python3 .github/scripts/mcp-tool-hashes.py check tools
       - name: mcp-scanner (static, YARA)
         run: python3 .github/scripts/scan-mcp-tools.py tools
       - name: skill-scanner
@@ -132,8 +134,41 @@ jobs:
           path: reports/agentic-radar
           if-no-files-found: ignore
 
+  aibom:
+    name: AI BOM (Cisco AIBOM)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install cisco-aibom (own venv)
+        run: |
+          python3 -m venv /tmp/aibom
+          /tmp/aibom/bin/pip install --require-hashes -r .github/requirements-aibom.txt
+      - name: AI BOM of the repo
+        # `analyze` requires an LLM; CI has none, so it points at a closed port and the BOM is deterministic-only
+        # (agentic_status "degraded" in the report). The fleet job (runbooks/aibom.md) works the same way.
+        run: |
+          mkdir -p reports
+          /tmp/aibom/bin/cisco-aibom --log-level WARNING analyze . -o json -O reports/aibom.json \
+            --llm-model none --llm-provider openai --llm-api-base http://127.0.0.1:9 --llm-api-key unused \
+            --agentic-max-retry-seconds 0 --agentic-timeout 5 --no-progress --no-show-summary
+          python3 -c 'import json; s = json.load(open("reports/aibom.json"))["aibom_analysis"]["summary"]; print(json.dumps(s))' \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: aibom
+          path: reports/aibom.json
+          if-no-files-found: ignore
+          retention-days: 30
+
   unit-tests:
-    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw, Pocket ID sync)
+    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw, Pocket ID sync, CI scripts)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -157,7 +192,7 @@ jobs:
       - name: Pocket ID sync
         working-directory: hosts/files/pocket-id
         run: python -m pytest -q tests
-      - name: DefenseClaw bundle script
+      - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
         run: python -m pytest -q .github/scripts/tests
       - name: DefenseClaw dashboards and rules match the pinned release
         run: python .github/scripts/defenseclaw-bundle.py check

@@ -1,0 +1,27 @@
+# PicoClaw hardware MCP server (ESP32 car + Pi vision-ai + PicoClaw agent messaging)
+name: picoclaw_only
+transport: stdio
+host: jetson
+command: /home/hermes-nikhil/.hermes/tools/node-26.7.0-linux-arm64/bin/node
+args: [/home/nikjetson/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js]
+source: /home/nikjetson/workspace/roboclaw/mcp-server (jetson)
+agents:
+  hermes-nikhil:
+    # Hermes config.yaml `tools.include`; the rest of the server's tools are pinned too, because the
+    # include list is a client-side filter and the server still offers them.
+    include: [send_to_picoclaw_agent, check_picoclaw_agent_connection]
+exported: "2026-11-15"
+export: >-
+  .github/scripts/export-mcp-tools.py --stdio -- /home/hermes-nikhil/.hermes/tools/node-26.7.0-linux-arm64/bin/node
+  /home/nikjetson/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js
+  (on the Jetson, with MQTT_CREDS_FILE=/nonexistent MQTT_BROKER=mqtt://127.0.0.1:1 so no credentials are read)
+# Reviewed mcp-scanner findings. An entry only applies while the tool's hash matches tools.sha256,
+# so any change to the tool brings the finding back.
+accepted_findings:
+  - tool: send_to_picoclaw_agent
+    analyzer: yara_analyzer
+    threat: DATA EXFILTRATION
+    sha256: daae0f05ef459bceab9e91cc47f02af0c9ae9a078fcb587ddcfe2319be76ff17
+    reason: >-
+      Sending a message to another agent is the tool's stated purpose. It goes to PicoClaw on the Pi over the
+      fleet's own TLS MQTT broker (nats.nghodki.ai), not to a third party. Reviewed 2026-11-15.

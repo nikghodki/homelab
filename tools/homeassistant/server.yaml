@@ -1,0 +1,16 @@
+# Home Assistant's built-in MCP server (Assist LLM API)
+name: homeassistant
+transport: streamable-http
+host: jetson
+url: http://localhost:8123/api/mcp/assist
+auth: long-lived HA token, HA_TOKEN in /home/hermes-nikhil/.hermes/.env (never committed)
+agents:
+  hermes-nikhil:
+    include: all
+# The tool list depends on the entities exposed to Assist (e.g. the todo_list enum), so re-export after
+# exposing or renaming entities in Home Assistant.
+exported: "2026-11-15"
+export: >-
+  HA_TOKEN=... .github/scripts/export-mcp-tools.py --url http://localhost:8123/api/mcp/assist --token-env HA_TOKEN
+  (on the Jetson)
+accepted_findings: []
