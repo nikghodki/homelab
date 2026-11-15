@@ -46,6 +46,32 @@ KServe pilot (parallel, optional)        ░░░░░░░░
 | Pi backup | Running → `~/backups/nikraspberry-2026-11-14/pi-full.tar.zst` on dgx-1 |
 | Pi 1 TB card | Being flashed with Raspberry Pi OS Lite (64-bit) in Raspberry Pi Imager |
 
+## 2a. Status on 2026-11-15
+
+| ID | Status | Notes |
+|---|---|---|
+| P0.1 | ✅ done | Pi backup on dgx-1, `~/backups/nikraspberry-2026-11-14/` (6.0 GB) |
+| P0.2 | ✅ done | Fresh Pi OS on the 1 TB card; user `nikghodki-raspberry-1`; picoclaw, ROS envs, LiDAR and camera restored; same Tailscale node. Still the desktop OS. |
+| P0.3 | 🟡 mostly | Jetson: DefenseClaw 1.0.9, Hermes in action mode, fail closed, gateway started at boot; doctor 0 failures. The `nikghodki` Hermes profile moved to `~/hermes-homes/nikhil-ghodki` and is unprotected until P0.15. |
+| P0.4 | ⬜ | Pi Edge Connector |
+| P0.5 | 🔁 changed | The work-managed DefenseClaw enterprise install and `dcsidecar` were **uninstalled** from dgx-1. dgx-1 has no coding agents yet; install open-source DefenseClaw for AI discovery and AIBOM, then add connectors when agents appear. |
+| P0.6 | ✅ done | LiteLLM Postgres and Redis listen on 127.0.0.1 only |
+| P0.7 | 🔁 changed | `nginx-gateway` is **not** removable: it fronts `model.nghodki.ai`, `voice-agent` and `ha`. Its crash loop (missing `kokoro-tts` upstream) is fixed with runtime upstream resolution. The dead LiteLLM routes are still to remove. |
+| P0.8 | ⬜ | LiveKit secret out of argv |
+| P0.9 | ⬜ | IP reservations (you, Google Wifi app) |
+| P0.10 | ⬜ | Omarchy: Tailscale isn't installed; needs a full system update (stale pacman database) |
+| P0.11 | ⬜ | Ethernet for the Sparks (you) |
+| P0.12 | ⬜ | Jetson `companion-agent.service` |
+| P0.13 | ✅ done | LiteLLM 1.109.1, pinned by digest (fixes GHSA-7hp6-4w63-5g45); rollback image and DB backup kept |
+| P0.14 | ⬜ new | Rotate the LiteLLM master key and salt key (salt key is the placeholder `sk-litellm-salt-key`); move both into SOPS. After the DGXMM work. |
+| P0.15 | ⬜ new | Hermes `nikghodki` profile as its own Linux user with its own DefenseClaw install |
+| P0.16 | ⬜ new | Home Assistant trusted proxies for `ha.nghodki.ai`: HA 2026.11 keeps HTTP settings in the UI, not YAML (you, in the HA UI) |
+| P0.17 | ⬜ new | LiteLLM key review: 13 keys, none expires, few have model limits; prune unused keys. picoclaw now has its own `picoclaw-pi` key (its old key was invalid). |
+| P1.1 | ✅ done | `nikghodki/homelab` |
+| P1.2 | ✅ done | SOPS + age; key saved offline |
+| P1.3 | ✅ done | Ansible baseline applied on all 5 hosts; second check-mode run shows 0 changes |
+| P1.8 | ✅ done | GitHub Actions (hash-locked tools, scoped OSV exceptions), Renovate installed, repo settings hardened |
+
 ## 3. Phase 0: Urgent fixes (week 1)
 
 | ID | Task | Depends | Effort | Acceptance |
