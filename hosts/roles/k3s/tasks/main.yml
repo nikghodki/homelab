@@ -124,5 +124,5 @@
   when: not ansible_check_mode
 
 - name: Admin kubeconfig
-  ansible.builtin.include_tasks: kubeconfig.yml
+  ansible.builtin.include_tasks: user_kubectl.yml
   when: k3s_kubeconfig_user | length > 0

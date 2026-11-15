@@ -1,0 +1,45 @@
+# Admin kubeconfig for a user on a server node, pointing at k3s_kubeconfig_server (not stored in Git).
+# (Not named *kubeconfig*: .gitignore keeps such files out of the repo.)
+- name: Server kubeconfig
+  ansible.builtin.stat:
+    path: /etc/rancher/k3s/k3s.yaml
+  register: k3s_server_kubeconfig
+
+- name: Write the user's kubeconfig
+  when: k3s_server_kubeconfig.stat.exists
+  block:
+    - name: Read the server kubeconfig
+      ansible.builtin.slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: k3s_kubeconfig_raw
+      no_log: true
+
+    - name: Folder ~/.kube
+      ansible.builtin.file:
+        path: "/home/{{ k3s_kubeconfig_user }}/.kube"
+        state: directory
+        owner: "{{ k3s_kubeconfig_user }}"
+        group: "{{ k3s_kubeconfig_user }}"
+        mode: "0700"
+
+    - name: ~/.kube/config
+      ansible.builtin.copy:
+        content: >-
+          {{ k3s_kubeconfig_raw.content | b64decode
+             | replace('https://127.0.0.1:6443', k3s_kubeconfig_server)
+             | replace(': default', ': homelab') }}
+        dest: "/home/{{ k3s_kubeconfig_user }}/.kube/config"
+        owner: "{{ k3s_kubeconfig_user }}"
+        group: "{{ k3s_kubeconfig_user }}"
+        mode: "0600"
+      no_log: true
+
+- name: Point kubectl at ~/.kube/config (the k3s kubectl defaults to the root-only k3s.yaml)
+  ansible.builtin.copy:
+    dest: /etc/profile.d/homelab-kubeconfig.sh
+    content: |
+      # Managed by homelab Ansible (roles/k3s)
+      if [ -r "$HOME/.kube/config" ]; then export KUBECONFIG="$HOME/.kube/config"; fi
+    owner: root
+    group: root
+    mode: "0644"
