@@ -1,0 +1,8 @@
+# Managed by homelab Ansible (roles/defenseclaw_aibom)
+[Unit]
+Description=Nightly DefenseClaw AIBOM snapshot and change summary
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.local/bin/homelab-aibom {{ defenseclaw_aibom_keep_days }}
+SyslogIdentifier=homelab-aibom

@@ -1,0 +1,33 @@
+- name: AIBOM job (runs as the user that owns the per-user DefenseClaw install)
+  when: defenseclaw_aibom_enabled | bool
+  become: false
+  block:
+    - name: Script
+      ansible.builtin.copy:
+        src: homelab-aibom.py
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/homelab-aibom"
+        mode: "0755"
+
+    - name: User unit folder
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user"
+        state: directory
+        mode: "0755"
+
+    - name: Service and timer
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.config/systemd/user/{{ item }}"
+        mode: "0644"
+      loop: [homelab-aibom.service, homelab-aibom.timer]
+
+    - name: Timer is enabled
+      ansible.builtin.systemd_service:
+        name: homelab-aibom.timer
+        scope: user
+        enabled: true
+        state: started
+        daemon_reload: true
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['user_uid'] }}"
+      when: not ansible_check_mode

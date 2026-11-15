@@ -7,7 +7,7 @@
  ],
  "timezone": "browser",
  "schemaVersion": 39,
- "version": 1,
+ "version": 2,
  "time": {
   "from": "now-6h",
   "to": "now"
@@ -254,7 +254,7 @@
    "type": "timeseries",
    "gridPos": {
     "x": 0,
-    "y": 11,
+    "y": 19,
     "w": 12,
     "h": 8
    },
@@ -287,7 +287,7 @@
    "type": "timeseries",
    "gridPos": {
     "x": 12,
-    "y": 11,
+    "y": 19,
     "w": 12,
     "h": 8
    },
@@ -318,7 +318,7 @@
    "type": "timeseries",
    "gridPos": {
     "x": 0,
-    "y": 19,
+    "y": 27,
     "w": 12,
     "h": 8
    },
@@ -351,7 +351,7 @@
    "type": "timeseries",
    "gridPos": {
     "x": 12,
-    "y": 19,
+    "y": 27,
     "w": 12,
     "h": 8
    },
@@ -382,7 +382,7 @@
    "type": "table",
    "gridPos": {
     "x": 0,
-    "y": 27,
+    "y": 35,
     "w": 24,
     "h": 8
    },
@@ -405,6 +405,76 @@
    ],
    "fieldConfig": {
     "defaults": {},
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 20,
+   "title": "GPU busy (Sparks, Jetson)",
+   "type": "timeseries",
+   "gridPos": {
+    "x": 0,
+    "y": 11,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (host_name) (fleet_gpu_percent)",
+     "legendFormat": "{{host_name}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 21,
+   "title": "Memory used (fleet-metrics; GB10 unified)",
+   "type": "timeseries",
+   "gridPos": {
+    "x": 12,
+    "y": 11,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (host_name) (fleet_memory_percent)",
+     "legendFormat": "{{host_name}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100
+    },
     "overrides": []
    },
    "options": {}
