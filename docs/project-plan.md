@@ -55,7 +55,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 |---|---|---|
 | P0.1 | ✅ | Pi backup on dgx-1 |
 | P0.2 | ✅ | Fresh Pi OS on the 1 TB card, user `nikghodki-raspberry-1`, restored; same Tailscale node |
-| P0.3 | 🟡 | Jetson: DefenseClaw 1.0.9, Hermes in action mode, fail closed, gateway at boot. Second Hermes profile moved to `~/hermes-homes/nikhil-ghodki`, unprotected until P0.15 |
+| P0.3 | 🟡 | Jetson: DefenseClaw 1.0.9, Hermes in action mode, fail closed, gateway at boot. Second Hermes profile protected since P0.15 |
 | P0.4 | 🔁 ✅ | Production Edge Connector 1.0.9 installed on the Pi as `edge-connector.service`, reporting to Fleet (see P1.12). picoclaw keeps its in-process hook until upstream can allow escalated calls |
 | P0.5 | 🔁 ✅ | Work-managed DefenseClaw + dcsidecar uninstalled; OSS 1.0.9 installed on dgx-1 (no agents there yet) |
 | P0.6 | ✅ | LiteLLM Postgres/Redis on 127.0.0.1 |
@@ -67,7 +67,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P0.12 | ✅ | `companion-agent` retired (code removed 28 Aug); no failed user units |
 | P0.13 | ✅ | LiteLLM 1.109.1 pinned by digest |
 | P0.14 | ⬜ | LiteLLM master + salt key rotation, after the DGXMM session |
-| P0.15 | ⬜ | Hermes second profile as its own Linux user |
+| P0.15 | ✅ | Profile nikhil-ghodki runs as Linux user `hermes-nikhil` with its own Hermes runtime and DefenseClaw (action, fail closed, `homelab` policy, OTLP to dgx-2). Its picoclaw MCP now reaches NATS as `hermes`. Chat test after DGXMM. runbooks/hermes-profiles.md |
 | P0.16 | ⏸️ | Home Assistant trusted proxies: HA 2026.11 needs this in its UI (you) |
 | P0.17 | 🟡 | picoclaw now has its own scoped key (`picoclaw-pi`, in `.security.yml`); key review/prune still to do |
 
@@ -101,7 +101,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 ### Findings to report upstream
 - Edge Connector 1.0.9 doesn't build against mbedTLS 3.6 (deprecated API + -Werror).
 - `cisco-ai-mcp-scanner` 4.8.7 pins `litellm==1.93.2` (GHSA-7hp6-4w63-5g45).
-- DefenseClaw's Hermes connector supports one HERMES_HOME; a second profile stops the gateway from starting.
+- DefenseClaw's Hermes connector supports one HERMES_HOME; a second profile stops the gateway from starting (worked around with one Linux user per profile).
 - OSS Fleet gateway denies every escalated tool hash and has no allow API (`sidecar.go` default-deny pipeline).
 - Edge Connector C tool table lacks picoclaw's `message`, `i2c`, `serial`, `spawn`, `cron`; `picoclaw_hook.py` is FFI-only and never uses the daemon socket.
 - Fleet gateway's MQTT client is MQTT 5 only (paho.golang) while the C devices speak 3.1.1; docs say 3.1.1 for both.

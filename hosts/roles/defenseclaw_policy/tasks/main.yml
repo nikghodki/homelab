@@ -1,39 +1,14 @@
 ---
-- name: Fleet DefenseClaw policy (per-user install; skipped where the CLI is absent)
-  become: false
-  vars:
-    defenseclaw_policy_cli: "{{ ansible_facts['env']['HOME'] }}/.local/bin/defenseclaw"
-    defenseclaw_policy_dest: "{{ ansible_facts['env']['HOME'] }}/.defenseclaw/policies/{{ defenseclaw_policy_name }}.yaml"
-  block:
-    - name: Look for the DefenseClaw CLI
-      ansible.builtin.stat:
-        path: "{{ defenseclaw_policy_cli }}"
-      register: defenseclaw_policy_cli_stat
+- name: Accounts to manage
+  ansible.builtin.set_fact:
+    defenseclaw_policy_accounts: "{{ defenseclaw_policy_users if defenseclaw_policy_users | length > 0 else [ansible_facts['user_id']] }}"
 
-    - name: Policy file and activation
-      when: defenseclaw_policy_cli_stat.stat.exists
-      block:
-        - name: Policy file
-          ansible.builtin.copy:
-            src: "{{ defenseclaw_policy_src }}"
-            dest: "{{ defenseclaw_policy_dest }}"
-            mode: "0600"
-          register: defenseclaw_policy_file
+- name: Account home folders
+  ansible.builtin.getent:
+    database: passwd
 
-        - name: Active policy
-          ansible.builtin.command: "{{ defenseclaw_policy_cli }} policy list"
-          register: defenseclaw_policy_list
-          changed_when: false
-          check_mode: false
-
-        - name: Activate the policy (gateway reloads it)
-          ansible.builtin.command: "{{ defenseclaw_policy_cli }} policy activate {{ defenseclaw_policy_name }}"
-          when: >-
-            defenseclaw_policy_file is changed or
-            defenseclaw_policy_list.stdout is not search('\* ' ~ defenseclaw_policy_name ~ ' .*\[active\]')
-          changed_when: true
-
-        - name: Validate rule files and Rego
-          ansible.builtin.command: "{{ defenseclaw_policy_cli }} policy validate"
-          changed_when: false
-          check_mode: false
+- name: Fleet DefenseClaw policy for each account
+  ansible.builtin.include_tasks: account.yml
+  loop: "{{ defenseclaw_policy_accounts }}"
+  loop_control:
+    loop_var: defenseclaw_policy_account

@@ -1,3 +1,5 @@
 ---
 defenseclaw_policy_name: homelab
 defenseclaw_policy_src: "{{ playbook_dir }}/../../policies/defenseclaw/{{ defenseclaw_policy_name }}.yaml"
+# Accounts with a per-user DefenseClaw install. Empty means the Ansible login user only.
+defenseclaw_policy_users: []
