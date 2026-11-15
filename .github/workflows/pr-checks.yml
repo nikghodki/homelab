@@ -117,7 +117,7 @@ jobs:
         run: .github/scripts/scan-skills.sh
 
   unit-tests:
-    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw policy and bundle)
+    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw, Pocket ID sync)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -137,6 +137,9 @@ jobs:
         run: PYTHONPATH=. python -m pytest -q tests
       - name: DefenseClaw fleet policy
         working-directory: policies/defenseclaw
+        run: python -m pytest -q tests
+      - name: Pocket ID sync
+        working-directory: hosts/files/pocket-id
         run: python -m pytest -q tests
       - name: DefenseClaw bundle script
         run: python -m pytest -q .github/scripts/tests

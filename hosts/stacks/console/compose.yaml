@@ -1,0 +1,26 @@
+# Console stack on dgx-2 (plan P1.13; architecture: namespace `console`). Deployed by playbooks/console.yml.
+# pocket-id: passkey-only OIDC provider at https://id.nghodki.ai (dgx-1 Caddy terminates TLS, D25).
+name: console
+
+services:
+  pocket-id:
+    image: ghcr.io/pocket-id/pocket-id:v2.19.2@sha256:3ee23895d6a3adb5dd5de801a4fd31fc31b960e6dfbea9b5200e33cf477695eb
+    restart: unless-stopped
+    environment:
+      APP_URL: https://id.nghodki.ai
+      TRUST_PROXY: "true"
+      ENCRYPTION_KEY_FILE: /run/pocket-id/encryption_key
+      STATIC_API_KEY_FILE: /run/pocket-id/static_api_key
+      ANALYTICS_DISABLED: "true"
+      VERSION_CHECK_DISABLED: "true"
+      UI_CONFIG_DISABLED: "false"
+      PUID: "1000"
+      PGID: "1000"
+    volumes:
+      - ./pocket-id:/run/pocket-id:ro
+      - pocket-id-data:/app/data
+    ports:
+      - "192.168.86.36:1411:1411"   # LAN only: dgx-1's Caddy is the only client
+
+volumes:
+  pocket-id-data:

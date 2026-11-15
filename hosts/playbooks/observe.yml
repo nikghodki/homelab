@@ -8,12 +8,18 @@
         file: "{{ playbook_dir }}/../../secrets/observe.enc.yaml"
         name: observe_secrets
       no_log: true
+    - name: Load sign-in client secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
+        name: console_secrets
+      no_log: true
   vars:
     # Used by the stack's templates (alertmanager, ntfy, gatus)
     ntfy_alerts_password: "{{ observe_secrets.ntfy_alerts_password }}"
     ntfy_alerts_password_hash: "{{ observe_secrets.ntfy_alerts_password_hash }}"
     ntfy_alerts_token: "{{ observe_secrets.ntfy_alerts_token }}"
     ntfy_phone_password_hash: "{{ observe_secrets.ntfy_phone_password_hash }}"
+    oidc_gatus_secret: "{{ console_secrets.oidc_gatus_secret }}"
   roles:
     - role: compose_stack
       vars:
@@ -23,3 +29,5 @@
           GRAFANA_ADMIN_PASSWORD: "{{ observe_secrets.grafana_admin_password }}"
           PHOENIX_SECRET: "{{ observe_secrets.phoenix_secret }}"
           PHOENIX_ADMIN_PASSWORD: "{{ observe_secrets.phoenix_admin_password }}"
+          OIDC_GRAFANA_SECRET: "{{ console_secrets.oidc_grafana_secret }}"
+          OIDC_PHOENIX_SECRET: "{{ console_secrets.oidc_phoenix_secret }}"

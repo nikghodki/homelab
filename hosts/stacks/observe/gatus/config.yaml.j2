@@ -1,6 +1,14 @@
 # Uptime checks (plan P1.7). Failures post to ntfy.
 metrics: true
 storage: {type: sqlite, path: /data/gatus.db}
+security:
+  # Pocket ID; only the admins group can use this client (identity/pocket-id.yaml).
+  oidc:
+    issuer-url: https://id.nghodki.ai
+    redirect-url: https://status.nghodki.ai/authorization-code/callback
+    client-id: gatus
+    client-secret: "{{ oidc_gatus_secret }}"
+    scopes: [openid]
 alerting:
   ntfy:
     url: http://ntfy

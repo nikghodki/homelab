@@ -1,0 +1,26 @@
+# Pocket ID contents (plan P1.13). Applied by hosts/files/pocket-id/pocketid_sync.py from dgx-1.
+# Client secrets are created once and kept in secrets/console.enc.yaml as oidc_<id>_secret.
+groups:
+  - {name: admins, friendlyName: Admins}
+  - {name: family, friendlyName: Family}
+
+users:
+  - {username: nikghodki, email: nikghodki@gmail.com, firstName: Nikhil, isAdmin: true, groups: [admins]}
+
+clients:
+  - id: grafana
+    name: Grafana
+    callbackURLs: [https://grafana.nghodki.ai/login/generic_oauth]
+    launchURL: https://grafana.nghodki.ai
+    groups: [admins]
+  - id: gatus
+    name: Gatus
+    callbackURLs: [https://status.nghodki.ai/authorization-code/callback]
+    launchURL: https://status.nghodki.ai
+    pkce: false        # Gatus 5.38 doesn't send PKCE
+    groups: [admins]
+  - id: phoenix
+    name: Phoenix
+    callbackURLs: [https://phoenix.nghodki.ai/oauth2/pocketid/tokens]
+    launchURL: https://phoenix.nghodki.ai
+    groups: [admins]
