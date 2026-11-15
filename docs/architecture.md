@@ -3,10 +3,17 @@
 | | |
 |---|---|
 | Owner | nikghodki |
-| Status | Draft v1, 2026-11-14 |
-| Related | [design.md](design.md) (requirements and decisions D1–D19), [project-plan.md](project-plan.md) |
+| Status | Draft v1.1, 2026-11-15 |
+| Related | [design.md](design.md) (requirements and decisions D1–D25), [project-plan.md](project-plan.md) |
 
 Numbers marked "est." are estimates, not measurements.
+
+**Changes 2026-11-15** (k3s layout, Phase 3, brought in line with what is built and decided):
+- The Jetson is an etcd member **plus a tainted worker** for robot, home and agent pods (D2 updated). §3, §5.
+- k3s, etcd and CNI traffic between the Sparks uses the direct link `10.100.136.0/24`. §4.4.
+- Placement of the Fleet MQTT broker and API proxy, dcgm-exporter, Pocket ID and the web CA cert. §3.1, §4.5.
+- New: what stays outside k3s (§3.2) and the interim Docker deployments with their k3s targets (§3.3).
+- Edge Connector escalation goes through the dedicated Fleet broker (D24), not NATS MQTT. §12.2.
 
 ---
 
@@ -32,7 +39,7 @@ Numbers marked "est." are estimates, not measurements.
 ╔═══════════════════════════════════════════════════════════════════════════════════════════════╗
 ║ ACCESS       WhatsApp (Hermes) · Open WebUI · Grafana · Phoenix · DGXMM UI · Foxglove         ║
 ╠═══════════════════════════════════════════════════════════════════════════════════════════════╣
-║ CONTROL      k3s (servers: dgx-1, dgx-2; etcd-only: Jetson) · kube-vip floating IP · Argo CD  ║
+║ CONTROL      k3s (servers: dgx-1, dgx-2; etcd+edge: Jetson) · kube-vip floating IP · Argo CD  ║
 ║ PLANE        DNS + HTTPS proxy · NATS JetStream (+MQTT) · Postgres · SOPS · Kyverno           ║
 ╠═══════════════════╦═══════════════════════╦══════════════════════╦════════════════════════════╣
 ║ MODEL PLANE       ║ TOOL PLANE            ║ AGENT PLANE          ║ JOB PLANE                  ║
@@ -59,13 +66,13 @@ Numbers marked "est." are estimates, not measurements.
 │ LiteLLM replica · DefenseClaw guardrail plugin      │ │ LiteLLM replica · Postgres primary (CNPG)           │
 │ NATS · DNS + proxy replica · Open WebUI · Coolify   │ │ NATS · DNS + proxy replica · Argo CD · Temporal     │
 │ Postgres standby · OTel Collector · Tetragon        │ │ VictoriaMetrics · Loki · Tempo · Grafana · Phoenix  │
-│ DefenseClaw managed (coding agents)                 │ │ Gatus · ntfy · SeaweedFS · MLflow                   │
-│                                                     │ │ ARC self-hosted runner · OTel · Tetragon · restic   │
+│ DefenseClaw managed + Fleet gateway (host)          │ │ Gatus · ntfy · SeaweedFS · MLflow · Pocket ID       │
+│ Fleet broker (Mosquitto) + API proxy · dcgm-exp.    │ │ ARC runner · OTel · Tetragon · restic · dcgm-exp.   │
 └───────────────────────┬─────────────────────────────┘ └──────────────────────┬──────────────────────────────┘
-                        └────── 2×200G RDMA: pooled models, model sync ────────┘
-┌──────── Jetson (etcd-only + agent) ────────┐ ┌──────── Omarchy (agent, x86) ──────────┐ ┌──── Pi (Ansible) ──────┐
-│ etcd member (vote only)                    │ │ OpenBot + its sandboxed computer       │ │ ROS 2 drivers: LiDAR,  │
-│ Hermes (2 profiles) + DefenseClaw gateway  │ │  (container desktop, gVisor/OpenShell, │ │  camera, motors        │
+                        └── 2×200G: k3s/etcd/CNI, pooled models, model sync ───┘
+┌──────── Jetson (etcd + tainted agent) ─────┐ ┌──────── Omarchy (agent, x86) ──────────┐ ┌──── Pi (Ansible) ──────┐
+│ etcd member; worker tainted for robot pods │ │ OpenBot + its sandboxed computer       │ │ ROS 2 drivers: LiDAR,  │
+│ Hermes + DefenseClaw (host until P4.5)     │ │  (container desktop, gVisor/OpenShell, │ │  camera, motors        │
 │ Home Assistant · LiveKit                   │ │  egress allowlist), one at a time      │ │ safety governor        │
 │ Nav2 · SLAM · Zenoh router · Nav2 bridge   │ │ light worker agents                    │ │ picoclaw + DefenseClaw │
 │ OTel Collector · Tetragon · headless       │ │ DefenseClaw managed · OTel · Tetragon  │ │  Edge Connector        │
@@ -75,21 +82,62 @@ Numbers marked "est." are estimates, not measurements.
 
 ### 3.1 Namespaces
 
-| Namespace | Contents |
-|---|---|
-| `edge` | DNS (CoreDNS for `*.nghodki.ai`), HTTPS proxy (Caddy), CrowdSec |
-| `bus` | NATS JetStream (3 replicas: dgx-1, dgx-2 and, as a small replica, the Jetson) |
-| `models` | LiteLLM (model, MCP and A2A gateway), DGXMM (one per Spark), DefenseClaw guardrail plugin |
-| `data` | CloudNativePG Postgres, SeaweedFS |
-| `agents` | Hermes, OpenBot, workers; MCP servers that run in the cluster |
-| `home` | Home Assistant, LiveKit |
-| `robot` | Nav2 bridge, Zenoh router (host network) |
-| `jobs` | Temporal, batch jobs, ARC runners |
-| `sim` | Isaac Lab / Isaac Sim and MuJoCo training and evaluation jobs, MLflow |
-| `observe` | VictoriaMetrics, Loki, Tempo, Grafana, Phoenix, Gatus, Alertmanager, ntfy, OTel gateway |
-| `console` | Fleet Console, Homepage (interim), Pocket ID, oauth2-proxy |
-| `security` | Kyverno, Tetragon, DefenseClaw Fleet gateway (for the Pi's Edge Connector), policy bundles, nightly AIBOM job |
-| `argocd` | Argo CD |
+| Namespace | Contents | Runs on |
+|---|---|---|
+| `edge` | DNS (CoreDNS for `*.nghodki.ai`), HTTPS proxy (Caddy, wildcard cert from a Secret, §4.5), `ca.nghodki.ai` install page, CrowdSec | Sparks (2 replicas) |
+| `bus` | NATS JetStream (3 replicas: dgx-1, dgx-2 and, as a small replica, the Jetson) | Sparks + Jetson (tolerates the taint) |
+| `models` | LiteLLM (model, MCP and A2A gateway), DGXMM (one per Spark), DefenseClaw guardrail plugin | Sparks |
+| `data` | CloudNativePG Postgres, SeaweedFS | Sparks |
+| `agents` | Hermes (after P4.5), OpenBot, workers; MCP servers that run in the cluster | Omarchy, Sparks; Hermes on the Jetson |
+| `home` | Home Assistant, LiveKit | Jetson (tolerates the taint) |
+| `robot` | Nav2 bridge, Zenoh router (host network) | Jetson (tolerates the taint) |
+| `jobs` | Temporal, batch jobs, ARC runners | dgx-2 |
+| `sim` | Isaac Lab / Isaac Sim and MuJoCo training and evaluation jobs, MLflow | dgx-2 (dgx-1 overnight) |
+| `observe` | VictoriaMetrics, Loki, Tempo, Grafana, Phoenix, Gatus, Alertmanager, ntfy, OTel gateway; **dcgm-exporter** (DaemonSet, `role=gpu` nodes only) | dgx-2; dcgm-exporter on both Sparks |
+| `console` | Fleet Console, Homepage (interim), **Pocket ID** (`id.nghodki.ai`), oauth2-proxy | dgx-2 |
+| `security` | Kyverno, Tetragon, policy bundles, nightly AIBOM job; **Fleet MQTT broker** (Mosquitto, D24, `fleet.nghodki.ai:8884`, TLS, per-device ACLs); **Fleet API TLS proxy** (Caddy `:8971`) | Fleet broker and proxy pinned to dgx-1 |
+| `argocd` | Argo CD | Sparks |
+
+- **Fleet API proxy.** The DefenseClaw Fleet gateway is part of the host-installed DefenseClaw on dgx-1 and listens
+  on loopback. The proxy must reach it over loopback, so it runs as a `hostNetwork` pod pinned to dgx-1 and forwards
+  only `/api/v1/fleet/*`. If the gateway ever runs as a pod, the proxy becomes a sidecar in that pod instead.
+- **Fleet broker.** Mosquitto keeps its own TLS certificate from the internal homelab CA (§4.5) and its per-device
+  ACLs and passwords as Secrets from SOPS. Port 8884 is a `LoadBalancer`/host port on dgx-1, because the Pi (not a
+  node) connects to it.
+- **dcgm-exporter** keeps listening on loopback `:9400`; the host OTel collector scrapes it as today. It needs the
+  NVIDIA device plugin / CDI on the Sparks.
+
+### 3.2 Outside k3s (Ansible-managed on the hosts)
+
+| What | Where | Why |
+|---|---|---|
+| Per-user DefenseClaw installs (gateway, hook connectors, Fleet gateway, sensor) | every host | They guard host processes and hooks, and must work when the cluster is down |
+| Host OTel collectors and fleet-metrics | every host | Host metrics and journald; the observability path must not depend on the cluster |
+| Tailscale | every host | Underlay; the cluster depends on it, not the other way round |
+| CA trust stores (internal homelab CA and web CA, role `homelab_ca`) | every host | Host trust is needed before any pod can pull or talk TLS |
+| picoclaw, Edge Connector daemon, ROS 2 drivers, safety governor | Pi | The Pi isn't a node |
+| OpenBot's per-bot computers (Docker, gVisor `runsc`) | Omarchy | Created and destroyed by OpenBot's supervisor, not by Kubernetes |
+| Model engines (vLLM, llama.cpp) | Sparks | Started by DGXMM as Docker containers (D3). They move into k3s only if the optional KServe pilot (PK.*) succeeds |
+| Hermes, DefenseClaw gateway | Jetson | Host-installed until P4.5 moves Hermes into `agents` |
+
+### 3.3 Interim deployments (Docker on hosts, before k3s)
+
+These run today as Docker Compose stacks, deployed by Ansible (`hosts/playbooks/<name>.yml`, `hosts/stacks/<name>/`)
+unless noted. P3.7 moves each into its k3s namespace and removes the Docker copy.
+
+| Stack | Host | Contents | k3s target |
+|---|---|---|---|
+| `observe` | dgx-2 | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, two OTel gateways, Grafana, Gatus, ntfy, Phoenix | `observe` |
+| `console` | dgx-2 | Pocket ID 2.19.2 (LAN port 1411; dgx-1 Caddy terminates TLS) | `console` |
+| `bus` | dgx-1 | NATS 2.15.3 (4222 TLS, MQTT 8883 TLS) | `bus` (3 replicas) |
+| `fleet` | dgx-1 | Mosquitto 2.1.2 (8884 TLS), Caddy Fleet API proxy (host network, `:8971`) | `security` |
+| `gpu` | dgx-1, dgx-2 | dcgm-exporter (loopback 9400) | `observe` (DaemonSet) |
+| `backup` | dgx-2 | restic rest-server (8000) | Stays on the host (restores must not need the cluster) |
+| edge-gateway | dgx-1 | `edge-caddy` + `edge-dnsmasq` in `~/edge-gateway`, **not in the repo yet** | `edge` (CoreDNS + Caddy, 2 replicas, behind kube-vip) |
+| LiteLLM | dgx-1 | `litellm-proxy` v1.109.1 + Postgres + Redis (hand-run, not in the repo) | `models` (2 replicas); Postgres → `data` (CNPG); Redis → `models` |
+| Open WebUI | dgx-1 | `open-webui` v0.13.3 (hand-run, not in the repo) | `agents` or `models` (decide in P3.7) |
+
+Not moved: DGXMM and its engines (§3.2). Coolify stays a host app.
 
 ## 4. Network
 
@@ -97,7 +145,7 @@ Numbers marked "est." are estimates, not measurements.
 - Every device has an **IP reservation** on the router.
 - Every device is reached by **Tailscale MagicDNS** name.
 - `*.nghodki.ai` resolves to the **kube-vip floating IP**, which lives on whichever server is up. Tailscale split
-  DNS points there.
+  DNS points there. Until P3.3, `edge-dnsmasq` on dgx-1 resolves the names to dgx-1 (.44).
 
 | Name | Service |
 |---|---|
@@ -110,6 +158,9 @@ Numbers marked "est." are estimates, not measurements.
 | `argocd` | Argo CD |
 | `ha` | Home Assistant |
 | `ntfy` | ntfy |
+| `id` | Pocket ID |
+| `ca` | Web CA install page (http) |
+| `fleet` | DefenseClaw Fleet: MQTT `:8884`, API `:8971` (dgx-1) |
 
 ### 4.2 Tailscale tags and ACLs
 
@@ -119,29 +170,68 @@ Numbers marked "est." are estimates, not measurements.
 | `tag:gpu` | dgx-1, dgx-2 | each other; `tag:control` services |
 | `tag:control` | dgx-1, dgx-2, Jetson (k3s ports) | each other |
 | `tag:agent` | Omarchy, Jetson | LiteLLM, LiteLLM MCP gateway, NATS, Phoenix (OTLP) |
-| `tag:robot` | Pi | NATS (its own subjects), Zenoh router on the Jetson, the OTel collector |
+| `tag:robot` | Pi | NATS (its own subjects), Fleet broker and API on dgx-1, Zenoh router on the Jetson, the OTel collector |
 | `tag:quarantine` | (applied during incidents) | `tag:admin` only |
 | phone / you | your devices | the web UIs, ntfy |
 
 ### 4.3 Exposure rules
 - Databases, Redis and internal APIs listen on cluster-internal addresses only (fixes F2).
-- Only the HTTPS proxy, k3s, NATS and Zenoh accept connections from other hosts, and only from the tags above.
+- Only the HTTPS proxy, k3s, NATS, the Fleet broker and API proxy (dgx-1 `:8884`, `:8971`) and Zenoh accept
+  connections from other hosts, and only from the tags above.
 - No inbound connections from the internet. GitHub is reached outbound only; Argo CD pulls.
+
+### 4.4 Links and node IPs
+
+| Link | Addresses | Carries |
+|---|---|---|
+| Spark ↔ Spark, cable 1 (200 Gb/s QSFP) | `enp1s0f0np0`: dgx-1 `10.100.136.1`, dgx-2 `10.100.136.2` | k3s API, etcd peer, CNI (flannel VXLAN) between the Sparks; model sync |
+| Spark ↔ Spark, cable 2 | `enP2p1s0f0np0`: `10.100.137.0/24` | RDMA for pooled models (NCCL); not used by k3s |
+| LAN | Wi-Fi today on every device; the Sparks move to 10 GbE `enP7s7` to a switch in P0.11 | Everything else, including the Jetson's and Omarchy's k3s traffic |
+
+- **Sparks:** `--node-ip=10.100.136.{1,2}`, `--node-external-ip=<LAN IP>`, `--flannel-iface=enp1s0f0np0`, and
+  `--tls-san` with the LAN IPs, the kube-vip IP and the names. So etcd, the API and pod traffic between the Sparks
+  use the cable.
+- **Jetson and Omarchy** reach the Sparks over the LAN. They have no path to `10.100.136.0/24`, so Ansible adds
+  host routes: `10.100.136.1/32 via 192.168.86.44` and `10.100.136.2/32 via 192.168.86.36`. Each Spark answers for its
+  own link address on its LAN interface (`rp_filter=2`, loose, today). Their own `--node-ip` is the LAN IP.
+- **MTU** is 1500 on every path today, so flannel's VXLAN MTU (1450) is the same everywhere. Raising the cable to
+  jumbo frames would need the CNI MTU set by hand.
+- After P0.11 the LAN path is wired, but the Spark-to-Spark traffic stays on the cable.
+
+### 4.5 TLS and the two CAs
+
+| CA | Scope | Used for | Trusted by |
+|---|---|---|---|
+| Internal homelab CA (`hosts/files/pki/homelab-ca.crt`) | No name constraint | NATS, the Fleet broker, backups, later internal service TLS | Fleet hosts only (role `homelab_ca`). **Never** installed on phones or family devices |
+| Homelab web CA (`hosts/files/pki/web-ca.crt`, D25) | Name-constrained to `nghodki.ai`, `pathlen:0` | The `*.nghodki.ai` wildcard on the front door | Fleet hosts, plus your phones and computers (installed once from `ca.nghodki.ai`) |
+
+- Both private keys live in `secrets/pki.enc.yaml` (SOPS). See `runbooks/web-https.md`.
+- **In the cluster**, Argo CD decrypts the wildcard cert and key (SOPS, P3.4) into a `kubernetes.io/tls` Secret in
+  `edge`. The Caddy pods mount it read-only. Renewal stays manual (397-day cert): re-issue, commit, Argo CD syncs,
+  Caddy reloads.
+- In-cluster services that need internal TLS (NATS, the Fleet broker) get their certs the same way, from the internal
+  CA. cert-manager with a CA issuer is an option later; not needed for the first move.
 
 ## 5. Cluster
 
-- **k3s servers:** dgx-1 and dgx-2 (API, scheduler, controllers, etcd).
-- **Jetson:** a k3s server with `--disable-apiserver --disable-controller-manager --disable-scheduler` (etcd only),
-  plus its normal workloads. Quorum = 2 of 3 etcd members.
+- **k3s servers:** dgx-1 and dgx-2 (API, scheduler, controllers, etcd). Node IPs on the Spark link (§4.4).
+- **Jetson:** a k3s server with `--disable-apiserver --disable-controller-manager --disable-scheduler` (etcd
+  member), and also a **worker** for a small set of pods. Quorum = 2 of 3 etcd members.
+  - Taint `nghodki.ai/jetson=true:NoSchedule`; label `nghodki.ai/role=edge-robot`.
+  - Only pods that tolerate the taint run there: `robot` (Zenoh router, Nav2 bridge), `home` (Home Assistant,
+    LiveKit), the small NATS replica, and Jetson-pinned `agents` pods (Hermes after P4.5).
+  - Every such pod sets tight requests and limits. `--system-reserved` keeps memory for etcd and the
+    host-installed Hermes and DefenseClaw (est. 3 GiB).
+  - Hermes and DefenseClaw stay host-installed until P4.5 moves Hermes.
 - **Agent nodes:** Omarchy. The Pi isn't in the cluster.
 - **kube-vip** gives a floating LAN IP for the API and the HTTPS proxy.
 - **Node labels:**
   - `role=gpu` (Sparks)
-  - `role=home-robot` (Jetson)
+  - `nghodki.ai/role=edge-robot` (Jetson)
   - `role=agent-x86` (Omarchy)
   - `node.kubernetes.io/instance-type=gb10|orin|x86`
 - **Taints:**
-  - The Jetson takes only home and robot workloads.
+  - Jetson: `nghodki.ai/jetson=true:NoSchedule` (above).
   - The Sparks take GPU-planned work and the services listed above.
 - **etcd snapshots** are taken every 6 h to SeaweedFS on dgx-2, kept for 7 days.
 - **Argo CD** watches `nikghodki/homelab` (read-only deploy key) and syncs `cluster/`.
@@ -300,7 +390,7 @@ Every agent has:
 
 | Agent | Host | Notes |
 |---|---|---|
-| Hermes | Jetson | Front door for people; delegates; WhatsApp alert and approval channel |
+| Hermes | Jetson | Front door for people; delegates; WhatsApp alert and approval channel. Host-installed; a pod in `agents` after P4.5 |
 | OpenBot (CopilotKit) | Omarchy | CopilotKit/OpenBot: its supervisor creates one computer per bot (Docker container with Chromium, `/workspace` and bash), with `COMPUTER_RUNTIME=runsc` (gVisor), an egress proxy with a per-bot allowlist, its policy gateway and audit log, plus DefenseClaw. Model via `OPENAI_BASE_URL` → LiteLLM (`smart`, or `coder` for coding). You can watch the screen and terminal live and take over. One computer at a time; rebuilt weekly from the image. Needs CopilotKit Intelligence. Images are amd64-only. |
 | Workers | Omarchy | Scheduled and long tasks as Temporal workflows |
 | picoclaw | Pi | Robot skills; accepts goals only from Hermes and the planner |
@@ -410,7 +500,7 @@ Linux x86_64 and arm64 are supported.
 | Hermes (2 profiles) | Jetson | Hermes hook connector; gateway as a restarting system service | managed / strict (tool calls fail closed) |
 | Claude Code, Codex, OpenCode | dgx-1, Omarchy | Hook connectors (one gateway, several connectors) | managed |
 | Unattended coding agents | dgx-1, Omarchy | OpenShell sandbox (`defenseclaw sandbox`) | managed |
-| picoclaw | Pi | **Edge Connector** (C engine: local rules, content inspection, rate limits including 10 physical actions per minute, audit log where each entry is chained to the last, so tampering shows); escalates undecided calls to the **Fleet gateway on dgx-1 over MQTT** (through NATS MQTT); signed policy updates over MQTT | strict, works offline |
+| picoclaw | Pi | **Edge Connector** (C engine: local rules, content inspection, rate limits including 10 physical actions per minute, audit log where each entry is chained to the last, so tampering shows); escalates undecided calls to the **Fleet gateway on dgx-1 over MQTT** (through the dedicated Fleet Mosquitto broker, D24); signed policy updates over MQTT | strict, works offline |
 | LiteLLM (every model, MCP and A2A call) | dgx-1, dgx-2 | **Agent-gateway route**: our LiteLLM guardrail plugin calls DefenseClaw for each step | closed for tool calls |
 | OpenBot (CopilotKit) | Omarchy | **Agent-gateway route** from OpenBot's policy gateway, plus LiteLLM for its model and tools | strict |
 | OpenClaw | MacBook Air | OpenClaw connector | out of scope for now (D18) |
