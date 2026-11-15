@@ -1,0 +1,27 @@
+# DefenseClaw Fleet broker and API proxy on dgx-1 (plan P1.12). Always --check --diff first.
+- name: DefenseClaw Fleet
+  hosts: bus
+  become: true
+  pre_tasks:
+    - name: Load Fleet secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/fleet.enc.yaml"
+        name: fleet_secrets
+      no_log: true
+    - name: Load PKI secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/pki.enc.yaml"
+        name: pki_secrets
+      no_log: true
+  vars:
+    mosquitto_dclaw_fleet_password_hash: "{{ fleet_secrets.mosquitto_dclaw_fleet_password_hash }}"
+    mosquitto_dclaw_device_1_1_1_password_hash: "{{ fleet_secrets.mosquitto_dclaw_device_1_1_1_password_hash }}"
+    pki_fleet_key: "{{ pki_secrets.pki_fleet_key }}"
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: fleet
+        compose_stack_src: "{{ playbook_dir }}/../stacks/fleet"
+        compose_stack_private_templates:
+          mosquitto: 1883
+          caddy: 0

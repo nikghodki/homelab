@@ -1,0 +1,5 @@
+---
+- name: Restart DefenseClaw gateway
+  ansible.builtin.command: "{{ ansible_facts['env']['HOME'] }}/.local/bin/defenseclaw-gateway restart"
+  become: false
+  changed_when: true

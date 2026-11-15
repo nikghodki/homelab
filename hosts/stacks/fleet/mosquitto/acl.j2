@@ -1,0 +1,13 @@
+# Topic layout: defenseclaw/{tenant}/{fleet}/{device}/... (edge-connector/integrations/mqtt-broker).
+# Devices write only their own topics and read only their verdicts and the fleet OTA channels.
+user dclaw-fleet
+topic readwrite defenseclaw/#
+
+# Raspberry Pi (picoclaw): tenant 1, fleet 1, device 1
+user dclaw-device-1-1-1
+topic write defenseclaw/1/1/1/register
+topic write defenseclaw/1/1/1/heartbeat
+topic write defenseclaw/1/1/1/verdict/req
+topic read defenseclaw/1/1/1/verdict/resp
+topic read defenseclaw/1/1/ota/policy
+topic read defenseclaw/1/1/ota/emergency

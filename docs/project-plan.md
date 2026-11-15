@@ -85,7 +85,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P1.9 | ⬜ | GitHub Pro decision (you) |
 | P1.10 | ⏸️ | Backups merged (#17) but **not deployed**, at your request |
 | P1.11 | 🟡 | AI discovery on; nightly AIBOM on the Jetson; OTLP + redaction done; policy `homelab` in Git (`policies/defenseclaw/`, CI tests) and active on dgx-1 and the Jetson. Webhooks dropped: DefenseClaw refuses private receivers, and high-severity events already reach ntfy through its vmalert rules. Release refresh: Renovate bumps `defenseclaw-bundle.yaml`, CI compares dashboards and rules with that release, `defenseclaw-bundle.py sync` refreshes them. Still to do: LLM judge via LiteLLM (after DGXMM) |
-| P1.12 | ⬜ | Edge Connector Fleet (needs a TLS proxy for the Fleet API; NATS MQTT is ready) |
+| P1.12 | 🟡 | Fleet gateway on in dgx-1's DefenseClaw (role `defenseclaw_fleet`); `fleet` stack: Mosquitto over TLS with per-device ACLs and a Caddy TLS proxy for the Fleet API (D24). Next: production Edge Connector on the Pi, registration, picoclaw hook, signed policy push |
 | P1.13 | ⏸️ | Pocket ID: needs HTTPS. Enable **HTTPS Certificates** in the Tailscale admin console (DNS page) (you) |
 | P1.14 | ✅ | One Alertmanager for vmalert alerts; Gatus posts to ntfy directly |
 | P1.15 | ✅ | Fleet Home dashboard (home page), grafana/status/ntfy/phoenix.nghodki.ai |
