@@ -1,0 +1,4 @@
+# DGX Sparks (dgx-1, dgx-2)
+# dcgm-exporter from playbooks/gpu.yml, scraped locally and pushed with the host's other metrics.
+otel_host_collector_extra_scrapes:
+  - {job: dcgm-exporter, target: "127.0.0.1:9400"}

@@ -1,0 +1,15 @@
+# GPU metrics on the Sparks (plan P1.6): NVIDIA dcgm-exporter, loopback only. The host OTel
+# collector scrapes it (otel_host_collector_extra_scrapes) and pushes to dgx-2 with everything else.
+# GB10: utilisation, temperature, power, SM clock, energy, enc/dec; memory is unified (host metrics).
+name: gpu
+
+services:
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.4.2-4.7.1-ubuntu22.04@sha256:0b98c0aceb106d3eac170bbaf21e70da7bc3a5136991fced511ea1f3dd0022e0
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+    ports:
+      - "127.0.0.1:9400:9400"

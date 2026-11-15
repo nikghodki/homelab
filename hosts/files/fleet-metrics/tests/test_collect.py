@@ -40,3 +40,36 @@ def test_gpu_none(tmp_path):
         raise FileNotFoundError()
     g = collect.read_gpu(sysfs_path=str(tmp_path / "missing"), run=fake_run)
     assert g == {"gpu_pct": None, "gpu_name": None}
+
+
+def _write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+def test_read_thermal_skips_zones_without_data(tmp_path):
+    _write(tmp_path / "class/thermal/thermal_zone0/type", "cpu-thermal\n")
+    _write(tmp_path / "class/thermal/thermal_zone0/temp", "50312\n")
+    _write(tmp_path / "class/thermal/thermal_zone1/type", "cv0-thermal\n")   # no temp file: like a Jetson cv zone
+    _write(tmp_path / "class/thermal/thermal_zone2/type", "gpu-thermal\n")
+    _write(tmp_path / "class/thermal/thermal_zone2/temp", "garbage\n")
+    assert collect.read_thermal(str(tmp_path)) == {"cpu-thermal": 50.3}
+
+
+def test_read_thermal_missing_root(tmp_path):
+    assert collect.read_thermal(str(tmp_path / "none")) == {}
+
+
+def test_read_power_ina3221(tmp_path):
+    mon = tmp_path / "class/hwmon/hwmon3"
+    _write(mon / "name", "ina3221\n")
+    _write(mon / "in1_label", "VDD_IN\n"); _write(mon / "in1_input", "19000\n"); _write(mon / "curr1_input", "380\n")
+    _write(mon / "in2_label", "VDD_CPU_GPU_CV\n"); _write(mon / "in2_input", "19000\n"); _write(mon / "curr2_input", "100\n")
+    _write(mon / "in4_input", "5000\n")   # unlabelled channel: skipped
+    _write(tmp_path / "class/hwmon/hwmon0/name", "pwmfan\n")
+    assert collect.read_power(str(tmp_path)) == {"VDD_IN": 7.22, "VDD_CPU_GPU_CV": 1.9}
+
+
+def test_read_power_none_elsewhere(tmp_path):
+    _write(tmp_path / "class/hwmon/hwmon0/name", "nvme\n")
+    assert collect.read_power(str(tmp_path)) == {}

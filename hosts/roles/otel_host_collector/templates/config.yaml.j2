@@ -26,6 +26,18 @@ receivers:
           static_configs:
             - targets: ["127.0.0.1:{{ otel_host_collector_fleet_metrics_port }}"]
 {% endif %}
+{% if otel_host_collector_extra_scrapes | length > 0 %}
+  prometheus/extra:
+    config:
+      scrape_configs:
+{% for s in otel_host_collector_extra_scrapes %}
+        - job_name: {{ s.job }}
+          scrape_interval: {{ s.interval | default('30s') }}
+          metrics_path: {{ s.path | default('/metrics') }}
+          static_configs:
+            - targets: ["{{ s.target }}"]
+{% endfor %}
+{% endif %}
 processors:
   memory_limiter: {check_interval: 2s, limit_percentage: 80, spike_limit_percentage: 20}
   resourcedetection:
@@ -46,7 +58,7 @@ service:
     metrics: {level: none}
   pipelines:
     metrics:
-      receivers: [hostmetrics{% if otel_host_collector_scrape_fleet_metrics %}, prometheus/fleet-metrics{% endif %}]
+      receivers: [hostmetrics{% if otel_host_collector_scrape_fleet_metrics %}, prometheus/fleet-metrics{% endif %}{% if otel_host_collector_extra_scrapes | length > 0 %}, prometheus/extra{% endif %}]
       processors: [memory_limiter, resourcedetection, resource, batch]
       exporters: [otlp]
     logs:

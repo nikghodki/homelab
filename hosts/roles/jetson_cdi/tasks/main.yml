@@ -1,0 +1,39 @@
+---
+# nvidia-cdi-refresh failed at boot on JetPack 7 (it ran before the GPU stack was ready). Pin CSV
+# discovery (what auto-detect picks on Tegra) and retry instead of giving up.
+- name: CDI generation in CSV mode
+  ansible.builtin.copy:
+    dest: /etc/nvidia-container-toolkit/nvidia-cdi-refresh.env
+    content: |
+      # Managed by homelab Ansible (role jetson_cdi)
+      NVIDIA_CTK_CDI_OUTPUT_FILE_PATH=/var/run/cdi/nvidia.yaml
+      NVIDIA_CTK_CDI_GENERATE_MODE=csv
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Refresh CDI
+
+- name: Drop-in folder
+  ansible.builtin.file:
+    path: /etc/systemd/system/nvidia-cdi-refresh.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Retry nvidia-cdi-refresh after a failed boot-time run
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nvidia-cdi-refresh.service.d/10-homelab-retry.conf
+    content: |
+      # Managed by homelab Ansible (role jetson_cdi)
+      [Unit]
+      After=systemd-modules-load.service
+      StartLimitIntervalSec=600
+      StartLimitBurst=10
+      [Service]
+      Restart=on-failure
+      RestartSec=20
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Refresh CDI
