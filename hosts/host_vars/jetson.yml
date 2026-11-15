@@ -1,2 +1,22 @@
 # Hermes is connected to DefenseClaw here, so the AIBOM has content
 defenseclaw_aibom_enabled: true
+restic_backup_paths:
+  - /home/nikjetson/.hermes
+  - /home/nikjetson/hermes-homes
+  - /home/nikjetson/homeassistant/config
+  - /home/nikjetson/.defenseclaw
+  - /home/nikjetson/.config/livekit
+  - /home/nikjetson/.config/systemd/user
+  - /home/nikjetson/workspace/roboclaw
+restic_backup_excludes:
+  - /home/nikjetson/.hermes/hermes-agent
+  - /home/nikjetson/.hermes/tools
+  - /home/nikjetson/.hermes/cache
+  - /home/nikjetson/.hermes/installs
+  - /home/nikjetson/.hermes/audio_cache
+  - /home/nikjetson/.hermes/image_cache
+  - /home/nikjetson/.hermes/logs
+  - /home/nikjetson/.defenseclaw/inventory.db*
+  - /home/nikjetson/homeassistant/config/home-assistant_v2.db*
+restic_backup_sqlite:
+  - {name: home-assistant, path: /home/nikjetson/homeassistant/config/home-assistant_v2.db}

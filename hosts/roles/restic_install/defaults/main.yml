@@ -1,0 +1,2 @@
+restic_install_version: 0.19.1
+restic_install_url: "https://github.com/restic/restic/releases/download/v{{ restic_install_version }}"

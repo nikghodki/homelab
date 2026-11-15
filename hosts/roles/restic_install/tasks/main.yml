@@ -1,0 +1,41 @@
+- name: Release architecture
+  ansible.builtin.set_fact:
+    restic_install_arch: "{{ {'aarch64': 'arm64', 'x86_64': 'amd64'}[ansible_facts['architecture']] }}"
+
+- name: Is this version installed
+  ansible.builtin.stat:
+    path: "/opt/restic/{{ restic_install_version }}/restic"
+  register: restic_install_present
+
+- name: Install restic (release binary, checked against SHA256SUMS)
+  when: not restic_install_present.stat.exists and not ansible_check_mode
+  block:
+    - name: Folder
+      ansible.builtin.file:
+        path: "/opt/restic/{{ restic_install_version }}"
+        state: directory
+        mode: "0755"
+    - name: Download
+      ansible.builtin.get_url:
+        url: "{{ restic_install_url }}/restic_{{ restic_install_version }}_linux_{{ restic_install_arch }}.bz2"
+        checksum: "sha256:{{ restic_install_url }}/SHA256SUMS"
+        dest: "/opt/restic/{{ restic_install_version }}/restic.bz2"
+        mode: "0644"
+    - name: Unpack
+      ansible.builtin.command:
+        cmd: >-
+          python3 -c "import bz2,shutil,sys; shutil.copyfileobj(bz2.open(sys.argv[1]), open(sys.argv[2],'wb'))"
+          /opt/restic/{{ restic_install_version }}/restic.bz2 /opt/restic/{{ restic_install_version }}/restic
+        creates: "/opt/restic/{{ restic_install_version }}/restic"
+    - name: Executable
+      ansible.builtin.file:
+        path: "/opt/restic/{{ restic_install_version }}/restic"
+        mode: "0755"
+
+- name: Current version link
+  ansible.builtin.file:
+    src: "/opt/restic/{{ restic_install_version }}/restic"
+    dest: /usr/local/bin/restic
+    state: link
+    force: true
+  when: not ansible_check_mode or restic_install_present.stat.exists

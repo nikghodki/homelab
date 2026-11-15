@@ -1,0 +1,56 @@
+- name: Password folder
+  ansible.builtin.file:
+    path: /etc/restic-prune
+    state: directory
+    mode: "0700"
+
+- name: Repository passwords
+  ansible.builtin.copy:
+    dest: "/etc/restic-prune/{{ item }}.pw"
+    content: "{{ backup_secrets['restic_password_' ~ (item | replace('-', '_'))] }}"
+    mode: "0600"
+  loop: "{{ restic_hosts }}"
+  no_log: true
+
+- name: Prune script
+  ansible.builtin.template:
+    src: homelab-backup-prune.sh.j2
+    dest: /usr/local/sbin/homelab-backup-prune
+    mode: "0700"
+
+- name: Prune service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/homelab-backup-prune.service
+    mode: "0644"
+    content: |
+      # Managed by homelab Ansible (roles/restic_prune)
+      [Unit]
+      Description=Prune and check restic repositories
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/homelab-backup-prune
+      Nice=10
+      IOSchedulingClass=idle
+      SyslogIdentifier=homelab-backup-prune
+
+- name: Prune timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/homelab-backup-prune.timer
+    mode: "0644"
+    content: |
+      # Managed by homelab Ansible (roles/restic_prune)
+      [Unit]
+      Description=Weekly restic prune and check
+      [Timer]
+      OnCalendar=Sun *-*-* 05:00:00
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+
+- name: Prune timer enabled
+  ansible.builtin.systemd_service:
+    name: homelab-backup-prune.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode

@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (roles/restic_backup)
+[Unit]
+Description=Nightly restic backup
+
+[Timer]
+OnCalendar={{ restic_backup_time }}
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

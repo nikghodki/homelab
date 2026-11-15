@@ -1,0 +1,13 @@
+#!/bin/bash
+# Managed by homelab Ansible (roles/restic_prune). Clients are append-only; retention runs here.
+set -uo pipefail
+rc=0
+{% for h in restic_hosts %}
+if [ -d /srv/homelab-backup/{{ h }} ]; then
+  RESTIC_PASSWORD_FILE=/etc/restic-prune/{{ h }}.pw /usr/local/bin/restic -r /srv/homelab-backup/{{ h }} \
+    forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune --cache-dir /var/cache/restic-prune || rc=1
+  RESTIC_PASSWORD_FILE=/etc/restic-prune/{{ h }}.pw /usr/local/bin/restic -r /srv/homelab-backup/{{ h }} \
+    check --read-data-subset=2% --cache-dir /var/cache/restic-prune || rc=1
+fi
+{% endfor %}
+exit $rc

@@ -1,0 +1,4 @@
+restic_backup_paths:
+  - /home/nikghodki/Work
+  - /home/nikghodki/Documents
+  - /home/nikghodki/Projects
