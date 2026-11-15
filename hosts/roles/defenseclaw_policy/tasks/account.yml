@@ -1,5 +1,5 @@
 ---
-- name: "Policy for {{ defenseclaw_policy_account }} (skipped where the CLI is absent)"
+- name: "Fleet policy, skipped where the CLI is absent, for {{ defenseclaw_policy_account }}"
   become: "{{ defenseclaw_policy_account != ansible_facts['user_id'] }}"
   become_user: "{{ defenseclaw_policy_account }}"
   vars:
