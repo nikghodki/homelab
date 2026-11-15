@@ -1,0 +1,3 @@
+defenseclaw_aibom_enabled: false   # only hosts with a connected agent (an AIBOM needs a connector)
+defenseclaw_aibom_keep_days: 30
+defenseclaw_aibom_time: "*-*-* 03:15:00"
