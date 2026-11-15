@@ -1,0 +1,24 @@
+# Which observe-stack files come from DefenseClaw's local observability bundle.
+# Checked in CI by .github/scripts/defenseclaw-bundle.py; Renovate bumps the version.
+# After a bump: run "defenseclaw-bundle.py sync" on dgx-1, port the printed diffs, commit.
+version: "1.0.9"  # renovate: datasource=github-tags depName=cisco-ai-defense/defenseclaw
+adapted_base: "1.0.9"  # release the adapted files were last ported from
+root: bundles/local_observability_stack
+
+# copied unchanged (a trailing / copies a whole folder)
+verbatim:
+  grafana/dashboards/: hosts/stacks/observe/grafana/dashboards/defenseclaw
+  prometheus/rules/alerts.yml: hosts/stacks/observe/vmalert/rules/defenseclaw-alerts.yml
+  prometheus/rules/recording.yml: hosts/stacks/observe/vmalert/rules/defenseclaw-recording.yml
+
+# changed for this stack; the check fails when upstream changes them
+adapted:
+  loki/loki.yaml:
+    dest: hosts/stacks/observe/loki/loki.yaml
+    upstream_sha256: 37e79b23af32194717d40a3b33aeafba7d6fd91c75a68723576968744cf1aad4
+  tempo/tempo.yaml:
+    dest: hosts/stacks/observe/tempo/tempo.yaml
+    upstream_sha256: 507a03eced68da2f1804ec9a73107ad92d0664949c667dd5922ef7fa0ca7cc9d
+  otel-collector/config.yaml:
+    dest: hosts/stacks/observe/otel-defenseclaw/config.yaml
+    upstream_sha256: 7674bd18c859010db7b6446202db1bd17d820bb1a2a825aa0ef21bfe1ac6008a

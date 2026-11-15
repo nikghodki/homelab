@@ -25,6 +25,16 @@
         "(?<depName>[a-z0-9][a-z0-9./_-]*):(?<currentValue>[A-Za-z0-9][A-Za-z0-9._-]*)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "DefenseClaw release behind the observe stack's dashboards and rules",
+      "managerFilePatterns": [
+        "/^hosts/stacks/observe/defenseclaw-bundle\\.yaml$/"
+      ],
+      "matchStrings": [
+        "version: \"(?<currentValue>[^\"]+)\"\\s+# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)"
+      ]
     }
   ],
   "packageRules": [
@@ -34,6 +44,16 @@
         ".github/**"
       ],
       "groupName": "CI tools"
+    },
+    {
+      "description": "DefenseClaw bump needs `defenseclaw-bundle.py sync` on dgx-1 before merge",
+      "matchDepNames": [
+        "cisco-ai-defense/defenseclaw"
+      ],
+      "automerge": false,
+      "prBodyNotes": [
+        "Run `.github/scripts/defenseclaw-bundle.py sync` on dgx-1, port any printed diffs, push to this branch."
+      ]
     }
   ],
   "pip-compile": {
