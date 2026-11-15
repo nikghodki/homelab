@@ -1,0 +1,5 @@
+# Direct Python tools used by CI. Compile with: uv pip compile --generate-hashes --python-version 3.12 --python-platform x86_64-manylinux_2_28 .github/requirements-ci.in -o .github/requirements-ci.txt
+yamllint==1.38.0
+ansible-lint==26.11.0
+cisco-ai-mcp-scanner==4.8.7
+cisco-ai-skill-scanner==2.3.2

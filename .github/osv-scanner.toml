@@ -1,0 +1,15 @@
+# OSV-Scanner exceptions for the CI tool lock file in this folder only (.github/requirements-ci.txt).
+# Each one expires, so it is looked at again; Renovate will drop it once upstream moves.
+
+[[IgnoredVulns]]
+id = "GHSA-7hp6-4w63-5g45"
+ignoreUntil = 2026-12-15
+reason = """litellm 1.93.2 is pinned exactly by cisco-ai-mcp-scanner 4.8.7. The advisory is a privilege escalation in \
+the LiteLLM *proxy server*; CI only imports litellm as a library for the offline YARA scan and never starts a proxy. \
+Remove when mcp-scanner allows litellm>=1.100.4."""
+
+[[IgnoredVulns]]
+id = "GHSA-g5ff-637f-6q2m"
+ignoreUntil = 2026-12-15
+reason = """Same pin (litellm 1.93.2 via cisco-ai-mcp-scanner 4.8.7). File read through the LiteLLM *proxy* \
+/utils/transform_request endpoint, which CI never runs. Remove when mcp-scanner allows litellm>=1.95.0."""

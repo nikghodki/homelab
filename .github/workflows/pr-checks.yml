@@ -36,7 +36,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Python tools
-        run: pip install -r .github/requirements-ci.txt
+        run: pip install --require-hashes -r .github/requirements-ci.txt
       - name: actionlint
         run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
       - name: yamllint
@@ -107,7 +107,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install scanners
-        run: pip install -r .github/requirements-ci.txt
+        run: pip install --require-hashes -r .github/requirements-ci.txt
       - name: mcp-scanner (static, YARA)
         run: python3 .github/scripts/scan-mcp-tools.py tools
       - name: skill-scanner

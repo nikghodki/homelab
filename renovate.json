@@ -7,14 +7,20 @@
     ":dependencyDashboard"
   ],
   "timezone": "America/Los_Angeles",
-  "schedule": ["before 6am on monday"],
-  "labels": ["renovate"],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "renovate"
+  ],
   "prConcurrentLimit": 5,
   "customManagers": [
     {
       "customType": "regex",
       "description": "Container images used with docker run in workflows (image:tag@sha256:digest)",
-      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
       "matchStrings": [
         "(?<depName>[a-z0-9][a-z0-9./_-]*):(?<currentValue>[A-Za-z0-9][A-Za-z0-9._-]*)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
@@ -24,8 +30,24 @@
   "packageRules": [
     {
       "description": "Group CI scanner tools into one PR",
-      "matchFileNames": [".github/**"],
+      "matchFileNames": [
+        ".github/**"
+      ],
       "groupName": "CI tools"
     }
-  ]
+  ],
+  "pip-compile": {
+    "managerFilePatterns": [
+      "/^\\.github/requirements-ci\\.txt$/"
+    ]
+  },
+  "pip_requirements": {
+    "enabled": false
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ]
+  }
 }
