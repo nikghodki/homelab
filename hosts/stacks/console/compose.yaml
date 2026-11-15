@@ -1,5 +1,7 @@
 # Console stack on dgx-2 (plan P1.13; architecture: namespace `console`). Deployed by playbooks/console.yml.
 # pocket-id: passkey-only OIDC provider at https://id.nghodki.ai (dgx-1 Caddy terminates TLS, D25).
+# homepage + oauth2-proxy: the launcher at https://ops.nghodki.ai (plan P1.15). Only oauth2-proxy is on the LAN;
+# it signs people in through Pocket ID (client `ops`, admins only) and forwards to homepage on the stack network.
 name: console
 
 services:
@@ -21,6 +23,50 @@ services:
       - pocket-id-data:/app/data
     ports:
       - "192.168.86.36:1411:1411"   # LAN only: dgx-1's Caddy is the only client
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v2.8.0@sha256:019d8f063a7299e7c1c51ee4a70b692291809af3244894fbec2c2ac7d1f71b18
+    restart: unless-stopped
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: ops.nghodki.ai
+      LOG_TARGETS: stdout
+      PUID: "1000"
+      PGID: "1000"
+      # siteMonitor checks go through the front door over https; trust the homelab web CA from the host bundle
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca-certificates.crt
+    volumes:
+      - ./homepage/settings.yaml:/app/config/settings.yaml:ro
+      - ./homepage/services.yaml:/app/config/services.yaml:ro
+      - ./homepage/widgets.yaml:/app/config/widgets.yaml:ro
+      - ./homepage/bookmarks.yaml:/app/config/bookmarks.yaml:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    extra_hosts:
+      - "grafana.nghodki.ai:192.168.86.44"
+      - "status.nghodki.ai:192.168.86.44"
+      - "phoenix.nghodki.ai:192.168.86.44"
+      - "ntfy.nghodki.ai:192.168.86.44"
+      - "webui.nghodki.ai:192.168.86.44"
+      - "model.nghodki.ai:192.168.86.44"
+      - "dgxmanager.nghodki.ai:192.168.86.44"
+      - "ha.nghodki.ai:192.168.86.44"
+      - "id.nghodki.ai:192.168.86.44"
+      - "ca.nghodki.ai:192.168.86.44"
+    # no ports: only oauth2-proxy reaches it, on the stack network
+    expose: ["3000"]
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
+    restart: unless-stopped
+    command: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+    volumes:
+      - ./oauth2-proxy/oauth2-proxy.cfg:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door and trust the
+    # homelab web CA from the host's bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+    ports:
+      - "192.168.86.36:4180:4180"   # LAN only: dgx-1's Caddy is the only client (ops.nghodki.ai)
+    depends_on: [pocket-id, homepage]
 
 volumes:
   pocket-id-data:

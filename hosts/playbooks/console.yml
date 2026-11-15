@@ -1,4 +1,4 @@
-# Console stack on dgx-2: Pocket ID (plan P1.13). Always --check --diff first.
+# Console stack on dgx-2: Pocket ID (plan P1.13), Homepage behind oauth2-proxy (P1.15). Always --check --diff first.
 - name: Console
   hosts: observe
   become: true
@@ -11,6 +11,8 @@
   vars:
     pocketid_encryption_key: "{{ console_secrets.pocketid_encryption_key }}"
     pocketid_static_api_key: "{{ console_secrets.pocketid_static_api_key }}"
+    oidc_ops_secret: "{{ console_secrets.oidc_ops_secret }}"
+    oauth2_proxy_ops_cookie_secret: "{{ console_secrets.oauth2_proxy_ops_cookie_secret }}"
   roles:
     - role: compose_stack
       vars:
@@ -18,3 +20,4 @@
         compose_stack_src: "{{ playbook_dir }}/../stacks/console"
         compose_stack_private_templates:
           pocket-id: 1000
+          oauth2-proxy: 65532   # distroless nonroot
