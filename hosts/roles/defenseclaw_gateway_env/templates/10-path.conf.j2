@@ -1,0 +1,4 @@
+# Managed by Ansible (role defenseclaw_gateway_env). The scanners (skill-scanner, mcp-scanner) live in ~/.local/bin;
+# without it they fail closed.
+[Service]
+Environment="PATH={{ defenseclaw_gateway_env_path }}"

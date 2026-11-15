@@ -4,6 +4,11 @@
   roles:
     - role: defenseclaw_policy
 
+- name: DefenseClaw gateway PATH (scanners in ~/.local/bin, else fail closed)
+  hosts: all
+  roles:
+    - role: defenseclaw_gateway_env
+
 - name: DefenseClaw Fleet gateway (plan P1.12)
   hosts: all
   roles:
