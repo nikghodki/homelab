@@ -1,0 +1,33 @@
+# k3s cluster (plan P3.2, runbooks/k3s.md). Always --check --diff first.
+# dgx-2 starts the cluster; dgx-1 and the Jetson join as servers one at a time; then the agents.
+- name: K3s first server (cluster-init)
+  hosts: k3s_init
+  become: true
+  pre_tasks: &k3s_secrets
+    - name: Load the k3s token from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/k3s.enc.yaml"
+        name: k3s_secrets
+      no_log: true
+  vars: &k3s_vars
+    k3s_token: "{{ k3s_secrets.k3s_token }}"
+  roles:
+    - role: k3s
+
+- name: K3s servers and the etcd member, one at a time
+  hosts: k3s_servers:!k3s_init
+  become: true
+  serial: 1
+  pre_tasks: *k3s_secrets
+  vars: *k3s_vars
+  roles:
+    - role: k3s
+
+- name: K3s agents, one at a time
+  hosts: k3s_agents
+  become: true
+  serial: 1
+  pre_tasks: *k3s_secrets
+  vars: *k3s_vars
+  roles:
+    - role: k3s

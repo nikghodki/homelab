@@ -1,0 +1,52 @@
+# Managed by homelab Ansible (roles/k3s). k3s reads this at start; a change restarts k3s. See runbooks/k3s.md.
+node-name: {{ inventory_hostname }}
+token-file: /etc/rancher/k3s/token
+node-ip: {{ k3s_node_ip }}
+{% if k3s_node_external_ip %}
+node-external-ip: {{ k3s_node_external_ip }}
+{% endif %}
+{% if k3s_flannel_iface %}
+flannel-iface: {{ k3s_flannel_iface }}
+{% endif %}
+{% if k3s_role == 'server' and k3s_cluster_init %}
+cluster-init: true
+{% else %}
+server: {{ k3s_server_url }}
+{% endif %}
+{% if k3s_role == 'server' %}
+{% if k3s_etcd_only %}
+disable-apiserver: true
+disable-controller-manager: true
+disable-scheduler: true
+{% else %}
+advertise-address: {{ k3s_node_ip }}
+tls-san:
+{% for san in k3s_tls_san %}
+  - "{{ san }}"
+{% endfor %}
+{% endif %}
+disable:
+{% for d in k3s_disable %}
+  - {{ d }}
+{% endfor %}
+secrets-encryption: {{ k3s_secrets_encryption | bool | lower }}
+write-kubeconfig-mode: "0600"
+{% endif %}
+{% if k3s_node_labels %}
+node-label:
+{% for l in k3s_node_labels %}
+  - "{{ l }}"
+{% endfor %}
+{% endif %}
+{% if k3s_node_taints %}
+node-taint:
+{% for t in k3s_node_taints %}
+  - "{{ t }}"
+{% endfor %}
+{% endif %}
+{% if k3s_kubelet_args %}
+kubelet-arg:
+{% for a in k3s_kubelet_args %}
+  - "{{ a }}"
+{% endfor %}
+{% endif %}

@@ -3,3 +3,12 @@
 sparks_extra_scrapes:
   - {job: dcgm-exporter, target: "127.0.0.1:9400"}
 otel_host_collector_extra_scrapes: "{{ sparks_extra_scrapes }}"
+# k3s servers with embedded etcd (plan P3.2). Node IP on the 200 Gb/s link; LAN IP as the external IP.
+k3s_role: server
+k3s_flannel_iface: enp1s0f0np0
+k3s_lan_iface: wlP9s9
+k3s_node_labels: [nghodki.ai/role=gpu, nghodki.ai/hw=gb10]
+# Scheduling budget only: the DGXMM engines run in Docker and are not counted by the kubelet.
+k3s_kubelet_args:
+  - system-reserved=cpu=2,memory=8Gi,ephemeral-storage=20Gi
+  - kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=5Gi

@@ -47,3 +47,10 @@ endpoints:
   - {name: omarchy ssh, group: hosts, url: "tcp://192.168.86.49:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: pi ssh, group: hosts, url: "tcp://192.168.86.39:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: Zenoh router (ROS 2), group: robot, url: "tcp://192.168.86.211:7447", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  # k3s (plan P3.2, runbooks/k3s.md). Anonymous auth is off, so a 401 from /readyz means the API server answers; the
+  # cluster CA isn't in Gatus, so TLS isn't verified, only the serving cert's expiry. etcd: TCP to each member.
+  - {name: API dgx-1, group: k3s, url: "https://192.168.86.44:6443/readyz", client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
+  - {name: API dgx-2, group: k3s, url: "https://192.168.86.36:6443/readyz", client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
+  - {name: etcd dgx-1, group: k3s, url: "tcp://10.100.136.1:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: etcd dgx-2, group: k3s, url: "tcp://10.100.136.2:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: etcd jetson, group: k3s, url: "tcp://192.168.86.211:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}

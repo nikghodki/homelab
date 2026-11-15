@@ -1,0 +1,46 @@
+# k3s (plan P3.2, runbooks/k3s.md). The version is pinned; the binary and the install script are checksum-verified.
+k3s_version: v1.37.2+k3s1
+# sha256 of the release binaries (sha256sum-<arch>.txt in the GitHub release)
+k3s_sha256:
+  aarch64: a779ccf1e5e2e33a62f5a29c2f1c0bbf99431e100579d4c10f0aa0742a6aa84b
+  x86_64: 265b3ee6a3198ef14033c63ef46cbb32370d83795199fb6d1b01f21575eddbda
+# install.sh at the same tag; used only for the systemd unit, the kubectl/crictl/ctr links and the
+# killall/uninstall scripts (INSTALL_K3S_SKIP_DOWNLOAD=true, nothing is fetched by it)
+k3s_install_script_sha256: ed01f89fd977bf20ac1516bbebf8370bf3ddbaa55dac8aba610956a4c78cc00b
+
+# server (embedded etcd) or agent
+k3s_role: agent
+# Exactly one server starts the cluster (cluster-init); every other node joins k3s_server_url.
+k3s_cluster_init: false
+# A server with no API server, controller manager or scheduler: an etcd member that also runs a kubelet.
+k3s_etcd_only: false
+k3s_server_url: ""
+k3s_node_ip: ""
+k3s_node_external_ip: ""
+k3s_flannel_iface: ""
+k3s_tls_san: []
+k3s_disable: [traefik, servicelb, metrics-server]
+k3s_secrets_encryption: true
+k3s_node_labels: []
+k3s_node_taints: []
+k3s_kubelet_args: []
+# Join token, from secrets/k3s.enc.yaml (loaded by playbooks/k3s.yml)
+k3s_token: ""
+
+# LAN interface: checked for rp_filter; carries k3s_link_routes (NetworkManager connection)
+k3s_lan_iface: ""
+# Host routes to the Spark link addresses for nodes that are not on the cable, e.g.
+# [{dest: 10.100.136.1/32, via: 192.168.86.44}]
+k3s_link_routes: []
+# Open the kubelet and flannel ports and the pod interfaces in ufw (hosts where ufw is on)
+k3s_ufw: false
+k3s_ufw_sources: [192.168.86.0/24, 10.100.136.0/24]
+# Refuse a first install when MemAvailable is below this (MiB); 0 = no check
+k3s_min_mem_available_mb: 0
+
+# Write an admin kubeconfig for this user (servers with an API server only), pointing at k3s_kubeconfig_server
+k3s_kubeconfig_user: ""
+k3s_kubeconfig_server: https://k8s.nghodki.ai:6443
+
+k3s_service: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"
+k3s_arch_suffix: "{{ {'aarch64': '-arm64', 'x86_64': ''}[ansible_architecture] }}"

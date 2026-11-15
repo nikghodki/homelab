@@ -1,0 +1,22 @@
+# k3s alerts (plan P3.2, runbooks/k3s.md), from Gatus' k3s checks (gatus_results_endpoint_success).
+groups:
+  - name: k3s
+    rules:
+      - alert: K3sEtcdMemberDown
+        expr: sum(gatus_results_endpoint_success{group="k3s", name=~"etcd .*"}) < 3
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "An etcd member is unreachable: the cluster can't lose another one (runbooks/k3s.md)"
+      - alert: K3sEtcdQuorumLost
+        expr: sum(gatus_results_endpoint_success{group="k3s", name=~"etcd .*"}) < 2
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Fewer than 2 of 3 etcd members answer: the k3s API is read-only or down (runbooks/k3s.md)"
+      - alert: K3sApiDown
+        expr: max(gatus_results_endpoint_success{group="k3s", name=~"API .*"}) == 0
+        for: 3m
+        labels: {severity: critical}
+        annotations:
+          summary: "Neither k3s API server answers on :6443 (runbooks/k3s.md)"

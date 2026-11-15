@@ -2,3 +2,16 @@ restic_backup_paths:
   - /home/nikghodki/Work
   - /home/nikghodki/Documents
   - /home/nikghodki/Projects
+# k3s agent (plan P3.2). A laptop: it may sleep (decisions/0005-k3s-over-wifi.md).
+k3s_role: agent
+k3s_node_ip: 192.168.86.49
+k3s_flannel_iface: wlp1s0
+k3s_lan_iface: wlp1s0
+k3s_link_routes:
+  - {dest: 10.100.136.1/32, via: 192.168.86.44}
+  - {dest: 10.100.136.2/32, via: 192.168.86.36}
+k3s_ufw: true
+k3s_node_labels: [nghodki.ai/role=agent-node, nghodki.ai/hw=x86]
+k3s_kubelet_args:
+  - system-reserved=cpu=1,memory=2Gi
+  - kube-reserved=cpu=250m,memory=512Mi

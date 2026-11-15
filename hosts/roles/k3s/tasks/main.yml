@@ -1,0 +1,128 @@
+# k3s server, etcd-only member or agent (plan P3.2). See runbooks/k3s.md.
+- name: Check the role's variables
+  ansible.builtin.assert:
+    that:
+      - k3s_role in ['server', 'agent']
+      - k3s_node_ip | length > 0
+      - k3s_token | length > 0
+      - k3s_cluster_init or k3s_server_url | length > 0
+      - ansible_architecture in k3s_sha256
+    quiet: true
+
+- name: Is k3s installed yet
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ k3s_service }}.service"
+  register: k3s_unit
+
+- name: Enough free memory for a first install
+  when: k3s_min_mem_available_mb | int > 0 and not k3s_unit.stat.exists
+  ansible.builtin.assert:
+    that: ansible_memory_mb.nocache.free | int >= k3s_min_mem_available_mb | int
+    fail_msg: "Only {{ ansible_memory_mb.nocache.free }} MiB available; k3s needs {{ k3s_min_mem_available_mb }} MiB here"
+    quiet: true
+
+- name: Reverse-path filter on the LAN interface
+  when: k3s_lan_iface | length > 0
+  block:
+    - name: Read rp_filter (the kernel uses the larger of "all" and the interface)
+      ansible.builtin.command: sysctl -n net.ipv4.conf.all.rp_filter net.ipv4.conf.{{ k3s_lan_iface }}.rp_filter
+      register: k3s_rp_filter
+      changed_when: false
+      check_mode: false
+
+    - name: Not strict (traffic for the Spark link addresses arrives on the LAN interface)
+      ansible.builtin.assert:
+        that: k3s_rp_filter.stdout_lines | map('int') | max != 1
+        fail_msg: "rp_filter is strict on {{ k3s_lan_iface }}; set it to 2 (loose)"
+        quiet: true
+
+- name: Routes to the Spark link addresses
+  ansible.builtin.include_tasks: routes.yml
+  when: k3s_link_routes | length > 0
+
+- name: Firewall
+  ansible.builtin.include_tasks: ufw.yml
+  when: k3s_ufw
+
+- name: Config folder
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Join token
+  ansible.builtin.copy:
+    content: "{{ k3s_token }}\n"
+    dest: /etc/rancher/k3s/token
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart k3s
+
+- name: Config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    mode: "0644"  # no secrets here (the token is in token-file); kubectl reads it as a user
+  notify: Restart k3s
+
+- name: The k3s binary (pinned release, sha256 checked)
+  ansible.builtin.get_url:
+    url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s_version | urlencode }}/k3s{{ k3s_arch_suffix }}"
+    dest: /usr/local/bin/k3s
+    checksum: "sha256:{{ k3s_sha256[ansible_architecture] }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart k3s
+
+- name: Install script (same tag, sha256 checked)
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/k3s-io/k3s/{{ k3s_version | urlencode }}/install.sh"
+    dest: /usr/local/sbin/homelab-k3s-install.sh
+    checksum: "sha256:{{ k3s_install_script_sha256 }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Systemd unit, kubectl/crictl/ctr links, killall and uninstall scripts (no download, no start)
+  ansible.builtin.command: /usr/local/sbin/homelab-k3s-install.sh
+  args:
+    creates: "/etc/systemd/system/{{ k3s_service }}.service"
+  environment:
+    INSTALL_K3S_SKIP_DOWNLOAD: "true"
+    INSTALL_K3S_SKIP_START: "true"
+    INSTALL_K3S_SKIP_SELINUX_RPM: "true"
+    INSTALL_K3S_EXEC: "{{ k3s_role }}"
+  notify: Restart k3s
+
+- name: Apply config, token or binary changes now
+  ansible.builtin.meta: flush_handlers
+
+- name: The k3s service is enabled and running
+  ansible.builtin.systemd_service:
+    name: "{{ k3s_service }}"
+    enabled: true
+    state: started
+  when: not ansible_check_mode
+
+- name: Node is Ready
+  ansible.builtin.command: >-
+    k3s kubectl get node {{ inventory_hostname }}
+    -o 'jsonpath={.status.conditions[?(@.type=="Ready")].status}'
+  delegate_to: "{{ groups['k3s_init'][0] }}"
+  register: k3s_ready
+  until: k3s_ready.stdout == "True"
+  retries: 60
+  delay: 5
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Admin kubeconfig
+  ansible.builtin.include_tasks: kubeconfig.yml
+  when: k3s_kubeconfig_user | length > 0
