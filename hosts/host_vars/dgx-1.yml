@@ -32,3 +32,9 @@ cisco_aibom_dirs:
   - {name: dgx-model-manager, path: /home/nikghodki-dgx/workspace/dgx-model-manager}
   - {name: litellm-setup, path: /home/nikghodki-dgx/litellm-setup}
 cisco_aibom_containers: [litellm-proxy, open-webui]
+# k3s (plan P3.2)
+k3s_node_ip: 10.100.136.1
+k3s_node_external_ip: 192.168.86.44
+k3s_kubeconfig_user: nikghodki-dgx
+# The LAN IP, not k8s.nghodki.ai: edge-dnsmasq answers AAAA with NXDOMAIN, which Go's resolver (kubectl) treats as no such host
+k3s_kubeconfig_server: https://192.168.86.44:6443

@@ -1,0 +1,35 @@
+# Host routes to the Spark link addresses (architecture §4.4), kept on the NetworkManager connection so they
+# come back after every reconnect, and added live so no reconnect is needed now.
+- name: NetworkManager connection on {{ k3s_lan_iface }}
+  ansible.builtin.command: nmcli -g GENERAL.CONNECTION device show {{ k3s_lan_iface }}
+  register: k3s_nm_connection
+  changed_when: false
+  check_mode: false
+  failed_when: k3s_nm_connection.rc != 0 or k3s_nm_connection.stdout | length == 0
+
+- name: Routes stored on the connection
+  ansible.builtin.command: nmcli -g ipv4.routes connection show {{ k3s_nm_connection.stdout | quote }}
+  register: k3s_nm_routes
+  changed_when: false
+  check_mode: false
+
+- name: Add missing routes to the connection
+  ansible.builtin.command: >-
+    nmcli connection modify {{ k3s_nm_connection.stdout | quote }} +ipv4.routes {{ (item.dest ~ ' ' ~ item.via) | quote }}
+  loop: "{{ k3s_link_routes }}"
+  when: (item.dest ~ ' ' ~ item.via) not in k3s_nm_routes.stdout
+  changed_when: true
+
+- name: Live routes
+  ansible.builtin.command: ip -4 route show {{ item.dest }}
+  loop: "{{ k3s_link_routes }}"
+  register: k3s_live_routes
+  changed_when: false
+  check_mode: false
+
+- name: Add missing live routes
+  ansible.builtin.command: ip route replace {{ item.item.dest }} via {{ item.item.via }} dev {{ k3s_lan_iface }}
+  loop: "{{ k3s_live_routes.results }}"
+  loop_control: {label: "{{ item.item.dest }}"}
+  when: ("via " ~ item.item.via ~ " ") not in (item.stdout ~ " ")
+  changed_when: true

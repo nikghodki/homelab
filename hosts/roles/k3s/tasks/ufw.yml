@@ -1,0 +1,26 @@
+# Kubelet (10250/tcp) and flannel VXLAN (8472/udp) from the LAN and the Spark link; pod traffic in and through.
+- name: Kubelet and VXLAN from the fleet
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item.0 }}"
+    to_port: "{{ item.1.port }}"
+    proto: "{{ item.1.proto }}"
+    comment: "k3s {{ item.1.name }}"
+  loop: "{{ k3s_ufw_sources | product([{'port': '10250', 'proto': 'tcp', 'name': 'kubelet'}, {'port': '8472', 'proto': 'udp', 'name': 'flannel'}]) | list }}"
+  loop_control: {label: "{{ item.0 }} {{ item.1.port }}/{{ item.1.proto }}"}
+
+- name: Pod interfaces may reach the host
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: "{{ item }}"
+    comment: k3s pods
+  loop: [cni0, flannel.1]
+
+- name: Pod traffic may be forwarded
+  community.general.ufw:
+    rule: allow
+    route: true
+    interface_in: "{{ item }}"
+    comment: k3s pods
+  loop: [cni0, flannel.1]

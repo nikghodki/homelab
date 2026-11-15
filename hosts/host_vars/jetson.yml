@@ -33,3 +33,21 @@ cisco_aibom_dirs:
   - {name: hermes-agent, path: /home/nikjetson/.hermes/hermes-agent}
   - {name: hermes-agent-hermes-nikhil, path: /home/hermes-nikhil/.hermes/hermes-agent}
   - {name: roboclaw, path: /home/nikjetson/workspace/roboclaw}
+# k3s (plan P3.2, design D2): etcd member + tainted worker. Memory is tight (Hermes x2, Home Assistant, LiveKit, ...).
+k3s_role: server
+k3s_etcd_only: true
+k3s_node_ip: 192.168.86.211
+k3s_flannel_iface: wlP1p1s0
+k3s_lan_iface: wlP1p1s0
+k3s_link_routes:
+  - {dest: 10.100.136.1/32, via: 192.168.86.44}
+  - {dest: 10.100.136.2/32, via: 192.168.86.36}
+k3s_node_labels: [nghodki.ai/role=edge-robot, nghodki.ai/hw=orin]
+k3s_node_taints: ["nghodki.ai/jetson=true:NoSchedule"]
+k3s_min_mem_available_mb: 2048
+# About 2.3 GiB allocatable; pods are evicted before host processes run out of memory.
+k3s_kubelet_args:
+  - system-reserved=cpu=1500m,memory=4Gi
+  - kube-reserved=cpu=500m,memory=768Mi
+  - eviction-hard=memory.available<300Mi,nodefs.available<5%,imagefs.available<5%
+  - max-pods=40

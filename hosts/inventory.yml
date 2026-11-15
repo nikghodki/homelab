@@ -22,6 +22,20 @@ all:
         omarchy:
           ansible_host: 192.168.86.49
           ansible_user: nikghodki
+    # k3s (plan P3.2, runbooks/k3s.md). dgx-2 starts the cluster; the others join it one at a time.
+    k3s:
+      children:
+        k3s_servers:
+          hosts:
+            dgx-2:
+            dgx-1:
+            jetson:
+        k3s_agents:
+          hosts:
+            omarchy:
+    k3s_init:
+      hosts:
+        dgx-2:
     bus:
       hosts:
         dgx-1:

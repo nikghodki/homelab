@@ -93,7 +93,7 @@ Numbers marked "est." are estimates, not measurements.
 | `robot` | Nav2 bridge, Zenoh router (host network) | Jetson (tolerates the taint) |
 | `jobs` | Temporal, batch jobs, ARC runners | dgx-2 |
 | `sim` | Isaac Lab / Isaac Sim and MuJoCo training and evaluation jobs, MLflow | dgx-2 (dgx-1 overnight) |
-| `observe` | VictoriaMetrics, Loki, Tempo, Grafana, Phoenix, Gatus, Alertmanager, ntfy, OTel gateway; **dcgm-exporter** (DaemonSet, `role=gpu` nodes only) | dgx-2; dcgm-exporter on both Sparks |
+| `observe` | VictoriaMetrics, Loki, Tempo, Grafana, Phoenix, Gatus, Alertmanager, ntfy, OTel gateway; **dcgm-exporter** (DaemonSet, `nghodki.ai/role=gpu` nodes only) | dgx-2; dcgm-exporter on both Sparks |
 | `console` | Fleet Console, Homepage (interim), **Pocket ID** (`id.nghodki.ai`), oauth2-proxy | dgx-2 |
 | `security` | Kyverno, Tetragon, policy bundles, nightly AIBOM job; **Fleet MQTT broker** (Mosquitto, D24, `fleet.nghodki.ai:8884`, TLS, per-device ACLs); **Fleet API TLS proxy** (Caddy `:8971`) | Fleet broker and proxy pinned to dgx-1 |
 | `argocd` | Argo CD | Sparks |
@@ -186,7 +186,7 @@ Not moved: DGXMM and its engines (§3.2). Coolify stays a host app.
 |---|---|---|
 | Spark ↔ Spark, cable 1 (200 Gb/s QSFP) | `enp1s0f0np0`: dgx-1 `10.100.136.1`, dgx-2 `10.100.136.2` | k3s API, etcd peer, CNI (flannel VXLAN) between the Sparks; model sync |
 | Spark ↔ Spark, cable 2 | `enP2p1s0f0np0`: `10.100.137.0/24` | RDMA for pooled models (NCCL); not used by k3s |
-| LAN | Wi-Fi today on every device; the Sparks move to 10 GbE `enP7s7` to a switch in P0.11 | Everything else, including the Jetson's and Omarchy's k3s traffic |
+| LAN | Wi-Fi today on every device; the Sparks move to 10 GbE `enP7s7` to a switch in P0.11 | Everything else, including the Jetson's and Omarchy's k3s traffic (over Wi-Fi until P0.11, decision 0005) |
 
 - **Sparks:** `--node-ip=10.100.136.{1,2}`, `--node-external-ip=<LAN IP>`, `--flannel-iface=enp1s0f0np0`, and
   `--tls-san` with the LAN IPs, the kube-vip IP and the names. So etcd, the API and pod traffic between the Sparks
@@ -225,15 +225,18 @@ Not moved: DGXMM and its engines (§3.2). Coolify stays a host app.
   - Hermes and DefenseClaw stay host-installed until P4.5 moves Hermes.
 - **Agent nodes:** Omarchy. The Pi isn't in the cluster.
 - **kube-vip** gives a floating LAN IP for the API and the HTTPS proxy.
-- **Node labels:**
-  - `role=gpu` (Sparks)
+- **Node labels** (as built in P3.2, runbooks/k3s.md):
+  - `nghodki.ai/role=gpu` (Sparks)
   - `nghodki.ai/role=edge-robot` (Jetson)
-  - `role=agent-x86` (Omarchy)
-  - `node.kubernetes.io/instance-type=gb10|orin|x86`
+  - `nghodki.ai/role=agent-node` (Omarchy)
+  - `nghodki.ai/hw=gb10|orin|x86`. Not `node.kubernetes.io/instance-type`: k3s's cloud controller sets that to `k3s`.
 - **Taints:**
   - Jetson: `nghodki.ai/jetson=true:NoSchedule` (above).
   - The Sparks take GPU-planned work and the services listed above.
-- **etcd snapshots** are taken every 6 h to SeaweedFS on dgx-2, kept for 7 days.
+- **etcd snapshots** are taken every 6 h to SeaweedFS on dgx-2, kept for 7 days (P3.8). Until then: k3s's default,
+  local on each server, 00:00 and 12:00, 5 kept; off-host backup is off (decision 0002).
+- **Built over Wi-Fi** (decision 0005, 2026-11-15): the Spark-to-Spark path is the cable as designed; the Jetson and
+  Omarchy reach the Sparks over Wi-Fi until P0.11.
 - **Argo CD** watches `nikghodki/homelab` (read-only deploy key) and syncs `cluster/`.
 
 ## 6. Model plane

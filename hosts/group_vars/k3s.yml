@@ -1,0 +1,10 @@
+# k3s (plan P3.2, runbooks/k3s.md). Everything joins through dgx-2's address on the Spark link (architecture §4.4).
+k3s_server_url: https://10.100.136.2:6443
+k3s_tls_san:
+  - 192.168.86.44
+  - 192.168.86.36
+  - 10.100.136.1
+  - 10.100.136.2
+  - 100.65.137.82
+  - 100.124.175.23
+  - k8s.nghodki.ai
