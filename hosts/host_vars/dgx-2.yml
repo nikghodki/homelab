@@ -1,2 +1,5 @@
 restic_backup_paths:
   - /opt/homelab
+# Cisco AIBOM (runbooks/aibom.md)
+cisco_aibom_enabled: true
+cisco_aibom_containers: [observe-phoenix-1]

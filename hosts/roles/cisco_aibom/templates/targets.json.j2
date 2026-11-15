@@ -1,0 +1,7 @@
+{{ {"host": inventory_hostname,
+    "exe": cisco_aibom_prefix + "/venv/bin/cisco-aibom",
+    "state": cisco_aibom_state,
+    "keep_days": cisco_aibom_keep_days | int,
+    "timeout_s": cisco_aibom_timeout_s | int,
+    "dirs": cisco_aibom_dirs,
+    "containers": cisco_aibom_containers} | to_nice_json }}

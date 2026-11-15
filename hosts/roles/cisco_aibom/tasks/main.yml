@@ -1,0 +1,75 @@
+- name: Cisco AIBOM fleet inventory
+  when: cisco_aibom_enabled | bool
+  block:
+    - name: Python venv support
+      ansible.builtin.apt:
+        name: python3-venv
+        state: present
+      when: ansible_facts['os_family'] == 'Debian'
+
+    - name: Folders
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - {path: "{{ cisco_aibom_prefix }}", mode: "0755"}
+        - {path: /etc/cisco-aibom, mode: "0755"}
+        - {path: "{{ cisco_aibom_state }}", mode: "0700"}
+
+    - name: Hash-locked requirements (same lock as CI)
+      ansible.builtin.copy:
+        src: "{{ cisco_aibom_requirements }}"
+        dest: "{{ cisco_aibom_prefix }}/requirements.txt"
+        owner: root
+        group: root
+        mode: "0644"
+      register: cisco_aibom_lock
+
+    - name: Is the venv there?
+      ansible.builtin.stat:
+        path: "{{ cisco_aibom_prefix }}/venv/bin/cisco-aibom"
+      register: cisco_aibom_exe
+
+    - name: Install cisco-aibom in its own venv
+      ansible.builtin.pip:
+        requirements: "{{ cisco_aibom_prefix }}/requirements.txt"
+        virtualenv: "{{ cisco_aibom_prefix }}/venv"
+        virtualenv_command: /usr/bin/python3 -m venv
+        extra_args: --require-hashes --no-deps
+      when: cisco_aibom_lock is changed or not cisco_aibom_exe.stat.exists
+
+    - name: Job script
+      ansible.builtin.copy:
+        src: cisco-aibom-fleet.py
+        dest: "{{ cisco_aibom_prefix }}/cisco-aibom-fleet"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Targets
+      ansible.builtin.template:
+        src: targets.json.j2
+        dest: /etc/cisco-aibom/targets.json
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Service and timer
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: [cisco-aibom.service, cisco-aibom.timer]
+
+    - name: Timer is enabled
+      ansible.builtin.systemd_service:
+        name: cisco-aibom.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+      when: not ansible_check_mode

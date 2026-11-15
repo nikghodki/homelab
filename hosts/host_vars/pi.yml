@@ -11,3 +11,9 @@ restic_backup_excludes:
   - /home/nikghodki-raspberry-1/.picoclaw/logs
 edge_connector_device_id: 1
 edge_connector_ipc_user: nikghodki-raspberry-1
+# Cisco AIBOM (runbooks/aibom.md)
+cisco_aibom_enabled: true
+cisco_aibom_memory_max: 1500M
+cisco_aibom_dirs:
+  - {name: picoclaw, path: /home/nikghodki-raspberry-1/.picoclaw}
+  - {name: roboclaw, path: /home/nikghodki-raspberry-1/workspace/roboclaw}

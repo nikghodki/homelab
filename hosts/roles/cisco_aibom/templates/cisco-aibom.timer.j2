@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (roles/cisco_aibom)
+[Unit]
+Description=Nightly Cisco AIBOM fleet inventory
+
+[Timer]
+OnCalendar={{ cisco_aibom_time }}
+RandomizedDelaySec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
