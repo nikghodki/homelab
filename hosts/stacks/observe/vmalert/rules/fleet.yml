@@ -1,0 +1,36 @@
+# Fleet alerts (architecture §5.1 / operations). DefenseClaw's own rules are in defenseclaw-*.yml.
+groups:
+  - name: fleet-hosts
+    rules:
+      - alert: FleetHostSilent
+        expr: max by (host_name) (time() - timestamp(system_memory_usage_bytes{state="used"})) > 300
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.host_name }} has sent no host metrics for 5 minutes"
+      - alert: FleetDiskWarning
+        expr: (1 - system_filesystem_usage_bytes{state="free"} / ignoring(state) sum without(state) (system_filesystem_usage_bytes)) > 0.80
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host_name }} {{ $labels.mountpoint }} is over 80% full"
+      - alert: FleetDiskCritical
+        expr: (1 - system_filesystem_usage_bytes{state="free"} / ignoring(state) sum without(state) (system_filesystem_usage_bytes)) > 0.90
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.host_name }} {{ $labels.mountpoint }} is over 90% full"
+      - alert: FleetMemoryLow
+        expr: system_memory_usage_bytes{state="free"} + ignoring(state) system_memory_usage_bytes{state="cached"} < 2e9
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.host_name }} has under 2 GB free memory"
+  - name: fleet-stack
+    rules:
+      - alert: ObservabilityComponentDown
+        expr: up == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.job }} ({{ $labels.instance }}) is not answering"

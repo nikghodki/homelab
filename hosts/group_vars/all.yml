@@ -6,3 +6,8 @@ base_unattended_security_upgrades: true
 # Turn on only after every admin path has a key (plan P1.4); it is off until then.
 base_ssh_disable_password_auth: false
 fleet_metrics_port: 9109
+# Observability (plan P1.6): the stack runs on dgx-2; host collectors push OTLP to it.
+observe_host: 192.168.86.36
+otel_host_collector_endpoint: "{{ observe_host }}:4319"
+otel_host_collector_version: 0.165.0
+otel_host_collector_memory_max: 256M

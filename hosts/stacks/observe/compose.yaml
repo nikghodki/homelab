@@ -1,0 +1,132 @@
+# Observability stack on dgx-2 (plan P1.6). Deployed by Ansible (playbooks/observe.yml) to /opt/homelab/observe.
+# Images are pinned by digest; Renovate keeps them current. Secrets come from .env (rendered from SOPS by Ansible).
+name: observe
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  victoriametrics:
+    <<: *restart
+    image: victoriametrics/victoria-metrics:v1.156.0@sha256:da8a90ac0912f16589be2b96a6441a2fca4bca415c83783d972d92e3b5b66970
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=12
+      - -httpListenAddr=:8428
+      - -promscrape.config=/etc/vm/scrape.yml
+    volumes:
+      - vm-data:/storage
+      - ./victoriametrics/scrape.yml:/etc/vm/scrape.yml:ro
+
+  vmalert:
+    <<: *restart
+    image: victoriametrics/vmalert:v1.156.0@sha256:4fea7d1a888d4db4ff18804434ef0f3ca8eb6482e289c50d32001c2db218287c
+    command:
+      - -datasource.url=http://victoriametrics:8428
+      - -remoteWrite.url=http://victoriametrics:8428
+      - -remoteRead.url=http://victoriametrics:8428
+      - -notifier.url=http://alertmanager:9093
+      - -rule=/etc/vmalert/rules/*.yml
+      - -evaluationInterval=30s
+    volumes:
+      - ./vmalert/rules:/etc/vmalert/rules:ro
+    depends_on: [victoriametrics, alertmanager]
+
+  alertmanager:
+    <<: *restart
+    image: prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - am-data:/alertmanager
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    depends_on: [ntfy]
+
+  loki:
+    <<: *restart
+    image: grafana/loki:3.7.10@sha256:b43c257ccfc925d4a50b8717cac61a3b51df8c48d01847936057e5c4075a24a7
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - loki-data:/loki
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+
+  tempo:
+    <<: *restart
+    image: grafana/tempo:2.10.10@sha256:12b0820f13ffa10ce956b6e9acc3b03f3cffded99109be6cc09d106fe56e5d38
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - tempo-data:/var/tempo
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+
+  # DefenseClaw gateways send OTLP here (4317 gRPC / 4318 HTTP), through DefenseClaw's own pipelines.
+  otel-defenseclaw:
+    <<: *restart
+    image: otel/opentelemetry-collector-contrib:0.165.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-defenseclaw/config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on: [victoriametrics, loki, tempo]
+
+  # Host collectors on every device send OTLP here (4319 gRPC / 4320 HTTP).
+  otel-fleet:
+    <<: *restart
+    image: otel/opentelemetry-collector-contrib:0.165.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-fleet/config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4319:4317"
+      - "4320:4318"
+    depends_on: [victoriametrics, loki]
+
+  grafana:
+    <<: *restart
+    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set in .env}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://grafana.nghodki.ai
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on: [victoriametrics, loki, tempo, alertmanager]
+
+  gatus:
+    <<: *restart
+    image: twinproduction/gatus:v5.38.0@sha256:085ed63da963728965d00a3c78aa6167e3bf135218485b893201758e079e8415
+    volumes:
+      - ./gatus/config.yaml:/config/config.yaml:ro
+      - gatus-data:/data
+    ports:
+      - "8081:8080"
+    depends_on: [ntfy]
+
+  ntfy:
+    <<: *restart
+    image: binwiederhier/ntfy:v2.38.0@sha256:771309aecfce18d8fe2bfb8069994ddd6be6ca6ccdd7badace3d791a0045ff0d
+    command: ["serve"]
+    volumes:
+      - ./ntfy/server.yml:/etc/ntfy/server.yml:ro
+      - ntfy-data:/var/lib/ntfy
+    ports:
+      - "8085:80"
+
+volumes:
+  vm-data:
+  am-data:
+  loki-data:
+  tempo-data:
+  grafana-data:
+  gatus-data:
+  ntfy-data:

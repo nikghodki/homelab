@@ -1,0 +1,94 @@
+- name: Pick the release architecture
+  ansible.builtin.set_fact:
+    otel_host_collector_arch: "{{ {'aarch64': 'arm64', 'x86_64': 'amd64'}[ansible_facts['architecture']] }}"
+
+- name: Is this version already installed
+  ansible.builtin.stat:
+    path: "/opt/otelcol-contrib/{{ otel_host_collector_version }}/otelcol-contrib"
+  register: otel_host_collector_installed
+
+- name: First install in check mode
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: would install otelcol-contrib {{ otel_host_collector_version }} and start it"
+  when: ansible_check_mode and not otel_host_collector_installed.stat.exists
+
+- name: Install, configure and run the collector
+  # A first install cannot be simulated in check mode (user, folders and binary do not exist yet).
+  when: not (ansible_check_mode and not otel_host_collector_installed.stat.exists)
+  block:
+    - name: Collector user
+      ansible.builtin.user:
+        name: otelcol
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+        groups: [systemd-journal]
+        append: true
+
+    - name: Install folder
+      ansible.builtin.file:
+        path: "/opt/otelcol-contrib/{{ otel_host_collector_version }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Download and unpack the collector
+      block:
+        - name: Download the collector (checked against the release's .sha256 file)
+          ansible.builtin.get_url:
+            url: "{{ otel_host_collector_release_url }}/{{ otel_host_collector_tarball }}"
+            checksum: "sha256:{{ lookup('ansible.builtin.url', otel_host_collector_release_url ~ '/' ~ otel_host_collector_tarball ~ '.sha256') | trim }}"
+            dest: "/opt/otelcol-contrib/{{ otel_host_collector_version }}/otelcol-contrib.tar.gz"
+            owner: root
+            group: root
+            mode: "0644"
+
+        - name: Unpack
+          ansible.builtin.unarchive:
+            src: "/opt/otelcol-contrib/{{ otel_host_collector_version }}/otelcol-contrib.tar.gz"
+            dest: "/opt/otelcol-contrib/{{ otel_host_collector_version }}"
+            remote_src: true
+            include: [otelcol-contrib]
+            creates: "/opt/otelcol-contrib/{{ otel_host_collector_version }}/otelcol-contrib"
+          notify: Restart otelcol
+
+    - name: Current version link
+      ansible.builtin.file:
+        src: "/opt/otelcol-contrib/{{ otel_host_collector_version }}/otelcol-contrib"
+        dest: /usr/local/bin/otelcol-contrib
+        state: link
+      notify: Restart otelcol
+
+    - name: Config folder
+      ansible.builtin.file:
+        path: /etc/otelcol-contrib
+        state: directory
+        owner: root
+        group: otelcol
+        mode: "0750"
+
+    - name: Config
+      ansible.builtin.template:
+        src: config.yaml.j2
+        dest: /etc/otelcol-contrib/config.yaml
+        owner: root
+        group: otelcol
+        mode: "0640"
+      notify: Restart otelcol
+
+    - name: Service unit
+      ansible.builtin.template:
+        src: otelcol-contrib.service.j2
+        dest: /etc/systemd/system/otelcol-contrib.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart otelcol
+
+    - name: Collector is enabled and running
+      ansible.builtin.systemd_service:
+        name: otelcol-contrib
+        enabled: true
+        state: started
+        daemon_reload: true

@@ -1,0 +1,28 @@
+# Rendered by Ansible (password from SOPS). All alerts go to ntfy topic "fleet-alerts"; Hermes/WhatsApp is added later.
+route:
+  receiver: ntfy
+  group_by: [alertname, host_name]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: ['severity="critical"']
+      receiver: ntfy-critical
+      repeat_interval: 30m
+receivers:
+  - name: ntfy
+    webhook_configs:
+      - url: http://ntfy/fleet-alerts?template=alertmanager
+        send_resolved: true
+        http_config:
+          basic_auth: {username: alerts, password: "{{ ntfy_alerts_password }}"}
+  - name: ntfy-critical
+    webhook_configs:
+      - url: http://ntfy/fleet-alerts?template=alertmanager&priority=urgent
+        send_resolved: true
+        http_config:
+          basic_auth: {username: alerts, password: "{{ ntfy_alerts_password }}"}
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']
+    equal: [alertname, host_name]
