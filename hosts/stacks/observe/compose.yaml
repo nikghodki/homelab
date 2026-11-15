@@ -91,7 +91,24 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set in .env}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: http://grafana.nghodki.ai
+      GF_SERVER_ROOT_URL: https://grafana.nghodki.ai
+      # Pocket ID; the local admin login stays as break-glass.
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Pocket ID
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${OIDC_GRAFANA_SECRET:?set in .env}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid email profile groups
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://id.nghodki.ai/authorize
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://id.nghodki.ai/api/oidc/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: https://id.nghodki.ai/api/oidc/userinfo
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+      GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH: groups
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(groups[*], 'admins') && 'GrafanaAdmin' || 'Viewer'"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: "true"
+      GF_AUTH_GENERIC_OAUTH_TLS_CLIENT_CA: /etc/ssl/certs/ca-certificates.crt
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/fleet/fleet-home.json
@@ -99,6 +116,10 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door and trust the
+    # homelab web CA from the host's bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
     ports:
       - "3000:3000"
     depends_on: [victoriametrics, loki, tempo, alertmanager]
@@ -109,6 +130,10 @@ services:
     volumes:
       - ./gatus/config.yaml:/config/config.yaml:ro
       - gatus-data:/data
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door and trust the
+    # homelab web CA from the host's bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
     ports:
       - "8081:8080"
     depends_on: [ntfy]
@@ -133,8 +158,24 @@ services:
       PHOENIX_SECRET: ${PHOENIX_SECRET:?set in .env}
       PHOENIX_DEFAULT_ADMIN_INITIAL_PASSWORD: ${PHOENIX_ADMIN_PASSWORD:?set in .env}
       PHOENIX_TELEMETRY_ENABLED: "false"
+      PHOENIX_ROOT_URL: https://phoenix.nghodki.ai
+      PHOENIX_CSRF_TRUSTED_ORIGINS: https://phoenix.nghodki.ai
+      PHOENIX_OAUTH2_POCKETID_DISPLAY_NAME: Pocket ID
+      PHOENIX_OAUTH2_POCKETID_CLIENT_ID: phoenix
+      PHOENIX_OAUTH2_POCKETID_CLIENT_SECRET: ${OIDC_PHOENIX_SECRET:?set in .env}
+      PHOENIX_OAUTH2_POCKETID_OIDC_CONFIG_URL: https://id.nghodki.ai/.well-known/openid-configuration
+      PHOENIX_OAUTH2_POCKETID_USE_PKCE: "true"
+      PHOENIX_OAUTH2_POCKETID_ALLOW_SIGN_UP: "true"
+      PHOENIX_OAUTH2_POCKETID_GROUPS_ATTRIBUTE_PATH: groups
+      PHOENIX_OAUTH2_POCKETID_ALLOWED_GROUPS: admins
+      PHOENIX_OAUTH2_POCKETID_ROLE_ATTRIBUTE_PATH: "contains(groups, 'admins') && 'ADMIN' || 'VIEWER'"
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
     volumes:
       - phoenix-data:/data
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door and trust the
+    # homelab web CA from the host's bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
     ports:
       - "6006:6006"
 

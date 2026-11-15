@@ -1,0 +1,20 @@
+# Console stack on dgx-2: Pocket ID (plan P1.13). Always --check --diff first.
+- name: Console
+  hosts: observe
+  become: true
+  pre_tasks:
+    - name: Load console secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
+        name: console_secrets
+      no_log: true
+  vars:
+    pocketid_encryption_key: "{{ console_secrets.pocketid_encryption_key }}"
+    pocketid_static_api_key: "{{ console_secrets.pocketid_static_api_key }}"
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: console
+        compose_stack_src: "{{ playbook_dir }}/../stacks/console"
+        compose_stack_private_templates:
+          pocket-id: 1000
