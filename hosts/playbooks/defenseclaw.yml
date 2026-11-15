@@ -1,4 +1,9 @@
 # DefenseClaw extras (plan P1.11). DefenseClaw itself is installed per user with its release installer.
+- name: DefenseClaw fleet policy
+  hosts: all
+  roles:
+    - role: defenseclaw_policy
+
 - name: DefenseClaw nightly AIBOM
   hosts: all
   roles:

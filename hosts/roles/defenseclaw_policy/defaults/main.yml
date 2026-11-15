@@ -1,0 +1,3 @@
+---
+defenseclaw_policy_name: homelab
+defenseclaw_policy_src: "{{ playbook_dir }}/../../policies/defenseclaw/{{ defenseclaw_policy_name }}.yaml"
