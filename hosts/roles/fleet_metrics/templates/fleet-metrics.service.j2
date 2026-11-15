@@ -1,0 +1,23 @@
+# Managed by homelab Ansible (roles/fleet_metrics); code from hosts/files/fleet-metrics
+[Unit]
+Description=Fleet metrics agent (resource + service telemetry, JSON and Prometheus on :{{ fleet_metrics_port }})
+After=network-online.target
+
+[Service]
+User=fleetmetrics
+Group=fleetmetrics
+WorkingDirectory=/opt/fleet-metrics
+Environment=PYTHONPATH=/opt/fleet-metrics
+Environment=FLEET_METRICS_PORT={{ fleet_metrics_port }}
+Environment=FLEET_UNITS={{ fleet_metrics_units }}
+ExecStart=/usr/bin/python3 -m fleet_metrics
+Restart=always
+RestartSec=5
+MemoryMax=96M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

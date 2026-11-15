@@ -22,6 +22,7 @@ receivers:
       scrape_configs:
         - job_name: fleet-metrics
           scrape_interval: 30s
+          metrics_path: /metrics/prometheus
           static_configs:
             - targets: ["127.0.0.1:{{ otel_host_collector_fleet_metrics_port }}"]
 {% endif %}

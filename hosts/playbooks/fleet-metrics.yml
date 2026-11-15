@@ -1,0 +1,6 @@
+# fleet-metrics on every host (JSON for the control center, Prometheus for the collectors).
+- name: Fleet metrics
+  hosts: all
+  become: true
+  roles:
+    - role: fleet_metrics

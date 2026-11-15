@@ -1,12 +1,84 @@
-- name: Fleet metrics answers on its port
+- name: Service user
+  ansible.builtin.user:
+    name: fleetmetrics
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Check for a docker group
+  ansible.builtin.getent:
+    database: group
+    key: docker
+    fail_key: false
+
+- name: Service user may read docker state (for /services)
+  ansible.builtin.user:
+    name: fleetmetrics
+    groups: [docker]
+    append: true
+  when: ansible_facts['getent_group']['docker'] is not none
+
+- name: Code folder
+  ansible.builtin.file:
+    path: /opt/fleet-metrics
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Code (from the homelab repo)
+  ansible.builtin.copy:
+    src: "{{ fleet_metrics_src }}"
+    dest: /opt/fleet-metrics/
+    owner: root
+    group: root
+    mode: "u=rwX,go=rX"
+  notify: Restart fleet-metrics
+
+- name: Retire the old per-user service
+  ansible.builtin.shell: |
+    set -o pipefail
+    export XDG_RUNTIME_DIR=/run/user/$(id -u)
+    if systemctl --user cat fleet-metrics.service >/dev/null 2>&1; then
+      systemctl --user disable --now fleet-metrics.service && echo retired
+    fi
+  args:
+    executable: /bin/bash
+  become: false
+  register: fleet_metrics_retired
+  changed_when: "'retired' in fleet_metrics_retired.stdout"
+
+- name: Service unit
+  ansible.builtin.template:
+    src: fleet-metrics.service.j2
+    dest: /etc/systemd/system/fleet-metrics.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fleet-metrics
+
+- name: Service is enabled and running
+  ansible.builtin.systemd_service:
+    name: fleet-metrics
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Flush handlers before probing
+  ansible.builtin.meta: flush_handlers
+
+- name: Prometheus endpoint answers
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ fleet_metrics_port }}/metrics"
-    status_code: 200
+    url: "http://127.0.0.1:{{ fleet_metrics_port }}/metrics/prometheus"
+    return_content: true
   register: fleet_metrics_probe
   failed_when: false
   check_mode: false
   become: false
 
-- name: Report hosts without fleet-metrics
+- name: Report
   ansible.builtin.debug:
-    msg: "{{ inventory_hostname }}: fleet-metrics {{ 'up' if fleet_metrics_probe.status | default(0) == 200 else 'NOT running' }}"
+    msg: >-
+      {{ inventory_hostname }}: fleet-metrics
+      {{ 'up' if (fleet_metrics_probe.status | default(0)) == 200 else 'NOT running' }}
