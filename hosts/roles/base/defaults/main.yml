@@ -1,0 +1,4 @@
+base_journald_max_use: 1G
+base_timezone: America/Los_Angeles
+base_unattended_security_upgrades: true
+base_ssh_disable_password_auth: false

@@ -1,0 +1,12 @@
+- name: Fleet metrics answers on its port
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ fleet_metrics_port }}/metrics"
+    status_code: 200
+  register: fleet_metrics_probe
+  failed_when: false
+  check_mode: false
+  become: false
+
+- name: Report hosts without fleet-metrics
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: fleet-metrics {{ 'up' if fleet_metrics_probe.status | default(0) == 200 else 'NOT running' }}"
