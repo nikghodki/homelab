@@ -1,0 +1,97 @@
+# ML stack on dgx-2 (plan P6.5; interim until k3s, architecture namespace `sim`). Deployed by playbooks/ml.yml.
+# MLflow tracking server with its own PostgreSQL and a local artifact volume served by MLflow (SeaweedFS comes with
+# k3s). Two ways in, both LAN only, the server itself has no port (runbooks/mlflow.md):
+#   oauth2-proxy  192.168.86.36:4181  people: https://mlflow.nghodki.ai via dgx-1's Caddy, Pocket ID, admins only
+#   api (Caddy)   192.168.86.36:5000  jobs: HTTP basic auth (user sim, secrets/ml.enc.yaml); /health is open
+name: ml
+
+x-restart: &restart
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  # No published port: only MLflow talks to it, on this stack's network.
+  postgresql:
+    <<: *restart
+    image: postgres:17.12-alpine@sha256:a77aa70e641402a21411b92b721c58d10f23b50ae5fdd2333efd22d166e1e5f7
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_DB: mlflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mlflow:
+    <<: *restart
+    image: homelab/mlflow:3.18.0-psycopg2.9.13   # built from ./mlflow; bump the tag when the Dockerfile changes
+    build:
+      context: ./mlflow
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql+psycopg2://mlflow:${POSTGRES_PASSWORD:?set in .env}@postgresql:5432/mlflow
+      # --serve-artifacts: clients upload and download through the server (mlflow-artifacts:/), never the volume
+      MLFLOW_ARTIFACTS_DESTINATION: /mlartifacts
+      # The GenAI job runner (online scoring, trace archival) starts ~9 huey consumers of ~240 MiB each and
+      # filled a 2 GiB cap. Experiment tracking doesn't need it.
+      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --workers=2
+      - --serve-artifacts
+      # Host headers that may reach the server: the browser name (via oauth2-proxy, which passes the host) and the
+      # job API (via Caddy). Anything else gets 403 (DNS-rebinding protection).
+      - --allowed-hosts=mlflow.nghodki.ai,192.168.86.36:5000,mlflow:5000,localhost:5000
+      - --cors-allowed-origins=https://mlflow.nghodki.ai
+    volumes:
+      - artifacts:/mlartifacts
+    mem_limit: 1g
+    expose: ["5000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      postgresql: {condition: service_healthy}
+
+  oauth2-proxy:
+    <<: *restart
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
+    command: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+    volumes:
+      - ./oauth2-proxy/oauth2-proxy.cfg:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    # Sign-in through Pocket ID: reach id.nghodki.ai at the front door and trust the homelab web CA from the host's
+    # bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+    mem_limit: 128m
+    ports:
+      - "192.168.86.36:4181:4180"   # LAN only: dgx-1's Caddy is the only client (mlflow.nghodki.ai)
+    depends_on: [mlflow]
+
+  api:
+    <<: *restart
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    user: "65532:65532"
+    cap_drop: [ALL]
+    environment:
+      XDG_CONFIG_HOME: /tmp/caddy
+      XDG_DATA_HOME: /tmp/caddy
+    volumes:
+      - ./api/Caddyfile:/etc/caddy/Caddyfile:ro
+    mem_limit: 128m
+    ports:
+      - "192.168.86.36:5000:5000"   # LAN only (not granted on Tailscale): sim jobs log runs here
+    depends_on: [mlflow]
+
+volumes:
+  pg-data:
+  artifacts:

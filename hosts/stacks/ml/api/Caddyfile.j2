@@ -1,0 +1,29 @@
+# Job API for MLflow (plan P6.5; runbooks/mlflow.md): LAN-only 192.168.86.36:5000 -> mlflow:5000.
+# Jobs can't sign in with a browser, so this endpoint takes HTTP basic auth (user sim, password in
+# secrets/ml.enc.yaml; MLFLOW_TRACKING_USERNAME/PASSWORD in the client). Only /health is open, for Gatus.
+# Rendered 0600 for uid 65532 (the container user).
+{
+	admin off
+	auto_https off
+	persist_config off
+	storage file_system /tmp/caddy
+}
+
+:5000 {
+	log {
+		output stdout
+		format json
+	}
+
+	@health path /health
+	handle @health {
+		reverse_proxy mlflow:5000
+	}
+
+	handle {
+		basic_auth {
+			sim {{ ml_secrets.mlflow_api_password_hash }}
+		}
+		reverse_proxy mlflow:5000
+	}
+}

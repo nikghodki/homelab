@@ -38,9 +38,14 @@ services:
   # MuJoCo 3.6 + MJX + Playground 0.2.0 on JAX 0.9.2 (CUDA 13), built locally from robots/sim/mujoco.
   mujoco:
     <<: *job
-    image: homelab/mujoco-playground:0.2.0-jax0.9.2
+    image: homelab/mujoco-playground:0.2.0-jax0.9.2-mlflow3.18.0
     build:
       context: ../../../robots/sim/mujoco
+    # MLflow job API settings (MLFLOW_TRACKING_URI/USERNAME/PASSWORD), written by playbooks/ml.yml. Without the
+    # file, or with `-e MLFLOW_TRACKING_URI=`, the job runs without MLflow (runbooks/mlflow.md).
+    env_file:
+      - path: /etc/homelab/mlflow-client.env
+        required: false
     environment:
       XLA_PYTHON_CLIENT_PREALLOCATE: "false"
       XLA_PYTHON_CLIENT_MEM_FRACTION: "0.15"   # of ~120 GiB unified memory, about 18 GiB

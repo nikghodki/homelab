@@ -1,0 +1,59 @@
+# ML stack on dgx-2: MLflow + PostgreSQL + oauth2-proxy + job API (plan P6.5, interim before k3s).
+# Always --check --diff first. runbooks/mlflow.md
+- name: ML
+  hosts: observe
+  become: true
+  pre_tasks:
+    - name: Load ml secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/ml.enc.yaml"
+        name: ml_secrets
+      no_log: true
+    - name: Load sign-in client secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
+        name: console_secrets
+      no_log: true
+  vars:
+    ml_dir: /opt/homelab/ml
+    ml_client_env: /etc/homelab/mlflow-client.env
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: ml
+        compose_stack_src: "{{ playbook_dir }}/../stacks/ml"
+        compose_stack_private_templates:
+          oauth2-proxy: 65532   # distroless nonroot
+          api: 65532            # Caddy runs as 65532 (compose `user:`)
+        compose_stack_env:
+          POSTGRES_PASSWORD: "{{ ml_secrets.postgres_password }}"
+  tasks:
+    - name: MLflow answers on the job API
+      ansible.builtin.uri:
+        url: http://192.168.86.36:5000/health
+      register: ml_health
+      until: ml_health.status == 200
+      retries: 30
+      delay: 5
+      when: not ansible_check_mode
+
+    # Sim jobs (hosts/stacks/sim, `env_file` with required: false) read this, so they log to MLflow when it exists.
+    - name: Client settings folder exists
+      ansible.builtin.file:
+        path: /etc/homelab
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Client settings for jobs on this host (readable by the docker group only)
+      ansible.builtin.copy:
+        dest: "{{ ml_client_env }}"
+        content: |
+          MLFLOW_TRACKING_URI=http://192.168.86.36:5000
+          MLFLOW_TRACKING_USERNAME=sim
+          MLFLOW_TRACKING_PASSWORD={{ ml_secrets.mlflow_api_password }}
+        owner: root
+        group: docker
+        mode: "0640"
+      no_log: true
