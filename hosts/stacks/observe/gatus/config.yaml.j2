@@ -17,6 +17,11 @@ endpoints:
   - {name: Home Assistant (direct), group: home, url: "http://192.168.86.211:8123/", <<: *web}
   - {name: Phoenix, group: observe, url: "http://phoenix:6006/healthz", <<: *web}
   - {name: Grafana, group: observe, url: "http://grafana:3000/api/health", <<: *web}
+  - {name: NATS (TLS), group: bus, url: "tcp://192.168.86.44:4222", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: NATS MQTT (picoclaw), group: bus, url: "tcp://192.168.86.44:8883", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: Fleet MQTT (Edge Connector), group: defenseclaw, url: "tcp://192.168.86.44:8884", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  # 401 without a token means the proxy, the gateway and Fleet are all up. The homelab CA isn't in Gatus' image, so TLS isn't verified here.
+  - {name: Fleet API, group: defenseclaw, url: "https://192.168.86.44:8971/api/v1/fleet/health", headers: {Host: fleet.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401", "[CERTIFICATE_EXPIRATION] > 336h"], alerts: [{type: ntfy}]}
   - {name: dgx-1 ssh, group: hosts, url: "tcp://192.168.86.44:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: dgx-2 ssh, group: hosts, url: "tcp://192.168.86.36:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: jetson ssh, group: hosts, url: "tcp://192.168.86.211:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
