@@ -84,7 +84,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P1.8 | ✅ | CI with hash-locked tools, unit tests, Renovate |
 | P1.9 | ⬜ | GitHub Pro decision (you) |
 | P1.10 | ⏸️ | Backups merged (#17) but **not deployed**, at your request |
-| P1.11 | 🟡 | AI discovery on; nightly AIBOM on the Jetson; OTLP + redaction done; DefenseClaw webhooks and policies-in-Git still to do |
+| P1.11 | 🟡 | AI discovery on; nightly AIBOM on the Jetson; OTLP + redaction done; policy `homelab` in Git (`policies/defenseclaw/`, CI tests) and active on dgx-1 and the Jetson. Webhooks dropped: DefenseClaw refuses private receivers, and high-severity events already reach ntfy through its vmalert rules. Still to do: LLM judge via LiteLLM (after DGXMM), release-refresh CI job |
 | P1.12 | ⬜ | Edge Connector Fleet (needs a TLS proxy for the Fleet API; NATS MQTT is ready) |
 | P1.13 | ⏸️ | Pocket ID: needs HTTPS. Enable **HTTPS Certificates** in the Tailscale admin console (DNS page) (you) |
 | P1.14 | ✅ | One Alertmanager for vmalert alerts; Gatus posts to ntfy directly |

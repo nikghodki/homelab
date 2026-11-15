@@ -117,7 +117,7 @@ jobs:
         run: .github/scripts/scan-skills.sh
 
   unit-tests:
-    name: Unit tests (fleet-metrics, LiteLLM guardrail)
+    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw policy)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -135,3 +135,6 @@ jobs:
       - name: DefenseClaw LiteLLM guardrail
         working-directory: hosts/files/litellm
         run: PYTHONPATH=. python -m pytest -q tests
+      - name: DefenseClaw fleet policy
+        working-directory: policies/defenseclaw
+        run: python -m pytest -q tests
