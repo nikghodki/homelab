@@ -1,0 +1,419 @@
+{
+ "uid": "fleet-home",
+ "title": "Fleet Home",
+ "tags": [
+  "fleet",
+  "home"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 39,
+ "version": 1,
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "refresh": "1m",
+ "editable": false,
+ "panels": [
+  {
+   "id": 1,
+   "title": "Hosts reporting",
+   "type": "stat",
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "count(count by (host_name) (system_memory_usage_bytes))",
+     "legendFormat": "",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 4
+       },
+       {
+        "color": "green",
+        "value": 5
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 2,
+   "title": "Alerts firing",
+   "type": "stat",
+   "gridPos": {
+    "x": 4,
+    "y": 0,
+    "w": 4,
+    "h": 4
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
+     "legendFormat": "",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       },
+       {
+        "color": "red",
+        "value": 3
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 99,
+   "title": "",
+   "type": "text",
+   "gridPos": {
+    "x": 8,
+    "y": 0,
+    "w": 16,
+    "h": 4
+   },
+   "options": {
+    "mode": "markdown",
+    "content": "### Go to\n**Security:** [DefenseClaw Overview](/d/defenseclaw-overview) \u00b7 [Agent360](/d/defenseclaw-agent-360) \u00b7 [Blocked events](/d/defenseclaw-blocked-events) \u00b7 [AI discovery](/d/defenseclaw-ai-discovery) \u00b7 [HITL](/d/defenseclaw-hitl)\n\n**Tools:** [Status (Gatus)](http://status.nghodki.ai) \u00b7 [Alerts (ntfy)](http://ntfy.nghodki.ai/fleet-alerts) \u00b7 [DGXMM](http://dgxmanager.nghodki.ai) \u00b7 [Open WebUI](http://webui.nghodki.ai) \u00b7 [Home Assistant](http://ha.nghodki.ai)\n\n**Explore:** [Logs](/explore?left=%7B%22datasource%22:%22defenseclaw-loki%22%7D) \u00b7 [Traces](/explore?left=%7B%22datasource%22:%22defenseclaw-tempo%22%7D)"
+   }
+  },
+  {
+   "id": 3,
+   "title": "Memory used",
+   "type": "bargauge",
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "100 * sum by (host_name) (system_memory_usage_bytes{state=\"used\"}) / sum by (host_name) (system_memory_usage_bytes)",
+     "legendFormat": "{{host_name}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 75
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "displayMode": "gradient",
+    "orientation": "horizontal",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "id": 4,
+   "title": "Disk used",
+   "type": "bargauge",
+   "gridPos": {
+    "x": 12,
+    "y": 4,
+    "w": 12,
+    "h": 7
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "100 * (1 - sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state=\"free\", mountpoint=~\"/|/home|/boot.*|/var.*\"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes{mountpoint=~\"/|/home|/boot.*|/var.*\"}))",
+     "legendFormat": "{{host_name}} {{mountpoint}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "max": 100,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 80
+       },
+       {
+        "color": "red",
+        "value": 90
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "displayMode": "gradient",
+    "orientation": "horizontal",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   }
+  },
+  {
+   "id": 5,
+   "title": "CPU busy",
+   "type": "timeseries",
+   "gridPos": {
+    "x": 0,
+    "y": 11,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "100 * (1 - sum by (host_name) (rate(system_cpu_time_seconds_total{state=\"idle\"}[5m])) / sum by (host_name) (rate(system_cpu_time_seconds_total[5m])))",
+     "legendFormat": "{{host_name}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent"
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 6,
+   "title": "Load (1 min)",
+   "type": "timeseries",
+   "gridPos": {
+    "x": 12,
+    "y": 11,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "max by (host_name) (system_cpu_load_average_1m)",
+     "legendFormat": "{{host_name}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 7,
+   "title": "Network",
+   "type": "timeseries",
+   "gridPos": {
+    "x": 0,
+    "y": 19,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (host_name, direction) (rate(system_network_io_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|tailscale.*|cni.*|flannel.*\"}[5m]))",
+     "legendFormat": "{{host_name}} {{direction}}",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "Bps"
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 8,
+   "title": "Log lines per host (5 min)",
+   "type": "timeseries",
+   "gridPos": {
+    "x": 12,
+    "y": 19,
+    "w": 12,
+    "h": 8
+   },
+   "datasource": {
+    "type": "loki",
+    "uid": "defenseclaw-loki"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "sum by (host_name) (count_over_time({host_name=~\".+\"}[5m]))",
+     "legendFormat": "{{host_name}}",
+     "datasource": {
+      "type": "loki",
+      "uid": "defenseclaw-loki"
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 9,
+   "title": "Firing alerts",
+   "type": "table",
+   "gridPos": {
+    "x": 0,
+    "y": 27,
+    "w": 24,
+    "h": 8
+   },
+   "datasource": {
+    "type": "prometheus",
+    "uid": "defenseclaw-prometheus"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "expr": "ALERTS{alertstate=\"firing\"}",
+     "legendFormat": "",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "defenseclaw-prometheus"
+     },
+     "instant": true,
+     "format": "table"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {}
+  }
+ ],
+ "templating": {
+  "list": []
+ },
+ "annotations": {
+  "list": []
+ }
+}
