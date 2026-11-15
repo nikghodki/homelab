@@ -3,11 +3,15 @@
 | | |
 |---|---|
 | Owner | nikghodki |
-| Status | Draft v1, 2026-11-14 |
+| Status | Draft v1.1, 2026-11-15 |
 | Related | [architecture.md](architecture.md) (how it is built), [project-plan.md](project-plan.md) (how we get there) |
 
 This document says **what** the system must do and **why** each major choice was made. The architecture
 document describes the components and how they connect. The project plan describes the order of work.
+
+**Changes 2026-11-15:** D2 now makes the Jetson an etcd member **and** a tainted worker for robot, home and agent
+pods (it already hosted Hermes, the Zenoh router and a NATS replica, which an etcd-only member can't run). Device
+roles (§7) and the Jetson capacity line (§9) follow.
 
 ---
 
@@ -112,7 +116,7 @@ Every device except the direct Spark link is on Wi-Fi.
 | # | Decision | Choice | Alternatives considered | Reason | Status |
 |---|---|---|---|---|---|
 | D1 | Orchestration | **k3s** (lightweight Kubernetes) | Docker Compose + Ansible; Nomad | Self-healing, scheduling by label, declarative, Git-driven; lightweight on ARM | Decided |
-| D2 | Control plane | **2 servers: dgx-1 and dgx-2**, plus an **etcd-only member on the Jetson** as the third vote | 3 full servers; 2 servers with external Postgres; Omarchy as a server | Your choice of 2 servers. A 2-member etcd stops on any reboot, so a ~300 MB vote-only member on the Jetson keeps quorum. Omarchy's hard disk is too slow for etcd. | Decided (witness confirmed 2026-11-14) |
+| D2 | Control plane | **2 servers: dgx-1 and dgx-2**, plus the Jetson as **etcd member + tainted worker for robot/agent pods** (taint `nghodki.ai/jetson=true:NoSchedule`, label `nghodki.ai/role=edge-robot`; no API server, scheduler or controllers) | 3 full servers; 2 servers with external Postgres; Omarchy as a server; etcd-only Jetson | Your choice of 2 servers. A 2-member etcd stops on any reboot, so a ~300 MB etcd member on the Jetson keeps quorum. Omarchy's hard disk is too slow for etcd. **Changed 2026-11-15:** the plan also puts the Zenoh router, Nav2 bridge, Home Assistant, a NATS replica and (after P4.5) Hermes on the Jetson, so it must also be a worker. The taint keeps everything else off, and tight limits protect etcd. Hermes and DefenseClaw stay host-installed until P4.5. | Decided (witness confirmed 2026-11-14; worker role 2026-11-15) |
 | D3 | GPU ownership | **DGXMM keeps it**; KServe is added under DGXMM later | KServe alone; KServe + Knative | KServe can't fit models into GB10 unified memory or hold requests while models load. DGXMM's planner does both. KServe adds declarative serving. | Decided; draft on DGXMM branch `feature/kserve-backend` |
 | D4 | Model access | **Agents call models through LiteLLM aliases** (capability names), never a model directly. **Which models, and the alias names, are decided later** (open question). | Agents call models directly | Swap models without touching agents; budgets and fallbacks | Mechanism decided; models and aliases open |
 | D5 | Message bus | **NATS JetStream with MQTT enabled** | Mosquitto only; Redis | One bus for events and notifications (request/reply between agents goes through LiteLLM A2A, D20); MQTT clients (picoclaw, HA) connect unchanged; per-account limits | Decided |
@@ -143,7 +147,7 @@ Every device except the direct Spark link is on Wi-Fi.
 |---|---|---|
 | dgx-1 | Interactive inference (chat, vision, speech, always-on robot and guard models); control plane | server |
 | dgx-2 | Batch (evals, red-team, fine-tuning, **Isaac Lab/Sim and MuJoCo training**, MLflow); storage; observability and other heavy CPU services; self-hosted CI runner; control plane | server |
-| Jetson | Home and robot brain: Hermes, Home Assistant, Nav2/SLAM, Zenoh router, LiveKit; **etcd-only member** | etcd-only + agent |
+| Jetson | Home and robot brain: Hermes, Home Assistant, Nav2/SLAM, Zenoh router, LiveKit; **etcd member** | etcd member + tainted agent (robot, home and agent pods only) |
 | Omarchy | OpenBot and its computer; light worker agents | agent |
 | Pi | Robot body: drivers, safety governor, picoclaw reflexes | none (Ansible) |
 | MacBook Air | Out of scope | none |
@@ -177,7 +181,7 @@ These are the layers, in order. Details are in architecture §12.
 |---|---|---|
 | dgx-1 | ~97 of 121 GiB at a typical busy moment, assuming example models (D4 is open); the rest is headroom for swapping a model and load spikes (can go to ~113) | OK |
 | dgx-2 | 15–23 GiB reserved for services; 80–90 GiB for batch work, shared by LLM evals and simulation (est. 20–60 GiB per sim job, depending on the number of parallel environments and on cameras); dgx-1 takes overnight sim jobs when idle | OK; the reserve must be enforced; one large sim job at a time |
-| Jetson | ~5.5 GiB with the etcd-only member and Nav2, without the desktop or vision | OK if headless |
+| Jetson | ~5.5 GiB with the etcd member, Nav2 and its few tolerated pods (with limits), without the desktop or vision | OK if headless |
 | Omarchy | ~5.5–6.5 of 7.7 GiB; one OpenBot desktop at a time; 2 cores are the real limit | Tight; SSD recommended |
 | Pi | ~1 GiB without vision; 1 TB card fixes storage | OK |
 
