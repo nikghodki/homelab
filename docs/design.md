@@ -48,7 +48,7 @@ survive any single machine rebooting, and easy to grow.
 | Device | Hardware | Runs today |
 |---|---|---|
 | dgx-1 `spark-83dc` (.44) | GB10, 20 cores, 121 GiB unified memory, 3.7 TB NVMe | DGXMM, LiteLLM (+ Postgres, Redis), Open WebUI, Coolify, edge DNS + proxy, DefenseClaw (managed, 1.0.2), fleet-metrics |
-| dgx-2 (.36) | GB10, 20 cores, 121 GiB, 3.7 TB NVMe | Nothing (idle) |
+| dgx-2 (.36) | GB10, 20 cores, 121 GiB, 3.7 TB NVMe | Nothing (idle) at inventory time (2026-11-14); since then observe, console, jobs, gpu stacks, sim jobs, and a DGXMM engine |
 | Spark ↔ Spark | 2 × 200 Gb/s RDMA, 10.100.136/137.x | Only used for manual tests that split a model across both |
 | Jetson `nikhil-jetson` (.211) | Orin, 6 cores, 7.4 GiB, 3.6 TB NVMe, JetPack 7.2.1 | Hermes (2 profiles), Home Assistant, roboclaw control center, vision-service, LiveKit |
 | Omarchy `nikghodki-omarchy-local` (.49) | Dell Inspiron 7348 (2015): i5-5200U 2c/4t, 8 GB soldered, 500 GB 5400 rpm HDD, Wi-Fi | A desktop only; Tailscale stopped |
@@ -197,7 +197,7 @@ These are the layers, in order. Details are in architecture §12.
 | R13 | Isaac Sim livestream, multi-node training, SkillGen, XR teleop and Cosmos Transfer aren't supported on DGX Spark (Isaac Lab 3.0 docs) | Run headless; record evaluation videos to MLflow; one Spark per training job |
 | R14 | Sim-to-real gap: a policy that works in simulation fails on the real robot | Domain randomization; cross-check in both simulators; calibrate the simulation from real rosbags; staged real-world gates (shadow → on blocks → speed-capped → live) under the safety governor |
 | R15 | Sim jobs and LLM batch jobs compete for dgx-2's memory | DGXMM budget covers sim jobs too; queue with priorities; overnight overflow to dgx-1 |
-| R12 | LiteLLM becomes critical for models, tools and agent calls at once | 2 replicas, pinned release (today `main-latest` = 1.100.0), Postgres HA, same `LITELLM_SALT_KEY` on both replicas; robot safety stays local on the Pi |
+| R12 | LiteLLM becomes critical for models, tools and agent calls at once | 2 replicas, pinned release (1.109.1 by digest since 2026-11-15), Postgres HA, same `LITELLM_SALT_KEY` on both replicas; robot safety stays local on the Pi |
 | R11 | CopilotKit OpenBot needs CopilotKit Intelligence; the free local mode is documented as a macOS preview, and Linux means their managed service or a licensed self-hosted install | Confirm the licensing path in P4.1; fallback trycua/cua + OpenShell |
 | R6 | KServe or vLLM images may not run on arm64 or GB10 | Pilot first; keep the Docker backend |
 | R7 | The MacBook Air's OpenClaw is outside the fleet and unprotected (DefenseClaw removed 29 Sep) | Accepted for now; revisit |

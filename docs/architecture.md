@@ -280,7 +280,7 @@ fleet needs, with example names and models, so the rest of this document has som
 
 ### 6.3 LiteLLM version
 
-Today LiteLLM runs `ghcr.io/berriai/litellm:main-latest` (1.100.0, built 2026-10-16). It gets pinned to a tested
+LiteLLM was on `ghcr.io/berriai/litellm:main-latest` (1.100.0) until 2026-11-15; it now runs 1.109.1 pinned by digest (P0.13). Each upgrade is pinned to a tested
 release (latest is v1.109.1, 2026-11-12) before it takes on MCP and A2A, and every upgrade goes through Renovate and
 CI like any other image.
 
