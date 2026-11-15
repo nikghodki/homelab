@@ -5,3 +5,4 @@ cisco-ai-mcp-scanner==4.8.7
 cisco-ai-skill-scanner==2.3.2
 pytest==9.2.0
 httpx==0.28.1
+cisco-ai-a2a-scanner==1.0.1
