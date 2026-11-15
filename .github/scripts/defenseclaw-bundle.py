@@ -14,11 +14,12 @@ import argparse
 import difflib
 import hashlib
 import io
+import re
 import sys
 import tarfile
-import urllib.request
 from pathlib import Path
 
+import httpx
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
@@ -28,8 +29,11 @@ TARBALL = "https://codeload.github.com/cisco-ai-defense/defenseclaw/tar.gz/refs/
 
 def fetch_bundle(version, root):
     """Return {relative path under root: bytes} for one release."""
-    with urllib.request.urlopen(TARBALL.format(version=version), timeout=60) as resp:
-        data = resp.read()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError(f"not a release version: {version!r}")
+    resp = httpx.get(TARBALL.format(version=version), timeout=60)
+    resp.raise_for_status()
+    data = resp.content
     files = {}
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
         for member in tar.getmembers():
