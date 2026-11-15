@@ -62,7 +62,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P0.7 | 🔁 🟡 | `nginx-gateway` fixed (missing kokoro upstream) and kept; dead LiteLLM routes still to remove |
 | P0.8 | ✅ | LiveKit key in a 0600 key file |
 | P0.9 | ⬜ | IP reservations (you) |
-| P0.10 | 🟡 | Omarchy fully updated (`omarchy update`), Tailscale installed; **needs your login** (URL from the update) and a re-login for Hyprland |
+| P0.10 | ✅ | Omarchy fully updated and back on Tailscale (`nikghodki-omarchy`, tag:agent) |
 | P0.11 | ⬜ | Ethernet for the Sparks (you) |
 | P0.12 | ✅ | `companion-agent` retired (code removed 28 Aug); no failed user units |
 | P0.13 | ✅ | LiteLLM 1.109.1 pinned by digest |
@@ -77,7 +77,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P1.1 | ✅ | `nikghodki/homelab`, hardened repo settings, squash-only |
 | P1.2 | ✅ | SOPS + age; key saved offline |
 | P1.3 | ✅ | Ansible baseline applied on all 5 hosts, idempotent |
-| P1.4 | ⏸️ | `policies/tailscale/policy.hujson` with tests; apply in the admin console after tagging (you) |
+| P1.4 | ✅ | Devices tagged; `policies/tailscale/policy.hujson` applied; checked from the Pi (bus and Fleet broker open; LiteLLM, SSH and the Fleet API blocked) |
 | P1.5 | ✅ | NATS 2.15.3 on dgx-1 (TLS, MQTT over TLS, deny-by-default users); homelab CA trusted on all hosts; picoclaw connected as `picoclaw`. End-to-end reply pending the qwen3.8 engine (busy in the DGXMM session) |
 | P1.6 | ✅ | dgx-2: VictoriaMetrics, Loki, Tempo, Grafana (19 DefenseClaw dashboards + Fleet Home), vmalert, Alertmanager, Gatus, ntfy; host collectors + fleet-metrics (now in the repo, Prometheus endpoint) on all 5 hosts; DefenseClaw OTLP from Jetson and dgx-1, redaction `sensitive` |
 | P1.7 | ✅ | Alerts → ntfy tested end to end (Gatus and Alertmanager) |
@@ -86,7 +86,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P1.10 | ⏸️ | Backups merged (#17) but **not deployed**, at your request |
 | P1.11 | 🟡 | AI discovery on; nightly AIBOM on the Jetson; OTLP + redaction done; policy `homelab` in Git (`policies/defenseclaw/`, CI tests) and active on dgx-1 and the Jetson. Webhooks dropped: DefenseClaw refuses private receivers, and high-severity events already reach ntfy through its vmalert rules. Release refresh: Renovate bumps `defenseclaw-bundle.yaml`, CI compares dashboards and rules with that release, `defenseclaw-bundle.py sync` refreshes them. Still to do: LLM judge via LiteLLM (after DGXMM) |
 | P1.12 | 🟡 | Fleet live: gateway on dgx-1 (role `defenseclaw_fleet`), `fleet` stack (Mosquitto TLS + per-device ACLs, Caddy TLS API proxy; D24), Pi daemon (production mbedTLS build, role `edge_connector`, device 1/1/1 **online**), signed policy v1 applied, signed verdict round-trip ~30 ms. picoclaw stays on its in-process hook: OSS 1.0.9 Fleet denies every escalated hash and the C tool table lacks picoclaw's message/i2c/serial/spawn/cron (runbooks/edge-connector.md). Upstream issues to file |
-| P1.13 | ⏸️ | Pocket ID: needs HTTPS. Enable **HTTPS Certificates** in the Tailscale admin console (DNS page) (you) |
+| P1.13 | ⬜ | Pocket ID: unblocked. HTTPS on every `*.nghodki.ai` site through the homelab web CA (D25); devices install the CA from `ca.nghodki.ai` |
 | P1.14 | ✅ | One Alertmanager for vmalert alerts; Gatus posts to ntfy directly |
 | P1.15 | ✅ | Fleet Home dashboard (home page), grafana/status/ntfy/phoenix.nghodki.ai |
 
