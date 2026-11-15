@@ -1,0 +1,432 @@
+{
+  "serverInfo": {
+    "name": "picoclaw-hardware",
+    "version": "1.0.0"
+  },
+  "tools": [
+    {
+      "name": "status",
+      "title": "Status",
+      "description": "Car connectivity + live state (ip, distance, ir, moving, blocked, edge).",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "get_sensors",
+      "title": "Read sensors",
+      "description": "Current ultrasonic distance and IR edge-sensor values.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "stop",
+      "title": "Stop",
+      "description": "Emergency stop — halt all motion immediately.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "horn",
+      "title": "Horn",
+      "description": "Sound the buzzer (e.g. when a person is in the way).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 5000,
+            "description": "How long to honk, ms (default ~600)."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "drive",
+      "title": "Drive",
+      "description": "Move in a direction. Forward motion gets firmware obstacle avoidance + edge protection when avoid=true (default).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "forward",
+              "backward",
+              "strafe_left",
+              "strafe_right",
+              "spin_left",
+              "spin_right"
+            ]
+          },
+          "speed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "0-255 (default 180)."
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Move this long then stop; omit for open-ended (deadman stops it)."
+          },
+          "avoid": {
+            "type": "boolean",
+            "description": "Obstacle/edge avoidance for forward motion (default true)."
+          }
+        },
+        "required": [
+          "direction"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "turn",
+      "title": "Turn",
+      "description": "Rotate in place by degrees (open-loop, approximate).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": [
+              "spin_left",
+              "spin_right"
+            ]
+          },
+          "degrees": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 360
+          }
+        },
+        "required": [
+          "direction",
+          "degrees"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "scan_surroundings",
+      "title": "Scan",
+      "description": "Sweep the ultrasonic pan head and return distance at each angle.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "find_path",
+      "title": "Find a path",
+      "description": "Scan the surroundings and recommend the clearest direction to head, with the exact turn to face it. Read-only.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "map_room",
+      "title": "Map the room",
+      "description": "Rotate in place and ultrasonic-sweep to build a coarse 360° distance map, flagging open directions. Approximate.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bins": {
+            "type": "integer",
+            "minimum": 8,
+            "maximum": 72,
+            "description": "Map resolution in sectors (default 24 = 15°)."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "go_to_room",
+      "title": "Go to a room",
+      "description": "Best-effort navigation toward and through the largest opening (doorway). Time-boxed. No metric/named-room navigation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_seconds": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 120,
+            "description": "Time budget (default 25)."
+          },
+          "speed": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 255,
+            "description": "Drive speed (default 170)."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "explore",
+      "title": "Explore",
+      "description": "Roam autonomously for a while using firmware obstacle/edge avoidance. Time-boxed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_seconds": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 120,
+            "description": "Time budget (default 20)."
+          },
+          "speed": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 255,
+            "description": "Drive speed (default 160)."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "follow_nearest",
+      "title": "Follow the nearest thing",
+      "description": "Track the NEAREST object by ultrasonic: center it, hold a target distance. Runs a few correction cycles then returns.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target_cm": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 120,
+            "description": "Distance to hold (default 40)."
+          },
+          "max_seconds": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 60,
+            "description": "How long this call follows (default 8)."
+          },
+          "speed": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 255,
+            "description": "Move speed (default 150)."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "navigate_to",
+      "title": "Navigate to a pose",
+      "description": "Drive to a map-frame (x, y, yaw) goal via Nav2's NavigateToPose action. Requires the navigation stack (ros2-nav/launch/navigation.launch.py) already running with a previously-saved map -- this tool does not start it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "description": "Target x position, meters, map frame."
+          },
+          "y": {
+            "type": "number",
+            "description": "Target y position, meters, map frame."
+          },
+          "yaw_deg": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Target heading, degrees (default 0)."
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 300000,
+            "description": "Max time to wait for the goal to finish (default 90000)."
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "explore_frontier",
+      "title": "Autonomously explore",
+      "description": "Launch explore_lite for a bounded time to autonomously map unexplored space, then stop it. Requires the navigation/mapping stack already running.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max_seconds": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 300,
+            "description": "How long to explore before stopping (default 60)."
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "follow_start",
+      "title": "Start following",
+      "description": "Begin following the enrolled person using the Pi's camera. Fails if no face is enrolled yet.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "follow_stop",
+      "title": "Stop following",
+      "description": "Stop the active follow-me session and halt the robot.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "enroll_face",
+      "title": "Enroll face",
+      "description": "Capture the person currently in view and set them as the identity to follow. Call while alone in frame.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "battery_status",
+      "title": "Battery status",
+      "description": "Read the Pi's UPS HAT battery voltage and an approximate charge percentage. `low_battery` is true below 20%.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "send_to_picoclaw_agent",
+      "title": "Send message to PicoClaw agent",
+      "description": "Send a message to the PicoClaw AI agent running on this Pi and wait for a response. Use this to ask PicoClaw to control the robot, answer questions, or perform tasks. PicoClaw has access to all the robot control tools via its own MCP server.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The message to send to PicoClaw agent"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 120,
+            "description": "How long to wait for response (default 60 seconds)"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    },
+    {
+      "name": "check_picoclaw_agent_connection",
+      "title": "Check PicoClaw agent connection",
+      "description": "Check if the MQTT connection to PicoClaw agent is active.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {}
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      }
+    }
+  ]
+}

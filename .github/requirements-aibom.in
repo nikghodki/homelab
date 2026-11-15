@@ -1,0 +1,5 @@
+# Cisco AI BOM (cisco-ai-defense/aibom) in its own venv. Separate from requirements-ci because CI (x86_64) and the
+# fleet hosts (aarch64, Python 3.12/3.13, role cisco_aibom) install from this one universal lock. `analyze` insists on the agentic + one provider extra even when no LLM is
+# reachable; it then falls back to its deterministic scanners. `analysis` adds secret detection and tree-sitter.
+# Compile with: uv pip compile --universal --generate-hashes --python-version 3.12 .github/requirements-aibom.in -o .github/requirements-aibom.txt
+cisco-aibom[agentic,llm-openai,analysis]==1.10.1
