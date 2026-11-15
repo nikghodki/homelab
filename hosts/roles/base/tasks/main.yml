@@ -18,7 +18,7 @@
     - /etc/systemd/journald.conf.d
     - /etc/ssh/sshd_config.d
 
-- name: sshd reads the drop-in folder
+- name: SSH daemon reads the drop-in folder
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
     line: Include /etc/ssh/sshd_config.d/*.conf
