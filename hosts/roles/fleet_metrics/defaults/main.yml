@@ -1,1 +1,4 @@
 fleet_metrics_port: 9109
+# systemd units whose state /services reports (comma-separated)
+fleet_metrics_units: ""
+fleet_metrics_src: "{{ playbook_dir }}/../files/fleet-metrics/fleet_metrics"
