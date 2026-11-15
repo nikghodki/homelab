@@ -168,7 +168,7 @@ jobs:
           retention-days: 30
 
   unit-tests:
-    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw, Pocket ID sync, AIBOM, CI scripts)
+    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw, Pocket ID sync, safety governor, AIBOM, CI scripts)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -192,6 +192,9 @@ jobs:
       - name: Pocket ID sync
         working-directory: hosts/files/pocket-id
         run: python -m pytest -q tests
+      - name: Robot safety governor (pure logic and sinks; no ROS or NATS)
+        working-directory: robots/safety/governor
+        run: PYTHONPATH=. python -m pytest -q tests
       - name: Cisco AIBOM fleet job
         run: python -m pytest -q hosts/roles/cisco_aibom/files/tests
       - name: CI scripts (DefenseClaw bundle, MCP tool hashes)

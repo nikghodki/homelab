@@ -1,4 +1,5 @@
-# ROS 2 + rmw_zenoh for the robot (plan P5.1): Zenoh router on the Jetson, LiDAR driver on the Pi.
+# ROS 2 + rmw_zenoh for the robot (plan P5.1): Zenoh router on the Jetson, LiDAR driver on the Pi;
+# safety governor on the Pi (plan P5.2, runbooks/robot-safety.md; mock sink unless told otherwise).
 # Always --check --diff first. The Pi's RoboStack env is a one-time manual step (runbooks/robot-ros.md).
 - name: Zenoh router
   hosts: jetson_group
@@ -11,3 +12,9 @@
   become: true
   roles:
     - role: ros_lidar
+
+- name: Safety governor
+  hosts: edge
+  become: true
+  roles:
+    - role: safety_governor

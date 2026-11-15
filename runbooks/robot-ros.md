@@ -2,7 +2,8 @@
 
 Plan P5.1: ROS 2 on the Jetson and the Pi with `rmw_zenoh` as the middleware, a Zenoh router on the
 Jetson, and the Pi's Oradar MS200 LiDAR on `/scan`. Playbook: `hosts/playbooks/robot.yml`.
-Nothing here moves the robot: the only node is the LiDAR driver (plus a static transform).
+Nothing here moves the robot: the only node is the LiDAR driver (plus a static transform). The safety
+governor that gates motor commands (P5.2) is in [robot-safety.md](robot-safety.md).
 
 | Piece | Where | Managed by |
 |---|---|---|

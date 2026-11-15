@@ -1,0 +1,26 @@
+# Robot safety governor on the Pi (runbooks/robot-safety.md). The governor serves metrics on the
+# Pi's 127.0.0.1:9113, scraped by the Pi's host collector (job safety-governor). The timestamp is
+# set when /safety/status is actually published, so it goes stale when the governor dies or hangs.
+groups:
+  - name: robot-safety
+    rules:
+      - alert: SafetyGovernorStatusStale
+        expr: >-
+          (time() - max(safety_governor_status_timestamp_seconds) > 60)
+          or absent_over_time(safety_governor_status_timestamp_seconds[3m])
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Pi safety governor has not published /safety/status for over a minute (down or hung); nothing may drive the robot"
+      - alert: SafetyGovernorLidarStale
+        expr: max(safety_governor_scan_age_seconds) > 5
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Safety governor has had no /scan for {{ $value | humanize }}s; the robot is held stopped (ros-lidar or the Zenoh router down?)"
+      - alert: SafetyGovernorRealSinkEnabled
+        expr: max(safety_governor_real_sink) > 0
+        for: 2h
+        labels: {severity: warning}
+        annotations:
+          summary: "The safety governor has driven a real motor sink for 2 hours; it should be on only for an on-blocks test"

@@ -1,0 +1,126 @@
+---
+- name: Account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ safety_governor_user }}"
+
+- name: RoboStack env and Zenoh settings (roles ros_lidar, runbooks/robot-ros.md)
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ safety_governor_env }}/bin/python"
+    - "{{ safety_governor_zenoh_env }}"
+  register: safety_governor_prereq
+
+- name: Prerequisites missing
+  ansible.builtin.fail:
+    msg: "{{ item.item }} is missing; run playbooks/robot.yml's LiDAR play and runbooks/robot-ros.md first"
+  loop: "{{ safety_governor_prereq.results }}"
+  loop_control: {label: "{{ item.item }}"}
+  when: not item.stat.exists
+
+- name: A real sink needs its settings
+  ansible.builtin.assert:
+    that:
+      - safety_governor_sink in ['mock', 'http_velocity', 'ros_cmd_vel']
+      - safety_governor_sink != 'http_velocity' or not safety_governor_real_sink_enabled or safety_governor_http_url | length > 0
+    fail_msg: "safety_governor_sink must be mock, http_velocity or ros_cmd_vel; http_velocity needs safety_governor_http_url"
+
+- name: Load bus secrets from SOPS
+  community.sops.load_vars:
+    file: "{{ playbook_dir }}/../../secrets/bus.enc.yaml"
+    name: safety_governor_secrets
+  no_log: true
+  delegate_to: localhost
+  become: false
+
+- name: Env, code, config and unit
+  become: true
+  become_user: "{{ safety_governor_user }}"
+  vars:
+    safety_governor_uid: "{{ ansible_facts.getent_passwd[safety_governor_user][1] }}"
+  block:
+    - name: Pinned nats-py in the env?
+      ansible.builtin.command:
+        argv:
+          - "{{ safety_governor_env }}/bin/python"
+          - -c
+          - "import sys, importlib.metadata as m; sys.exit(0 if m.version('nats-py') == '{{ safety_governor_nats_py_version }}' else 1)"
+      register: safety_governor_nats_py
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Install nats-py (conda-forge, the env's other packages frozen)
+      ansible.builtin.command:
+        argv:
+          - "{{ safety_governor_micromamba }}"
+          - install
+          - -y
+          - -p
+          - "{{ safety_governor_env }}"
+          - -c
+          - conda-forge
+          - --freeze-installed
+          - "nats-py={{ safety_governor_nats_py_version }}"
+      when: safety_governor_nats_py.rc != 0
+      changed_when: true
+      notify: Restart safety-governor
+
+    - name: Folders
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: "{{ item.mode | default(omit) }}"
+      loop:
+        - {path: "{{ safety_governor_code_dir }}/safety_governor", mode: "0755"}
+        - {path: "{{ safety_governor_code_dir }}/integration", mode: "0755"}
+        - {path: "{{ safety_governor_config_dir }}", mode: "0700"}
+        - {path: "{{ safety_governor_home }}/.config/systemd/user"}
+      loop_control: {label: "{{ item.path }}"}
+
+    - name: Governor code
+      ansible.builtin.copy:
+        src: "{{ safety_governor_src }}/governor/safety_governor/{{ item }}"
+        dest: "{{ safety_governor_code_dir }}/safety_governor/{{ item }}"
+        mode: "0644"
+      loop: [__init__.py, core.py, sinks.py, metrics.py, nats_bridge.py, node.py, estop_cli.py]
+      notify: Restart safety-governor
+
+    - name: Integration test (mock sink only)
+      ansible.builtin.copy:
+        src: "{{ safety_governor_src }}/governor/integration/pi_integration.py"
+        dest: "{{ safety_governor_code_dir }}/integration/pi_integration.py"
+        mode: "0644"
+
+    - name: NATS credentials (picoclaw user)
+      ansible.builtin.copy:
+        content: "{{ {'user': 'picoclaw', 'password': safety_governor_secrets.nats_picoclaw_password} | to_json }}\n"
+        dest: "{{ safety_governor_config_dir }}/nats-credentials.json"
+        mode: "0600"
+      no_log: true
+      notify: Restart safety-governor
+
+    - name: Config, unit, test wrapper and e-stop CLI
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - {src: governor.json.j2, dest: "{{ safety_governor_config_dir }}/governor.json", mode: "0644"}
+        - {src: safety-governor.service.j2, dest: "{{ safety_governor_home }}/.config/systemd/user/safety-governor.service", mode: "0644"}
+        - {src: run-integration-test.j2, dest: "{{ safety_governor_code_dir }}/run-integration-test", mode: "0755"}
+        - {src: safety-estop.j2, dest: "{{ safety_governor_home }}/.local/bin/safety-estop", mode: "0755"}
+      loop_control: {label: "{{ item.dest | basename }}"}
+      notify: Restart safety-governor
+
+    - name: Service is enabled and running
+      ansible.builtin.systemd_service:
+        name: safety-governor
+        scope: user
+        enabled: true
+        state: started
+        daemon_reload: true
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ safety_governor_uid }}"
+      when: not ansible_check_mode

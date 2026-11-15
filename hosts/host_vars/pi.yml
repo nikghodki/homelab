@@ -17,3 +17,6 @@ cisco_aibom_memory_max: 1500M
 cisco_aibom_dirs:
   - {name: picoclaw, path: /home/nikghodki-raspberry-1/.picoclaw}
   - {name: roboclaw, path: /home/nikghodki-raspberry-1/workspace/roboclaw}
+# Safety governor metrics (127.0.0.1 only) for the status-stale alert (runbooks/robot-safety.md)
+otel_host_collector_extra_scrapes:
+  - {job: safety-governor, target: "127.0.0.1:9113", interval: 15s}
