@@ -1,0 +1,30 @@
+# A2A agent card for Hermes on the Jetson (draft until LiteLLM's A2A gateway serves it, plan P4.10).
+# Scanned in CI by a2a-scanner (.github/scripts/scan-agents.py).
+name: Hermes
+description: >-
+  Home agent for the homelab. Answers questions, reads Home Assistant state, and asks for approval
+  before changing devices or sending the robot anywhere.
+url: https://hermes.nghodki.ai/a2a
+version: 0.21.6
+protocolVersion: 0.3.0
+provider:
+  organization: nikghodki homelab
+  url: https://nghodki.ai
+capabilities:
+  streaming: true
+  pushNotifications: false
+defaultInputModes: [text/plain]
+defaultOutputModes: [text/plain]
+skills:
+  - id: home-status
+    name: Home status
+    description: Reads Home Assistant entity state and history.
+    tags: [home, read-only]
+  - id: home-control
+    name: Home control
+    description: Changes Home Assistant devices after the user approves each change.
+    tags: [home, approval]
+  - id: robot-errand
+    name: Robot errand
+    description: Asks the Pi robot (picoclaw) to drive to a named spot, after the user approves.
+    tags: [robot, approval]

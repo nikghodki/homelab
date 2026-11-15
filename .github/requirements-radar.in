@@ -1,0 +1,4 @@
+# Agentic Radar in its own venv: it pins rich<14, the skill scanner needs rich>=14.
+# Compile with: uv pip compile --generate-hashes --python-version 3.12 --python-platform x86_64-manylinux_2_28 .github/requirements-radar.in -o .github/requirements-radar.txt
+agentic-radar==0.14.2
+pyyaml==6.0.3

@@ -99,7 +99,7 @@ jobs:
         run: .github/scripts/check-kubernetes.sh "$KUBECONFORM_IMAGE" "$KYVERNO_IMAGE"
 
   ai-scanners:
-    name: AI scanners (MCP tools, skills)
+    name: AI scanners (MCP tools, skills, agent cards, agent code)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -115,6 +115,22 @@ jobs:
         run: python3 .github/scripts/scan-mcp-tools.py tools
       - name: skill-scanner
         run: .github/scripts/scan-skills.sh
+      - name: a2a-scanner still flags a known-bad agent card
+        run: python3 .github/scripts/scan-agents.py --self-test
+      - name: a2a-scanner (agent cards, offline analyzers)
+        run: python3 .github/scripts/scan-agents.py
+      - name: Agentic Radar (own venv; it pins rich<14)
+        run: |
+          python3 -m venv /tmp/radar
+          /tmp/radar/bin/pip install --require-hashes -r .github/requirements-radar.txt
+          PATH=/tmp/radar/bin:$PATH .github/scripts/scan-agent-code.sh
+      - name: Agentic Radar reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: agentic-radar
+          path: reports/agentic-radar
+          if-no-files-found: ignore
 
   unit-tests:
     name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw, Pocket ID sync)

@@ -98,6 +98,11 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P2.6 | 🟡 | Phoenix on dgx-2 (`phoenix.nghodki.ai`, login on); LiteLLM to be connected in the P0.14 window |
 | P2.1-P2.3, P2.5, P2.7, P2.8 | ⬜ | DGXMM work, after the DGXMM session |
 
+### Phase 4
+| ID | Status | Notes |
+|---|---|---|
+| P4.9 | ✅ | a2a-scanner on `agents/*/card.yaml` (fails CI on HIGH/CRITICAL; self-test with a known-bad card) and Agentic Radar for agents that opt in with `radar.yaml` (its own venv and lock: it pins rich<14). First card: `agents/hermes/card.yaml` |
+
 ### Findings to report upstream
 - Edge Connector 1.0.9 doesn't build against mbedTLS 3.6 (deprecated API + -Werror).
 - `cisco-ai-mcp-scanner` 4.8.7 pins `litellm==1.93.2` (GHSA-7hp6-4w63-5g45).
