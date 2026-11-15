@@ -44,9 +44,8 @@
     // Agents and home: models (LiteLLM) and the message bus (NATS, MQTT) on dgx-1.
     {"src": ["tag:agent", "tag:home"], "dst": ["dgx-1"], "ip": ["tcp:4000", "tcp:4222", "tcp:8883"]},
 
-    // Robot: the message bus only (MQTT/NATS), plus the DefenseClaw gateway on the Jetson.
-    {"src": ["tag:robot"], "dst": ["dgx-1"], "ip": ["tcp:8883", "tcp:4222"]},
-    {"src": ["tag:robot"], "dst": ["tag:home"], "ip": ["tcp:18970"]},
+    // Robot: the message bus (MQTT/NATS) and the DefenseClaw Fleet broker (Edge Connector, D24) on dgx-1.
+    {"src": ["tag:robot"], "dst": ["dgx-1"], "ip": ["tcp:8883", "tcp:4222", "tcp:8884"]},
 
     // Ansible / admin automation from dgx-1 to every device.
     {"src": ["dgx-1"], "dst": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "ip": ["tcp:22"]},
@@ -60,7 +59,7 @@
     {"src": "nikghodki@gmail.com",   "accept": ["dgx-2:22", "dgx-1:4000"]},
     {"src": "vilasghodki@gmail.com", "accept": ["dgx-1:443", "dgx-1:80"], "deny": ["dgx-1:22", "dgx-2:3000", "dgx-1:5432"]},
     {"src": "ameyaraul@gmail.com",   "accept": ["dgx-1:443"], "deny": ["dgx-1:22", "dgx-1:8883", "dgx-2:22"]},
-    {"src": "tag:robot",             "accept": ["dgx-1:8883", "dgx-2:4319"], "deny": ["dgx-1:4000", "dgx-1:22", "dgx-2:3000"]},
+    {"src": "tag:robot",             "accept": ["dgx-1:8883", "dgx-1:8884", "dgx-2:4319"], "deny": ["dgx-1:4000", "dgx-1:22", "dgx-1:8971", "dgx-2:3000"]},
     {"src": "tag:agent",             "accept": ["dgx-1:4000", "dgx-1:8883"], "deny": ["dgx-2:22"]},
   ],
 }
