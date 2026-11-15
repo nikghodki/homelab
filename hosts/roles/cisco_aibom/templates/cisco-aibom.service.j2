@@ -1,0 +1,32 @@
+# Managed by homelab Ansible (roles/cisco_aibom)
+# Root only so it can read every user's agent code and reach the Docker socket; the scan itself is read-only:
+# no capabilities except reading files, the rest of the file system read-only, own /tmp.
+[Unit]
+Description=Cisco AIBOM of this host's agent code and AI container images
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 {{ cisco_aibom_prefix }}/cisco-aibom-fleet /etc/cisco-aibom/targets.json
+SyslogIdentifier=cisco-aibom
+Environment=HOME={{ cisco_aibom_state }}
+Environment=AIBOM_LOG_LEVEL=WARNING
+Nice=19
+IOSchedulingClass=idle
+MemoryMax={{ cisco_aibom_memory_max }}
+TimeoutStartSec=6h
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+AmbientCapabilities=
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths={{ cisco_aibom_state }}
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077

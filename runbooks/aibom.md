@@ -1,0 +1,82 @@
+# Cisco AIBOM (AI bill of materials)
+
+[Cisco AIBOM](https://github.com/cisco-ai-defense/aibom) (`cisco-aibom`, PyPI) inventories the AI parts of code and
+container images: models, agents, MCP servers and clients, skills, prompts, datasets, endpoints, AI dependencies,
+secrets. Decision: decisions/0003-cisco-ai-defense-tools.md.
+
+| Piece | Where | Managed by |
+|---|---|---|
+| Version pin (hash-locked, universal: x86_64 CI and aarch64 hosts, Python 3.12/3.13) | `.github/requirements-aibom.in` / `.txt` | Renovate (pip-compile) |
+| CI scan of this repo, JSON as the `aibom` artifact (30 days) | `pr-checks.yml` job `aibom` (~1.5 min) | — |
+| Nightly fleet scan | systemd `cisco-aibom.timer` (system unit, ~04:20; Jetson 04:50) on dgx-1, dgx-2, Jetson, Pi | role `cisco_aibom`, `playbooks/aibom.yml`, `host_vars/*` |
+| Full reports | `/var/lib/cisco-aibom/<host>-<date>.json` on each host, root only, 30 days | the job |
+| Summary and diff | journal (`SyslogIdentifier=cisco-aibom`) → host collector → Loki on dgx-2 | — |
+| Dashboard | Grafana → Fleet → **AI inventory** | `hosts/stacks/observe/grafana/dashboards/fleet/ai-inventory.json` |
+
+## What each host scans
+
+| Host | Code dirs (read in place) | Container images (of the running containers) |
+|---|---|---|
+| dgx-1 | DGXMM `~/workspace/dgx-model-manager`, LiteLLM config `~/litellm-setup` | `litellm-proxy`, `open-webui` |
+| dgx-2 | — | `observe-phoenix-1` |
+| jetson | Hermes `~nikjetson/.hermes/hermes-agent`, Hermes `~hermes-nikhil/.hermes/hermes-agent`, `~/workspace/roboclaw` | — |
+| pi | PicoClaw `~/.picoclaw` (config, workspace, skills), `~/workspace/roboclaw` | — |
+
+Pocket ID and the rest of the observe stack are not AI components and are not scanned. To add a target, extend
+`cisco_aibom_dirs` / `cisco_aibom_containers` in the host's `host_vars` and run the playbook.
+
+## How it works
+
+Per host, not centrally: AIBOM scans local paths and local images, so each host scans what it runs, secrets in
+the scanned code never leave the host, and only counts and component names go to Loki (secret findings are counted,
+never named). The job (`/opt/cisco-aibom/cisco-aibom-fleet`) runs `cisco-aibom analyze` once per target, writes one
+JSON per host and night, compares it with the previous night and logs:
+
+- `{"event": "aibom", "total", "counts" (per type), "targets" (per dir/image), "added", "removed", "errors", ...}`
+- `{"event": "aibom.new" | "aibom.removed", "target", "type", "name", "file"}`, at most 50 per direction and night.
+
+A target that fails is reported in `errors` (the unit exits 1) and is not counted as "removed".
+
+Containers use AIBOM's container mode (`--container-extraction-tier docker`: `docker save` to find the app dirs,
+then create + cp). dgx-2's Docker uses the containerd image store, which drops compressed layers after unpacking,
+so `docker save` fails there; the job then copies the image's working dir, `/app`, `/opt` and `/srv` out of a
+created (never started) container and scans that folder (`"method": "docker-cp-fallback"` in the JSON).
+
+The unit runs as root (to read every user's code and reach the Docker socket) but read-only: only
+`CAP_DAC_READ_SEARCH`, `ProtectSystem=strict`, `ProtectHome=read-only`, its own `/tmp`, `Nice=19`, idle I/O,
+`MemoryMax` per host (dgx-1 16G for the Open WebUI image, which takes about 25 min and 13 GB; Jetson 3G; Pi 1500M).
+
+**No LLM.** `cisco-aibom analyze` requires `--llm-model`; its agentic stage confirms or drops each candidate and adds
+identifiers. The job points it at a closed port, so it falls back to its deterministic scanners (`agentic_status:
+degraded` in the reports). Expect some false positives (test fixtures, model names in tests). Turning enrichment on
+needs a dedicated LiteLLM virtual key for AIBOM (owned by the LiteLLM session) and then `--llm-provider openai
+--llm-api-base <LiteLLM URL>/v1 --llm-model <alias>` with the key from a root-only env file.
+
+## Two AIBOMs on the Jetson
+
+| | DefenseClaw AIBOM (role `defenseclaw_aibom`) | Cisco AIBOM (role `cisco_aibom`) |
+|---|---|---|
+| Question | What has this agent **connected**? | What do the **code and images** contain? |
+| Source | `defenseclaw aibom scan --json`: the running connector's inventory (Hermes skills, plugins, MCP servers, memory, rules) | Static analysis of directories and container images |
+| Hosts | Jetson (needs a connected agent) | dgx-1, dgx-2, Jetson, Pi |
+| Unit | user unit `homelab-aibom.timer` (03:15), `SyslogIdentifier=homelab-aibom` | system unit `cisco-aibom.timer` (04:50 on the Jetson), `SyslogIdentifier=cisco-aibom` |
+| Reports | `~/.local/state/homelab-aibom/` | `/var/lib/cisco-aibom/` |
+
+Both stay. The AI inventory dashboard shows both; they do not share names or files.
+
+## Common tasks
+
+```bash
+# run now on one host (from dgx-1, hosts/)
+~/.venvs/ansible/bin/ansible <host> -b -m systemd_service -a "name=cisco-aibom.service state=started"
+# follow it / last summary
+sudo journalctl -u cisco-aibom -f
+# latest report
+sudo ls -t /var/lib/cisco-aibom/ | head -1
+# start the diff from scratch (e.g. after adding targets)
+sudo rm /var/lib/cisco-aibom/<host>-*.json
+```
+
+Upgrade: bump `cisco-aibom` in `.github/requirements-aibom.in`, recompile with the command in its header, let the
+`aibom` CI job pass, merge, then `ansible-playbook playbooks/aibom.yml` (the venv is rebuilt when the lock changes).
+The first night after an upgrade may show added/removed components that are only scanner changes.

@@ -1,0 +1,342 @@
+{
+  "uid": "ai-inventory",
+  "title": "AI inventory",
+  "tags": [
+    "fleet",
+    "aibom",
+    "security"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "",
+  "editable": false,
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Nightly **Cisco AIBOM** of each host's agent code and AI container images (role `cisco_aibom`, runbooks/aibom.md). Deterministic scanners only, no LLM. Full JSON per host in `/var/lib/cisco-aibom` (30 days). The bottom panel is DefenseClaw's own AIBOM on the Jetson (what Hermes has connected)."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Components per host (latest run)",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (fleet_host) (last_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", total=\"total\", added=\"added\", removed=\"removed\" | event=\"aibom\" | unwrap total [2d]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "fleet_host": "Host",
+              "Value": "Components"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 3,
+      "title": "New components, last 24h",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 3,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (fleet_host) (count_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.new\" [24h]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "fleet_host": "Host",
+              "Value": "New"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 4,
+      "title": "Removed components, last 24h",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 3,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (fleet_host) (count_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.removed\" [24h]))",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "fleet_host": "Host",
+              "Value": "Removed"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 5,
+      "title": "Latest runs (counts per type and target, errors)",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "description": "One line per host and night. counts: components per type; targets: per scanned dir or image.",
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", total=\"total\", added=\"added\", removed=\"removed\" | event=\"aibom\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 6,
+      "title": "New components (last 24h)",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "description": "Capped at 50 lines per host and night; secrets are shown as (secret).",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.new\" | line_format \"{{.fleet_host}}  {{.target}}  {{.type}}  {{.name}}  {{.file}}\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 7,
+      "title": "Removed components (last 24h)",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 19,
+        "w": 12,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.removed\" | line_format \"{{.fleet_host}}  {{.target}}  {{.type}}  {{.name}}  {{.file}}\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 8,
+      "title": "DefenseClaw AIBOM (Jetson, homelab-aibom)",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{host_name=~\".+\"} |= \"homelab-aibom {\" | json msg=\"MESSAGE\" | line_format \"{{.msg}}\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    }
+  ]
+}

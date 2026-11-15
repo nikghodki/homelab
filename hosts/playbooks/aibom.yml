@@ -1,0 +1,6 @@
+# Cisco AIBOM nightly fleet inventory (runbooks/aibom.md). Always --check --diff first.
+- name: Cisco AIBOM
+  hosts: all
+  become: true
+  roles:
+    - role: cisco_aibom
