@@ -74,3 +74,38 @@ def test_http_sink_sends_latest_payload_and_survives_errors():
     assert sent[0] == ("http://192.0.2.1/velocity", {"linear": 0.1, "angular": 0.3})
     assert sent[-1] == ("http://192.0.2.1/velocity", {"linear": 0.0, "angular": 0.0})
     assert len(errors) == 1
+
+
+def test_http_sink_real_post_to_local_server():
+    """The default poster against a throw-away local HTTP server (127.0.0.1, no car)."""
+    import http.server
+
+    got = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):  # noqa: N802
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            got.append((self.path, json.loads(body)))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.handle_request, daemon=True).start()
+    sink = HttpVelocitySink(f"http://127.0.0.1:{srv.server_port}")
+    sink.send(Velocity(0.05, 0.0, -0.1))
+    for _ in range(200):
+        if got:
+            break
+        threading.Event().wait(0.01)
+    sink.close()
+    srv.server_close()
+    assert got == [("/velocity", {"linear": 0.05, "angular": -0.1})]
+
+
+@pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://x", "192.168.1.1", ""])
+def test_http_sink_rejects_non_http_urls(url):
+    with pytest.raises(ValueError):
+        HttpVelocitySink(url)

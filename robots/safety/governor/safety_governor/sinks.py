@@ -14,10 +14,10 @@ A real sink is only built when `real_sink_enabled` is true; otherwise the mock i
 from __future__ import annotations
 
 import collections
+import http.client
 import json
 import threading
 import time
-import urllib.request
 from urllib.parse import urlparse
 
 from .core import Velocity
@@ -74,8 +74,13 @@ class HttpVelocitySink(Sink):
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             raise ValueError("http_velocity sink needs http_url like http://192.168.86.x")
         self._endpoint = url.rstrip("/") + "/velocity"
+        # Only http/https to a fixed host: no other URL schemes can be reached.
+        self._conn_cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        self._host = parsed.hostname
+        self._port = parsed.port
+        self._path = parsed.path.rstrip("/") + "/velocity"
         self._timeout = timeout
-        self._post = post or self._urllib_post
+        self._post = post or self._http_post
         self._on_error = on_error or (lambda exc: None)
         self._pending: Velocity | None = None
         self._cond = threading.Condition()
@@ -107,16 +112,13 @@ class HttpVelocitySink(Sink):
             except Exception as exc:  # noqa: BLE001 - a failed call must never kill the governor
                 self._on_error(exc)
 
-    @staticmethod
-    def _urllib_post(endpoint: str, payload: dict, timeout: float) -> None:
-        req = urllib.request.Request(
-            endpoint,
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 - fixed http(s) URL from config
-            resp.read()
+    def _http_post(self, endpoint: str, payload: dict, timeout: float) -> None:
+        conn = self._conn_cls(self._host, self._port, timeout=timeout)
+        try:
+            conn.request("POST", self._path, body=json.dumps(payload), headers={"Content-Type": "application/json"})
+            conn.getresponse().read()
+        finally:
+            conn.close()
 
 
 def make_sink(sink_cfg: dict, ros_factory=None, on_error=None) -> tuple[Sink, str]:
