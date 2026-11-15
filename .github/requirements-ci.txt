@@ -1,0 +1,5 @@
+# Python tools used by CI. Renovate keeps these pinned versions current.
+yamllint==1.38.0
+ansible-lint==26.11.0
+cisco-ai-mcp-scanner==4.8.7
+cisco-ai-skill-scanner==2.3.2

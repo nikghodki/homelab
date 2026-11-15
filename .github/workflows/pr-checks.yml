@@ -1,0 +1,114 @@
+name: pr-checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  TRUFFLEHOG_IMAGE: trufflesecurity/trufflehog:3.99.9@sha256:2ec535840f860aa27f11fee20222fb790326ecd66325c96bd49d02ec6af46eca
+  SEMGREP_IMAGE: semgrep/semgrep:1.185.0@sha256:67518c174185a2043fdbed16c70631b79209499b3671178e7194379b48295a0d
+  OSV_IMAGE: ghcr.io/google/osv-scanner:v2.7.1@sha256:a70ffffc2bfd33482953e5d6b64c6fcdb30239717a07b0f0d3ab2859ce3e4cde
+  TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+  KUBECONFORM_IMAGE: ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e
+  KYVERNO_IMAGE: ghcr.io/kyverno/kyverno-cli:v1.20.0@sha256:bd2b8b7c9d550ecf04e0bacaf351adce2f82ce67fd3f291075edcee7f8ab4ab4
+
+jobs:
+  lint:
+    name: Lint (workflows, YAML, Ansible)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install Python tools
+        run: pip install -r .github/requirements-ci.txt
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
+      - name: yamllint
+        run: yamllint -c .yamllint.yaml .
+      - name: ansible-lint
+        if: hashFiles('hosts/**/*.yml', 'hosts/**/*.yaml') != ''
+        run: ansible-lint hosts/
+
+  secrets:
+    name: Secret scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: gitleaks (full history)
+        run: docker run --rm -v "$PWD:/repo:ro" "$GITLEAKS_IMAGE" git /repo --redact --verbose --exit-code 1
+      - name: TruffleHog (verified secrets)
+        run: docker run --rm -v "$PWD:/repo:ro" "$TRUFFLEHOG_IMAGE" git file:///repo --only-verified --fail --no-update
+      - name: secrets/ is SOPS-encrypted
+        run: .github/scripts/check-sops.sh
+
+  code:
+    name: Code, dependency and config scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Semgrep
+        run: docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" semgrep scan --config p/default --metrics=off --error
+      - name: OSV-Scanner (dependencies)
+        run: |
+          set +e
+          docker run --rm -v "$PWD:/src:ro" "$OSV_IMAGE" scan source -r /src
+          rc=$?
+          # 128 = no package manifests found yet
+          if [ "$rc" -eq 128 ]; then echo "no dependency manifests yet"; exit 0; fi
+          exit "$rc"
+      - name: Trivy (vulnerabilities, misconfigurations, secrets)
+        run: >
+          docker run --rm -v "$PWD:/src:ro" "$TRIVY_IMAGE" fs
+          --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress /src
+
+  kubernetes:
+    name: Kubernetes manifests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: kubeconform + Kyverno CLI
+        run: .github/scripts/check-kubernetes.sh "$KUBECONFORM_IMAGE" "$KYVERNO_IMAGE"
+
+  ai-scanners:
+    name: AI scanners (MCP tools, skills)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install scanners
+        run: pip install -r .github/requirements-ci.txt
+      - name: mcp-scanner (static, YARA)
+        run: python3 .github/scripts/scan-mcp-tools.py tools
+      - name: skill-scanner
+        run: .github/scripts/scan-skills.sh

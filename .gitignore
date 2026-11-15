@@ -1,0 +1,16 @@
+# secrets and keys
+*.agekey
+age.key
+keys.txt
+*.pem
+*.key
+.env
+.env.*
+*kubeconfig*
+secrets/**/*.dec.*
+# local tooling
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+*.swp
