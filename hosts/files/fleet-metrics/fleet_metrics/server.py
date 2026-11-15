@@ -10,7 +10,7 @@ from fleet_metrics import collect, services
 DEFAULT_SYSFS = "/sys/devices/platform/gpu.0/load"
 
 
-def build_metrics(proc_root: str = "/proc", sysfs_path: str = DEFAULT_SYSFS) -> dict:
+def build_metrics(proc_root: str = "/proc", sysfs_path: str = DEFAULT_SYSFS, sys_root: str = "/sys") -> dict:
     mem = collect.read_mem(proc_root)
     gpu = collect.read_gpu(sysfs_path=sysfs_path)
     return {
@@ -18,6 +18,8 @@ def build_metrics(proc_root: str = "/proc", sysfs_path: str = DEFAULT_SYSFS) -> 
         "mem_pct": mem["mem_pct"], "mem_used_gb": mem["mem_used_gb"], "mem_total_gb": mem["mem_total_gb"],
         "gpu_pct": gpu["gpu_pct"], "gpu_name": gpu["gpu_name"],
         "uptime_s": collect.read_uptime(proc_root),
+        "temps_c": collect.read_thermal(sys_root),
+        "power_w": collect.read_power(sys_root),
     }
 
 
@@ -46,6 +48,14 @@ def render_prometheus(m: dict) -> str:
     if m.get("gpu_pct") is not None:
         out += ["# HELP fleet_gpu_percent GPU busy, percent", "# TYPE fleet_gpu_percent gauge",
                 f'fleet_gpu_percent{{gpu_name="{_label(m.get("gpu_name") or "")}"}} {m["gpu_pct"]}']
+    if m.get("temps_c"):
+        out += ["# HELP fleet_temperature_celsius Thermal zone temperature, Celsius",
+                "# TYPE fleet_temperature_celsius gauge"]
+        out += [f'fleet_temperature_celsius{{zone="{_label(z)}"}} {v}' for z, v in sorted(m["temps_c"].items())]
+    if m.get("power_w"):
+        out += ["# HELP fleet_power_watts Power rail draw (Jetson INA3221), watts",
+                "# TYPE fleet_power_watts gauge"]
+        out += [f'fleet_power_watts{{rail="{_label(r)}"}} {v}' for r, v in sorted(m["power_w"].items())]
     return "\n".join(out) + "\n"
 
 

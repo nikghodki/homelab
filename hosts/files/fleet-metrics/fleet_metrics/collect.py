@@ -97,3 +97,55 @@ def read_gpu(sysfs_path: str = "/sys/devices/platform/gpu.0/load", run=subproces
     except (OSError, ValueError, subprocess.SubprocessError):
         pass
     return {"gpu_pct": None, "gpu_name": None}
+
+
+def read_thermal(sys_root: str = "/sys") -> dict:
+    """Temperature per thermal zone, in Celsius ({zone type: °C}). Zones that report no data are skipped."""
+    temps = {}
+    base = os.path.join(sys_root, "class", "thermal")
+    try:
+        zones = sorted(z for z in os.listdir(base) if z.startswith("thermal_zone"))
+    except OSError:
+        return temps
+    for zone in zones:
+        try:
+            with open(os.path.join(base, zone, "type")) as f:
+                name = f.read().strip()
+            with open(os.path.join(base, zone, "temp")) as f:
+                milli = int(f.read().strip())
+        except (OSError, ValueError):
+            continue
+        if name and name not in temps:
+            temps[name] = round(milli / 1000, 1)
+    return temps
+
+
+def read_power(sys_root: str = "/sys") -> dict:
+    """Power per labelled INA3221 rail (Jetson), in watts ({rail: W}); empty elsewhere."""
+    rails = {}
+    base = os.path.join(sys_root, "class", "hwmon")
+    try:
+        mons = sorted(os.listdir(base))
+    except OSError:
+        return rails
+    for mon in mons:
+        path = os.path.join(base, mon)
+        try:
+            with open(os.path.join(path, "name")) as f:
+                if f.read().strip() != "ina3221":
+                    continue
+        except OSError:
+            continue
+        for n in range(1, 8):
+            try:
+                with open(os.path.join(path, f"in{n}_label")) as f:
+                    label = f.read().strip()
+                with open(os.path.join(path, f"in{n}_input")) as f:
+                    millivolts = int(f.read().strip())
+                with open(os.path.join(path, f"curr{n}_input")) as f:
+                    milliamps = int(f.read().strip())
+            except (OSError, ValueError):
+                continue
+            if label:
+                rails[label] = round(millivolts * milliamps / 1e6, 3)
+    return rails

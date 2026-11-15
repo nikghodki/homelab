@@ -7,9 +7,12 @@ def test_build_metrics_shape(monkeypatch):
     monkeypatch.setattr(server.collect, "read_cpu", lambda p: 12.0)
     monkeypatch.setattr(server.collect, "read_uptime", lambda p: 999.0)
     monkeypatch.setattr(server.collect, "read_gpu", lambda sysfs_path: {"gpu_pct": 40.0, "gpu_name": "Jetson GPU"})
+    monkeypatch.setattr(server.collect, "read_thermal", lambda root: {"gpu-thermal": 49.4})
+    monkeypatch.setattr(server.collect, "read_power", lambda root: {"VDD_IN": 7.2})
     m = server.build_metrics(proc_root="/proc", sysfs_path="/x")
     assert m == {"cpu_pct": 12.0, "mem_pct": 50.0, "mem_used_gb": 4.0,
-                 "mem_total_gb": 8.0, "gpu_pct": 40.0, "gpu_name": "Jetson GPU", "uptime_s": 999.0}
+                 "mem_total_gb": 8.0, "gpu_pct": 40.0, "gpu_name": "Jetson GPU", "uptime_s": 999.0,
+                 "temps_c": {"gpu-thermal": 49.4}, "power_w": {"VDD_IN": 7.2}}
 
 
 def test_build_services(monkeypatch):
@@ -52,3 +55,17 @@ def test_route_prometheus(monkeypatch):
                                                                "mem_total_gb": None, "gpu_pct": None, "gpu_name": None, "uptime_s": None})
     status, body = server.route("/metrics/prometheus", units=[], proc_root="/proc", sysfs_path="/x")
     assert status == 200 and isinstance(body, str) and "fleet_cpu_percent 1.0" in body
+
+
+def test_prometheus_temperatures_and_power():
+    m = {"temps_c": {"gpu-thermal": 49.4, "cpu-thermal": 50.3}, "power_w": {"VDD_IN": 7.2}}
+    text = server.render_prometheus(m)
+    assert "# TYPE fleet_temperature_celsius gauge\n" in text
+    assert 'fleet_temperature_celsius{zone="cpu-thermal"} 50.3\n' in text
+    assert 'fleet_temperature_celsius{zone="gpu-thermal"} 49.4\n' in text
+    assert 'fleet_power_watts{rail="VDD_IN"} 7.2\n' in text
+
+
+def test_prometheus_omits_empty_temperature_and_power():
+    text = server.render_prometheus({"temps_c": {}, "power_w": {}})
+    assert "fleet_temperature_celsius" not in text and "fleet_power_watts" not in text

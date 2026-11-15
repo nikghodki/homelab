@@ -64,7 +64,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P0.9 | ⬜ | IP reservations (you) |
 | P0.10 | ✅ | Omarchy fully updated and back on Tailscale (`nikghodki-omarchy`, tag:agent) |
 | P0.11 | ⬜ | Ethernet for the Sparks (you) |
-| P0.12 | ✅ | `companion-agent` retired (code removed 28 Aug); no failed user units |
+| P0.12 | ✅ | `companion-agent` retired (code removed 28 Aug); no failed user units; Jetson `nvidia-cdi-refresh` fixed (CSV mode, retry; role `jetson_cdi`) |
 | P0.13 | ✅ | LiteLLM 1.109.1 pinned by digest |
 | P0.14 | ⬜ | LiteLLM master + salt key rotation, after the DGXMM session |
 | P0.15 | ✅ | Profile nikhil-ghodki runs as Linux user `hermes-nikhil` with its own Hermes runtime and DefenseClaw (action, fail closed, `homelab` policy, OTLP to dgx-2). Its picoclaw MCP now reaches NATS as `hermes`. Chat test after DGXMM. runbooks/hermes-profiles.md |
@@ -79,7 +79,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P1.3 | ✅ | Ansible baseline applied on all 5 hosts, idempotent |
 | P1.4 | ✅ | Devices tagged; `policies/tailscale/policy.hujson` applied; checked from the Pi (bus and Fleet broker open; LiteLLM, SSH and the Fleet API blocked) |
 | P1.5 | ✅ | NATS 2.15.3 on dgx-1 (TLS, MQTT over TLS, deny-by-default users); homelab CA trusted on all hosts; picoclaw connected as `picoclaw`. End-to-end reply pending the qwen3.8 engine (busy in the DGXMM session) |
-| P1.6 | ✅ | dgx-2: VictoriaMetrics, Loki, Tempo, Grafana (19 DefenseClaw dashboards + Fleet Home), vmalert, Alertmanager, Gatus, ntfy; host collectors + fleet-metrics (now in the repo, Prometheus endpoint) on all 5 hosts; DefenseClaw OTLP from Jetson and dgx-1, redaction `sensitive` |
+| P1.6 | ✅ | dgx-2: VictoriaMetrics, Loki, Tempo, Grafana (19 DefenseClaw dashboards + Fleet Home), vmalert, Alertmanager, Gatus, ntfy; host collectors + fleet-metrics (now in the repo, Prometheus endpoint) on all 5 hosts; DefenseClaw OTLP from Jetson and dgx-1, redaction `sensitive`; GPU: dcgm-exporter on both Sparks (util, temp, power, clock, energy) and thermal + INA3221 power rails from fleet-metrics on every host |
 | P1.7 | ✅ | Alerts → ntfy tested end to end (Gatus and Alertmanager) |
 | P1.8 | ✅ | CI with hash-locked tools, unit tests, Renovate |
 | P1.9 | ⬜ | GitHub Pro decision (you) |

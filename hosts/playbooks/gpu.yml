@@ -1,0 +1,15 @@
+# GPU plumbing (plan P1.6, P0.12 follow-up). Always --check --diff first.
+- name: GPU metrics on the Sparks
+  hosts: sparks
+  become: true
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: gpu
+        compose_stack_src: "{{ playbook_dir }}/../stacks/gpu"
+
+- name: CDI specs on the Jetson
+  hosts: jetson_group
+  become: true
+  roles:
+    - role: jetson_cdi
