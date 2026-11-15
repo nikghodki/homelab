@@ -21,3 +21,5 @@
         compose_stack_src: "{{ playbook_dir }}/../stacks/observe"
         compose_stack_env:
           GRAFANA_ADMIN_PASSWORD: "{{ observe_secrets.grafana_admin_password }}"
+          PHOENIX_SECRET: "{{ observe_secrets.phoenix_secret }}"
+          PHOENIX_ADMIN_PASSWORD: "{{ observe_secrets.phoenix_admin_password }}"

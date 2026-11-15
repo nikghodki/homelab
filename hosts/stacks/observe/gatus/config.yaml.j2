@@ -15,6 +15,7 @@ endpoints:
   - {name: dgxmanager.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: dgxmanager.nghodki.ai}, <<: *web}
   - {name: ha.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: ha.nghodki.ai}, <<: *web}
   - {name: Home Assistant (direct), group: home, url: "http://192.168.86.211:8123/", <<: *web}
+  - {name: Phoenix, group: observe, url: "http://phoenix:6006/healthz", <<: *web}
   - {name: Grafana, group: observe, url: "http://grafana:3000/api/health", <<: *web}
   - {name: dgx-1 ssh, group: hosts, url: "tcp://192.168.86.44:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: dgx-2 ssh, group: hosts, url: "tcp://192.168.86.36:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
