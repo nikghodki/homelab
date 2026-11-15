@@ -1,0 +1,39 @@
+---
+- name: "Gateway PATH drop-in, skipped where the unit is absent, for {{ defenseclaw_gateway_env_account }}"
+  become: "{{ defenseclaw_gateway_env_account != ansible_facts['user_id'] }}"
+  become_user: "{{ defenseclaw_gateway_env_account }}"
+  vars:
+    defenseclaw_gateway_env_home: "{{ ansible_facts.getent_passwd[defenseclaw_gateway_env_account][4] }}"
+    defenseclaw_gateway_env_uid: "{{ ansible_facts.getent_passwd[defenseclaw_gateway_env_account][1] }}"
+    defenseclaw_gateway_env_unit_dir: "{{ defenseclaw_gateway_env_home }}/.config/systemd/user"
+  block:
+    - name: Look for the gateway user unit
+      ansible.builtin.stat:
+        path: "{{ defenseclaw_gateway_env_unit_dir }}/defenseclaw-gateway.service"
+      register: defenseclaw_gateway_env_unit
+
+    - name: Drop-in and reload
+      when: defenseclaw_gateway_env_unit.stat.exists
+      block:
+        - name: Drop-in folder
+          ansible.builtin.file:
+            path: "{{ defenseclaw_gateway_env_unit_dir }}/defenseclaw-gateway.service.d"
+            state: directory
+            mode: "0755"
+
+        - name: PATH drop-in
+          ansible.builtin.template:
+            src: 10-path.conf.j2
+            dest: "{{ defenseclaw_gateway_env_unit_dir }}/defenseclaw-gateway.service.d/10-path.conf"
+            mode: "0644"
+          register: defenseclaw_gateway_env_dropin
+
+        # Reload only; the gateway reads PATH on its next start. No restart, so live sessions aren't cut.
+        # Not a handler: it must run as this account with its own XDG_RUNTIME_DIR, inside the per-account loop.
+        - name: Reload the user manager  # noqa: no-handler
+          ansible.builtin.systemd_service:
+            scope: user
+            daemon_reload: true
+          environment:
+            XDG_RUNTIME_DIR: "/run/user/{{ defenseclaw_gateway_env_uid }}"
+          when: defenseclaw_gateway_env_dropin is changed

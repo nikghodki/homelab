@@ -1,0 +1,6 @@
+---
+# PATH for the per-user defenseclaw-gateway unit. The scanners (skill-scanner, mcp-scanner) live in ~/.local/bin;
+# without it on PATH the gateway fails closed and quarantines every skill it rescans.
+defenseclaw_gateway_env_path: "%h/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Accounts with a per-user DefenseClaw install. Empty means the Ansible login user only.
+defenseclaw_gateway_env_users: "{{ defenseclaw_policy_users | default([]) }}"

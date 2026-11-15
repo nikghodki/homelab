@@ -25,6 +25,22 @@ redaction.
 - DefenseClaw can't scan these MCP servers (local/private by design; a path launcher isn't allowlisted). They're kept
   with a warning, the same as on the main gateway.
 
+## Skill scanner (temporary: LLM judge off)
+
+- Since 2026-11-15 the skill scanner runs static-only for both accounts (`scanners.skill_scanner.use_llm: false`,
+  set with `defenseclaw setup skill-scanner --no-use-llm --non-interactive`), because the LLM behind LiteLLM is down
+  during the DGXMM work. Static-only is stricter: it can't clear the false positives the judge used to clear.
+- **Re-enable it once the model is back**, as each account: `defenseclaw setup skill-scanner --use-llm`, then
+  `defenseclaw skill scan all`. Skills that the static scan quarantined (below) may pass again then.
+- The gateway needs `~/.local/bin` on PATH (that's where `skill-scanner` and `mcp-scanner` live). Without it the
+  scanner fails closed and the policy quarantines every skill it rescans. Role `defenseclaw_gateway_env` writes the
+  `defenseclaw-gateway.service.d/10-path.conf` drop-in for each account in `defenseclaw_policy_users`.
+- Recovering skills quarantined for "scanner failure": `defenseclaw skill restore <name>` then
+  `defenseclaw skill unblock <name>`. DefenseClaw 1.0.9 refuses the restore when the skill's folder name differs from
+  its `name:` (for example `mlops/models/segment-anything` vs `segment-anything-model`) or when the copy sits under
+  `quarantine/per-source/`; then copy the quarantine folder back to the recorded original path (`cp -a`, the path is
+  in `quarantine_records` in `~/.defenseclaw/audit.db`) and rescan. The stale quarantine record stays listed.
+
 ## Rollback
 
 nikjetson's old `hermes-gateway-nikhil-ghodki` unit is disabled but kept, and its data is still in
