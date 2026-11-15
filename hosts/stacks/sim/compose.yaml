@@ -1,0 +1,53 @@
+# Simulation jobs on dgx-2 (plan P6.2, P6.4; runbooks/simulation.md). Nothing here runs on its own:
+# every service is in the "jobs" profile, never restarts, and is started on demand with
+#   docker compose -f hosts/stacks/sim/compose.yaml --profile jobs run --rm <service> [args]
+# or through robots/sim/measure.sh, which also samples GPU and memory and stops a job that
+# eats into the Spark's service reserve.
+#
+# Memory: GB10 memory is unified. mem_limit caps the container's CPU-side memory (cgroup); CUDA
+# allocations are not charged to the cgroup, so each framework is also capped on the GPU side
+# (JAX: XLA_PYTHON_CLIENT_MEM_FRACTION; Isaac Lab: --num_envs) and measure.sh watches MemAvailable.
+name: sim
+
+x-job: &job
+  profiles: [jobs]
+  restart: "no"
+  mem_limit: 16g
+  memswap_limit: 16g
+  shm_size: 2g
+  network_mode: bridge
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  deploy:
+    resources:
+      reservations:
+        devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+
+services:
+  # Isaac Lab 3.0.0 kit-less image (Newton/MuJoCo-Warp physics, no Isaac Sim, no EULA), multi-arch from NGC.
+  isaaclab:
+    <<: *job
+    image: nvcr.io/nvidia/isaac-lab:3.0.0-kitless@sha256:d47169952b55effb46dba8f79761d381532b521561ecba38a3019adc7648884b
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - isaaclab-logs:/workspace/isaaclab/logs
+    entrypoint: ["isaaclab"]
+    command: ["train", "--rl_library", "rsl_rl", "--task", "Isaac-Cartpole-Direct", "--max_iterations", "300", "physics=newton_mjwarp"]
+
+  # MuJoCo 3.6 + MJX + Playground 0.2.0 on JAX 0.9.2 (CUDA 13), built locally from robots/sim/mujoco.
+  mujoco:
+    <<: *job
+    image: homelab/mujoco-playground:0.2.0-jax0.9.2
+    build:
+      context: ../../../robots/sim/mujoco
+    environment:
+      XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+      XLA_PYTHON_CLIENT_MEM_FRACTION: "0.15"   # of ~120 GiB unified memory, about 18 GiB
+    volumes:
+      - mujoco-cache:/home/sim/.cache
+    command: ["--env", "Go1JoystickFlatTerrain", "--timesteps", "20000000"]
+
+volumes:
+  isaaclab-logs:
+  mujoco-cache:
