@@ -1,0 +1,28 @@
+# DefenseClaw Fleet on dgx-1 (plan P1.12). Deployed by playbooks/fleet.yml.
+# mosquitto: the Fleet MQTT broker. The gateway's Go client speaks MQTT 5, which NATS lacks,
+#            so Fleet gets its own broker with per-device ACLs (DefenseClaw's documented setup).
+# caddy:     TLS for the Fleet API. It must reach the gateway over loopback (host network) and
+#            forwards only /api/v1/fleet/*; the rest of the gateway API stays on 127.0.0.1.
+name: fleet
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.1.2-alpine@sha256:75d6662dee52c947dc9dd9c29f1d8d7ffef78ddaf38001caa09755681e8bbc98
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto:/mosquitto/config:ro
+      - mosquitto-data:/mosquitto/data
+    ports:
+      - "8884:8884"   # MQTT over TLS: Fleet gateway and Edge Connector devices
+
+  caddy:
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./caddy:/etc/caddy:ro
+      - caddy-data:/data
+
+volumes:
+  mosquitto-data:
+  caddy-data:

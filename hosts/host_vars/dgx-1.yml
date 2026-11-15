@@ -1,3 +1,4 @@
+defenseclaw_fleet_enabled: true
 restic_backup_paths:
   - /home/nikghodki-dgx/edge-gateway/conf
   - /home/nikghodki-dgx/edge-gateway/dnsmasq

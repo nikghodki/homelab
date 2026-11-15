@@ -1,0 +1,13 @@
+---
+defenseclaw_fleet_enabled: false      # the host that runs the Fleet gateway (dgx-1)
+defenseclaw_fleet_broker_url: ssl://fleet.nghodki.ai:8884
+defenseclaw_fleet_api_url: https://fleet.nghodki.ai:8971/api/v1/fleet
+defenseclaw_fleet_ca_cert: /usr/local/share/ca-certificates/homelab-ca.crt
+# fleet.* keys written with `defenseclaw config set`
+defenseclaw_fleet_config:
+  enabled: true
+  mqtt_broker_url: "{{ defenseclaw_fleet_broker_url }}"
+  mqtt_require_tls: true
+  trust_proxy_headers: true     # only loopback peers (the fleet stack's Caddy) may claim HTTPS
+  allow_key_over_http: false
+  auto_register: false

@@ -1,0 +1,17 @@
+# Managed by homelab Ansible (stacks/fleet). TLS front for the DefenseClaw Fleet API.
+{
+	admin off
+	auto_https off
+}
+
+https://fleet.nghodki.ai:8971 {
+	tls /etc/caddy/certs/fleet.crt /etc/caddy/certs/fleet.key
+	handle /api/v1/fleet/* {
+		reverse_proxy 127.0.0.1:18970 {
+			header_up X-Forwarded-Proto https
+		}
+	}
+	handle {
+		respond 404
+	}
+}

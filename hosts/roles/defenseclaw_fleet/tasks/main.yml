@@ -1,0 +1,53 @@
+---
+- name: DefenseClaw Fleet gateway settings (per-user install)
+  when: defenseclaw_fleet_enabled | bool
+  become: false
+  vars:
+    defenseclaw_fleet_home: "{{ ansible_facts['env']['HOME'] }}/.defenseclaw"
+    defenseclaw_fleet_env:
+      DCLAW_FLEET_API_URL: "{{ defenseclaw_fleet_api_url }}"
+      DCLAW_FLEET_API_TOKEN: "{{ defenseclaw_fleet_secrets.dclaw_fleet_api_token }}"
+      DCLAW_OTA_HMAC_KEY: "{{ defenseclaw_fleet_secrets.dclaw_ota_hmac_key }}"
+      DCLAW_EMERGENCY_KEY: "{{ defenseclaw_fleet_secrets.dclaw_emergency_key }}"
+      DCLAW_AUDIT_KEY: "{{ defenseclaw_fleet_secrets.dclaw_audit_key_dgx1 }}"
+      DCLAW_MQTT_USER: dclaw-fleet
+      DCLAW_MQTT_PASS: "{{ defenseclaw_fleet_secrets.mosquitto_dclaw_fleet_password }}"
+      DCLAW_TLS_CA_CERT: "{{ defenseclaw_fleet_ca_cert }}"
+  block:
+    - name: Load Fleet secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/fleet.enc.yaml"
+        name: defenseclaw_fleet_secrets
+      no_log: true
+
+    - name: Fleet secrets in the gateway environment file
+      ansible.builtin.lineinfile:
+        path: "{{ defenseclaw_fleet_home }}/.env"
+        regexp: "^{{ item.key }}="
+        line: "{{ item.key }}={{ item.value }}"
+        mode: "0600"
+      loop: "{{ defenseclaw_fleet_env | dict2items }}"
+      loop_control: {label: "{{ item.key }}"}
+      no_log: true
+      notify: Restart DefenseClaw gateway
+
+    - name: Current gateway config
+      ansible.builtin.slurp:
+        src: "{{ defenseclaw_fleet_home }}/config.yaml"
+      register: defenseclaw_fleet_current
+
+    - name: Fleet config keys
+      vars:
+        defenseclaw_fleet_have: "{{ (defenseclaw_fleet_current.content | b64decode | from_yaml).fleet | default({}) }}"
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_facts['env']['HOME'] }}/.local/bin/defenseclaw"
+          - config
+          - set
+          - "fleet.{{ item.key }}"
+          - "{{ item.value | string | lower if item.value is boolean else item.value }}"
+      loop: "{{ defenseclaw_fleet_config | dict2items }}"
+      loop_control: {label: "fleet.{{ item.key }}"}
+      when: defenseclaw_fleet_have.get(item.key, false) != item.value
+      changed_when: true
+      notify: Restart DefenseClaw gateway
