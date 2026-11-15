@@ -1,0 +1,6 @@
+# Trust the homelab CA on every host (plan P1.5: TLS for NATS/MQTT and later internal services).
+- name: Homelab CA
+  hosts: all
+  become: true
+  roles:
+    - role: homelab_ca

@@ -22,6 +22,9 @@ all:
         omarchy:
           ansible_host: 192.168.86.49
           ansible_user: nikghodki
+    bus:
+      hosts:
+        dgx-1:
     observe:
       hosts:
         dgx-2:
