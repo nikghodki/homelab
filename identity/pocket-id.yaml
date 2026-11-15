@@ -29,3 +29,9 @@ clients:
     callbackURLs: [https://ops.nghodki.ai/oauth2/callback]
     launchURL: https://ops.nghodki.ai
     groups: [admins]      # oauth2-proxy also checks --allowed-group=admins; PKCE S256
+  - id: temporal
+    name: Temporal
+    callbackURLs: [https://temporal.nghodki.ai/auth/sso/callback]
+    launchURL: https://temporal.nghodki.ai
+    pkce: false        # Temporal UI 2.58 doesn't send PKCE
+    groups: [admins]

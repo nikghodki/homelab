@@ -21,3 +21,6 @@ scrape_configs:
     static_configs: [{targets: ["grafana:3000"]}]
   - job_name: gatus
     static_configs: [{targets: ["gatus:8080"]}]
+  # Temporal server in the jobs stack (plan P4.7); its metrics port is published on dgx-2's LAN address.
+  - job_name: temporal
+    static_configs: [{targets: ["192.168.86.36:9233"], labels: {service: temporal}}]
