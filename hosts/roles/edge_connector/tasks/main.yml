@@ -1,0 +1,115 @@
+---
+- name: Edge Connector binary is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/edge-connector
+  register: edge_connector_bin
+
+- name: Edge Connector service
+  when: edge_connector_bin.stat.exists
+  block:
+    - name: Load Fleet secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/fleet.enc.yaml"
+        name: edge_connector_secrets
+      no_log: true
+      delegate_to: localhost
+      become: false
+
+    - name: IPC user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ edge_connector_ipc_user }}"
+
+    - name: Socket group
+      ansible.builtin.group:
+        name: dclaw-ipc
+        system: true
+
+    - name: Agent account may use the socket
+      ansible.builtin.user:
+        name: "{{ edge_connector_ipc_user }}"
+        groups: dclaw-ipc
+        append: true
+      register: edge_connector_ipc_group
+      notify: Restart agent user manager
+
+    - name: Service account
+      ansible.builtin.user:
+        name: defenseclaw
+        system: true
+        shell: /usr/sbin/nologin
+        home: /var/lib/defenseclaw
+        create_home: false
+
+    - name: Config folder (the daemon account may read device.key, nothing else)
+      ansible.builtin.file:
+        path: /etc/defenseclaw
+        state: directory
+        owner: root
+        group: defenseclaw
+        mode: "0750"
+
+    - name: Device key as raw 32 bytes (fed on stdin, never on a command line)
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            import binascii, os, sys
+            path = "/etc/defenseclaw/device.key"
+            key = binascii.unhexlify(sys.stdin.read().strip())
+            assert len(key) == 32
+            try:
+                same = open(path, "rb").read() == key
+            except FileNotFoundError:
+                same = False
+            if not same:
+                fd = os.open(path + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o640)
+                os.write(fd, key); os.close(fd)
+                os.replace(path + ".new", path)
+                print("changed")
+        stdin: "{{ edge_connector_secrets['dclaw_device_key_' ~ edge_connector_tenant_id ~ '_' ~ edge_connector_fleet_id ~ '_' ~ edge_connector_device_id] }}"
+      register: edge_connector_key
+      changed_when: "'changed' in edge_connector_key.stdout"
+      no_log: true
+      notify: Restart edge-connector
+      when: not ansible_check_mode
+
+    - name: Device key permissions
+      ansible.builtin.file:
+        path: /etc/defenseclaw/device.key
+        owner: root
+        group: defenseclaw
+        mode: "0640"
+      when: not ansible_check_mode
+
+    - name: Environment file (root only; systemd reads it before dropping privileges)
+      vars:
+        edge_connector_key_suffix: "{{ edge_connector_tenant_id }}_{{ edge_connector_fleet_id }}_{{ edge_connector_device_id }}"
+        edge_connector_ipc_uid: "{{ ansible_facts.getent_passwd[edge_connector_ipc_user][1] }}"
+        edge_connector_ipc_gid: "{{ ansible_facts.getent_passwd[edge_connector_ipc_user][2] }}"
+      ansible.builtin.template:
+        src: edge-connector.env.j2
+        dest: /etc/defenseclaw/edge-connector.env
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      notify: Restart edge-connector
+
+    - name: Unit
+      ansible.builtin.template:
+        src: edge-connector.service.j2
+        dest: /etc/systemd/system/edge-connector.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart edge-connector
+
+    - name: Service is enabled and running
+      ansible.builtin.systemd_service:
+        name: edge-connector
+        enabled: true
+        state: started
+        daemon_reload: true
+      when: not ansible_check_mode

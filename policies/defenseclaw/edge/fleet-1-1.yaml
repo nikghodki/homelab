@@ -1,0 +1,24 @@
+# Edge Connector policy for tenant 1 / fleet 1 (the Pi running picoclaw). Plan P1.12.
+# Push: defenseclaw edge-connector policy push policies/defenseclaw/edge/fleet-1-1.yaml --tenant-id 1 --fleet-id 1
+# The gateway compiles it, signs it with DCLAW_OTA_HMAC_KEY and publishes it on defenseclaw/1/1/ota/policy.
+# Each device runs a 10-minute canary and restores its previous partition if blocks exceed
+# 5x the baseline for 3 consecutive minutes.
+name: fleet-1-1
+skill_actions:
+  critical:
+    runtime: disable
+  high:
+    runtime: disable
+  medium:
+    runtime: warn
+iot_extensions:
+  capability_sequences:
+    - sequence: [net_fetch, exec_shell]
+      action: block
+    - sequence: [net_fetch, actuate]
+      action: block
+    - sequence: [sensor_read, net_fetch, exec_shell]
+      action: block
+  destination_allowlist: []
+  canary:
+    baseline_blocks_per_min: 5

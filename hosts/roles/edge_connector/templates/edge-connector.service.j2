@@ -1,0 +1,34 @@
+# Managed by homelab Ansible (role edge_connector). Based on edge-connector/packaging/edge-connector.service.
+[Unit]
+Description=DefenseClaw Edge Connector
+Wants=network-online.target
+After=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/edge-connector
+EnvironmentFile=/etc/defenseclaw/edge-connector.env
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=defenseclaw
+RuntimeDirectoryMode=0750
+StateDirectory=defenseclaw
+StateDirectoryMode=0700
+UMask=0077
+# The socket gets the daemon's primary group: dclaw-ipc members (the agent) can connect,
+# but only the defenseclaw group can read /etc/defenseclaw/device.key.
+User=defenseclaw
+Group=dclaw-ipc
+SupplementaryGroups=defenseclaw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadWritePaths=/var/lib/defenseclaw
+LimitNOFILE=1024
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

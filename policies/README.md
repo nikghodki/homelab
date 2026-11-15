@@ -17,3 +17,5 @@
 `hosts/playbooks/defenseclaw.yml` copies the policy to every host that has the DefenseClaw CLI and activates it. `tests/` runs in CI and fails if an edit loosens these rules.
 
 Edit the YAML by hand. `defenseclaw policy edit scanner -p` writes lowercase severity keys next to the uppercase ones, and the test catches this.
+
+`defenseclaw/edge/` holds Edge Connector policies, one per tenant/fleet. They are pushed through the Fleet API, which compiles them, signs them and sends them over MQTT. See `runbooks/edge-connector.md`.
