@@ -1,0 +1,60 @@
+# Jobs stack on dgx-2: Temporal + PostgreSQL + Web UI (plan P4.7, interim before k3s). Always --check --diff first.
+# runbooks/temporal.md
+- name: Jobs
+  hosts: observe
+  become: true
+  pre_tasks:
+    - name: Load jobs secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/jobs.enc.yaml"
+        name: jobs_secrets
+      no_log: true
+    - name: Load sign-in client secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
+        name: console_secrets
+      no_log: true
+  vars:
+    jobs_dir: /opt/homelab/jobs
+    jobs_namespace: homelab
+    jobs_namespace_retention: 7d
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: jobs
+        compose_stack_src: "{{ playbook_dir }}/../stacks/jobs"
+        compose_stack_env:
+          POSTGRES_PASSWORD: "{{ jobs_secrets.postgres_password }}"
+          OIDC_TEMPORAL_SECRET: "{{ console_secrets.oidc_temporal_secret }}"
+  tasks:
+    - name: Temporal frontend is serving
+      ansible.builtin.command:
+        cmd: docker compose exec -T admin-tools temporal operator cluster health
+        chdir: "{{ jobs_dir }}"
+      register: jobs_health
+      until: jobs_health.rc == 0 and 'SERVING' in jobs_health.stdout
+      retries: 30
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Look up the namespace, {{ jobs_namespace }}
+      ansible.builtin.command:
+        cmd: docker compose exec -T admin-tools temporal operator namespace describe --namespace {{ jobs_namespace }}
+        chdir: "{{ jobs_dir }}"
+      register: jobs_ns
+      failed_when: jobs_ns.rc != 0 and 'not found' not in (jobs_ns.stderr | lower)
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Create the namespace if missing, {{ jobs_namespace }}
+      ansible.builtin.command:
+        cmd: >-
+          docker compose exec -T admin-tools temporal operator namespace create
+          --namespace {{ jobs_namespace }} --retention {{ jobs_namespace_retention }}
+          --description "Homelab jobs (runbooks/temporal.md)"
+        chdir: "{{ jobs_dir }}"
+      changed_when: true
+      when:
+        - not ansible_check_mode
+        - jobs_ns.rc != 0

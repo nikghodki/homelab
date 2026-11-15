@@ -1,0 +1,94 @@
+# Jobs stack on dgx-2 (plan P4.7; interim until k3s, architecture namespace `jobs`). Deployed by playbooks/jobs.yml.
+# Temporal server with PostgreSQL persistence, the Web UI and admin-tools (schema setup + CLI). runbooks/temporal.md.
+name: jobs
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  # No published port: only Temporal and admin-tools (on this stack's network) talk to it.
+  postgresql:
+    <<: *restart
+    image: postgres:17.12-alpine@sha256:a77aa70e641402a21411b92b721c58d10f23b50ae5fdd2333efd22d166e1e5f7
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Creates or upgrades the temporal and temporal_visibility schemas, then idles so that
+  # `docker compose exec admin-tools temporal ...` works. Healthy once the schemas are current.
+  admin-tools:
+    <<: *restart
+    image: temporalio/admin-tools:1.32.2@sha256:4a95866efba29d7e17ab012df5232795e8b0ad0f7d5f9d1ec4df321f7792a754
+    command: ["sh", "/run/admin-tools/setup-schema.sh"]
+    environment:
+      SQL_PLUGIN: postgres12
+      SQL_HOST: postgresql
+      SQL_PORT: "5432"
+      SQL_USER: temporal
+      SQL_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      TEMPORAL_ADDRESS: temporal:7233
+    volumes:
+      - ./admin-tools:/run/admin-tools:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/schema-ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    depends_on:
+      postgresql: {condition: service_healthy}
+
+  temporal:
+    <<: *restart
+    image: temporalio/server:1.32.2@sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_SEEDS: postgresql
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:?set in .env}
+      NUM_HISTORY_SHARDS: "4"   # fixed for the life of the database
+      PROMETHEUS_ENDPOINT: 0.0.0.0:9090
+      DYNAMIC_CONFIG_FILE_PATH: /run/temporal/dynamicconfig.yaml
+    volumes:
+      - ./temporal:/run/temporal:ro
+    ports:
+      - "192.168.86.36:7233:7233"   # frontend gRPC, LAN only (workers on Omarchy and the Sparks); no mTLS yet
+      - "192.168.86.36:9233:9090"   # Prometheus metrics, scraped by VictoriaMetrics
+    depends_on:
+      admin-tools: {condition: service_healthy}
+
+  ui:
+    <<: *restart
+    image: temporalio/ui:2.58.1@sha256:ac3c13eddb4547d830991bb5eee93a5d97140134522b7297fdb2be1fe25ef925
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_UI_PORT: "8080"
+      TEMPORAL_DEFAULT_NAMESPACE: homelab
+      TEMPORAL_CORS_ORIGINS: https://temporal.nghodki.ai
+      TEMPORAL_DISABLE_NEWS_FETCH: "true"
+      # Sign-in through Pocket ID (P1.13); only the admins group may use the client (identity/pocket-id.yaml).
+      TEMPORAL_AUTH_ENABLED: "true"
+      TEMPORAL_AUTH_LABEL: Pocket ID
+      TEMPORAL_AUTH_PROVIDER_URL: https://id.nghodki.ai
+      TEMPORAL_AUTH_CLIENT_ID: temporal
+      TEMPORAL_AUTH_CLIENT_SECRET: ${OIDC_TEMPORAL_SECRET:?set in .env}
+      TEMPORAL_AUTH_CALLBACK_URL: https://temporal.nghodki.ai/auth/sso/callback
+      TEMPORAL_AUTH_SCOPES: openid,profile,email
+    volumes:
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    # Reach id.nghodki.ai at the front door and trust the homelab web CA from the host's bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+    ports:
+      - "192.168.86.36:8233:8080"   # LAN only: dgx-1's Caddy serves it as temporal.nghodki.ai
+    depends_on:
+      - temporal
+
+volumes:
+  pg-data:
