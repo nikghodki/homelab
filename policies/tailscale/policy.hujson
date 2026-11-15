@@ -1,0 +1,66 @@
+// Tailscale policy for the homelab tailnet (plan P1.4, architecture §4.2).
+// Governs Tailscale traffic only; LAN traffic between the devices is not affected.
+// Apply: Tailscale admin console -> Access controls -> paste this file -> the "tests" below must pass.
+// Before applying, tag the fleet devices (admin console -> Machines -> Edit ACL tags):
+//   spark-83dc (dgx-1): tag:gpu, tag:control     nikghodki-dgx-2: tag:gpu, tag:control
+//   nikhil-jetson: tag:control, tag:home, tag:agent   nikghodki-omarchy: tag:agent   nikghodki-raspberry: tag:robot
+{
+  "groups": {
+    "group:admins": ["nikghodki@gmail.com"],
+    "group:family": ["vilasghodki@gmail.com"],
+    "group:guests": ["ameyaraul@gmail.com"],
+  },
+
+  "tagOwners": {
+    "tag:gpu":        ["group:admins"],
+    "tag:control":    ["group:admins"],
+    "tag:home":       ["group:admins"],
+    "tag:agent":      ["group:admins"],
+    "tag:robot":      ["group:admins"],
+    "tag:quarantine": ["group:admins"],   // incident response: reachable only by admins, reaches nothing
+  },
+
+  "hosts": {
+    "dgx-1": "100.65.137.82",
+    "dgx-2": "100.124.175.23",
+  },
+
+  "grants": [
+    // You: everything.
+    {"src": ["group:admins"], "dst": ["*"], "ip": ["*"]},
+
+    // Family and guests: the web front door on dgx-1 (*.nghodki.ai: Home Assistant, Open WebUI, LiteLLM ...) and DNS.
+    {"src": ["group:family", "group:guests"], "dst": ["dgx-1"], "ip": ["tcp:80", "tcp:443", "tcp:53", "udp:53"]},
+
+    // Control plane and GPU nodes talk to each other freely (k3s, etcd, NATS, model sync).
+    {"src": ["tag:gpu", "tag:control"], "dst": ["tag:gpu", "tag:control"], "ip": ["*"]},
+
+    // Every fleet device: DNS + web front door on dgx-1, telemetry and backups on dgx-2.
+    {"src": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "dst": ["dgx-1"],
+     "ip": ["tcp:53", "udp:53", "tcp:80", "tcp:443"]},
+    {"src": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "dst": ["dgx-2"],
+     "ip": ["tcp:4317-4320", "tcp:8000"]},
+
+    // Agents and home: models (LiteLLM) and the message bus (NATS, MQTT) on dgx-1.
+    {"src": ["tag:agent", "tag:home"], "dst": ["dgx-1"], "ip": ["tcp:4000", "tcp:4222", "tcp:8883"]},
+
+    // Robot: the message bus only (MQTT/NATS), plus the DefenseClaw gateway on the Jetson.
+    {"src": ["tag:robot"], "dst": ["dgx-1"], "ip": ["tcp:8883", "tcp:4222"]},
+    {"src": ["tag:robot"], "dst": ["tag:home"], "ip": ["tcp:18970"]},
+
+    // Ansible / admin automation from dgx-1 to every device.
+    {"src": ["dgx-1"], "dst": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "ip": ["tcp:22"]},
+  ],
+
+  "ssh": [
+    {"action": "check", "src": ["group:admins"], "dst": ["autogroup:self"], "users": ["autogroup:nonroot", "root"]},
+  ],
+
+  "tests": [
+    {"src": "nikghodki@gmail.com",   "accept": ["dgx-2:22", "dgx-1:4000"]},
+    {"src": "vilasghodki@gmail.com", "accept": ["dgx-1:443", "dgx-1:80"], "deny": ["dgx-1:22", "dgx-2:3000", "dgx-1:5432"]},
+    {"src": "ameyaraul@gmail.com",   "accept": ["dgx-1:443"], "deny": ["dgx-1:22", "dgx-1:8883", "dgx-2:22"]},
+    {"src": "tag:robot",             "accept": ["dgx-1:8883", "dgx-2:4319"], "deny": ["dgx-1:4000", "dgx-1:22", "dgx-2:3000"]},
+    {"src": "tag:agent",             "accept": ["dgx-1:4000", "dgx-1:8883"], "deny": ["dgx-2:22"]},
+  ],
+}
