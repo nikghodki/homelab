@@ -1,7 +1,7 @@
 // Tailscale policy for the homelab tailnet (plan P1.4, architecture §4.2).
 // Governs Tailscale traffic only; LAN traffic between the devices is not affected.
 // Apply: Tailscale admin console -> Access controls -> paste this file -> the "tests" below must pass.
-// Before applying, tag the fleet devices (admin console -> Machines -> Edit ACL tags):
+// First add only tagOwners to the live policy, then tag (Machines -> Edit ACL tags), then apply this file:
 //   spark-83dc (dgx-1): tag:gpu, tag:control     nikghodki-dgx-2: tag:gpu, tag:control
 //   nikhil-jetson: tag:control, tag:home, tag:agent   nikghodki-omarchy: tag:agent   nikghodki-raspberry: tag:robot
 {
