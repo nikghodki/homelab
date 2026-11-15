@@ -1,0 +1,29 @@
+# Fleet inventory. Run from dgx-1 (the control node), from this folder.
+# Addresses are LAN IPs until DHCP reservations / Tailscale names are in place (plan P0.9).
+all:
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  children:
+    sparks:
+      hosts:
+        dgx-1:
+          ansible_connection: local
+          ansible_user: nikghodki-dgx
+        dgx-2:
+          ansible_host: 192.168.86.36
+          ansible_user: nikghodki-dgx-2
+    jetson_group:
+      hosts:
+        jetson:
+          ansible_host: 192.168.86.211
+          ansible_user: nikjetson
+    agent_nodes:
+      hosts:
+        omarchy:
+          ansible_host: 192.168.86.49
+          ansible_user: nikghodki
+    edge:
+      hosts:
+        pi:
+          ansible_host: 192.168.86.39
+          ansible_user: nikghodki-raspberry-1

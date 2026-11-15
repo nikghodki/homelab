@@ -1,0 +1,23 @@
+- name: Tailscale is installed
+  ansible.builtin.package:
+    name: tailscale
+    state: present
+
+- name: Tailscale daemon is enabled and running
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started
+  when: tailscale_enabled | bool
+
+- name: Read Tailscale state
+  ansible.builtin.command: tailscale status --json --self --peers=false
+  register: tailscale_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Report hosts that are not logged in to Tailscale
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: Tailscale BackendState={{ (tailscale_status.stdout | from_json).BackendState | default('unknown') }}"
+  when: tailscale_status.rc == 0

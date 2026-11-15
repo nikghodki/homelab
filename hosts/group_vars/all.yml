@@ -1,0 +1,8 @@
+# Defaults for every host. Override per group or host.
+base_timezone: America/Los_Angeles
+base_journald_max_use: 1G
+# Security-only automatic upgrades; never reboot automatically (reboots happen in the monthly window).
+base_unattended_security_upgrades: true
+# Turn on only after every admin path has a key (plan P1.4); it is off until then.
+base_ssh_disable_password_auth: false
+fleet_metrics_port: 9109

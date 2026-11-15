@@ -1,0 +1,8 @@
+# Baseline for every host. Always run with --check --diff first.
+- name: Fleet baseline
+  hosts: all
+  become: true
+  roles:
+    - role: base
+    - role: tailscale
+    - role: fleet_metrics
