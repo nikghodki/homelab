@@ -17,6 +17,9 @@ ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 StateDirectory=otelcol-contrib
+{% for name in otel_host_collector_credentials | sort %}
+LoadCredential={{ name }}:/etc/otelcol-contrib/credentials/{{ name }}
+{% endfor %}
 
 [Install]
 WantedBy=multi-user.target

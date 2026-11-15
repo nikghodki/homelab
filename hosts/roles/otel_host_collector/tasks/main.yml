@@ -77,6 +77,27 @@
         mode: "0640"
       notify: Restart otelcol
 
+    - name: Credentials folder (root only)
+      ansible.builtin.file:
+        path: /etc/otelcol-contrib/credentials
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Credentials (passed to the service with LoadCredential)
+      ansible.builtin.copy:
+        content: "{{ item.value }}"
+        dest: "/etc/otelcol-contrib/credentials/{{ item.key }}"
+        owner: root
+        group: root
+        mode: "0600"
+      loop: "{{ otel_host_collector_credentials | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      no_log: true
+      notify: Restart otelcol
+
     - name: Service unit
       ansible.builtin.template:
         src: otelcol-contrib.service.j2

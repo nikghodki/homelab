@@ -7,7 +7,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -625,6 +625,114 @@
         "overrides": []
       },
       "options": {}
+    },
+    {
+      "id": 110,
+      "title": "Security hardening (Lynis, weekly)",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 60,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 111,
+      "title": "Lynis hardening index (latest run, 15 d)",
+      "type": "bargauge",
+      "gridPos": {
+        "x": 0,
+        "y": 61,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (fleet_host) (last_over_time({host_name=~\".+\"} |= \"hardening_index=\" | json ident=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | ident=\"lynis\" | line_format \"{{.msg}}\" | regexp \"hardening_index=(?P<hardening_index>[0-9]+)\" | unwrap hardening_index [15d]))",
+          "legendFormat": "{{fleet_host}}",
+          "instant": true,
+          "queryType": "instant",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 75
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 112,
+      "title": "Lynis warnings (last 8 d)",
+      "type": "logs",
+      "gridPos": {
+        "x": 12,
+        "y": 61,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{host_name=~\".+\"} |= \"warning test=\" | json ident=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | ident=\"lynis\" | line_format \"{{.msg}}\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          }
+        }
+      ],
+      "timeFrom": "8d",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
     }
   ],
   "templating": {

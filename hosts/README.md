@@ -26,3 +26,7 @@ From dgx-1, in this folder (`hosts/`):
 Roles today: `base` (time zone, journal cap, SSH hardening drop-in, security-only upgrades), `tailscale`
 (installed, running, logged-in report), `fleet_metrics` (probe). More roles follow the plan: DefenseClaw, OTel
 collector, Tetragon, Lynis.
+
+`lynis` (`playbooks/lynis.yml`): weekly `lynis-audit.timer` (Sunday 03:30, idle CPU and I/O priority). The wrapper
+`/usr/local/sbin/lynis-audit` logs `hardening_index=N warnings=W ...` and one line per warning to the journal with tag
+`lynis`; the host collector ships them to Loki, and Fleet Home shows the latest index per host.

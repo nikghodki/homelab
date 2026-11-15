@@ -2,5 +2,15 @@
 - name: Host collectors
   hosts: all
   become: true
+  pre_tasks:
+    - name: Load Fleet secrets from SOPS (Fleet gateway host)
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/fleet.enc.yaml"
+        name: fleet_secrets
+      no_log: true
+      when: defenseclaw_fleet_enabled | default(false)
+  vars:
+    otel_host_collector_credentials: >-
+      {{ {'fleet-api-token': fleet_secrets.dclaw_fleet_api_token} if (defenseclaw_fleet_enabled | default(false)) else {} }}
   roles:
     - role: otel_host_collector

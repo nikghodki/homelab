@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (roles/lynis)
+[Unit]
+Description=Weekly Lynis security audit
+
+[Timer]
+OnCalendar={{ lynis_on_calendar }}
+RandomizedDelaySec={{ lynis_randomized_delay }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

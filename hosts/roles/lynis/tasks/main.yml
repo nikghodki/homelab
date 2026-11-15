@@ -1,0 +1,44 @@
+- name: Install Lynis
+  ansible.builtin.package:
+    name: lynis
+    state: present
+
+- name: Audit wrapper
+  ansible.builtin.template:
+    src: lynis-audit.sh.j2
+    dest: /usr/local/sbin/lynis-audit
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Service and timer units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [lynis-audit.service, lynis-audit.timer]
+  notify: Reload systemd
+
+- name: Flush handlers before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Timer is enabled and running
+  ansible.builtin.systemd_service:
+    name: lynis-audit.timer
+    enabled: true
+    state: started
+  when: not ansible_check_mode
+
+- name: Is there a report yet
+  ansible.builtin.stat:
+    path: /var/log/lynis-report.dat
+  register: lynis_report
+
+- name: First audit (runs in the background)
+  ansible.builtin.systemd_service:
+    name: lynis-audit.service
+    state: started
+    no_block: true
+  when: not ansible_check_mode and not lynis_report.stat.exists
