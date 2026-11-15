@@ -22,6 +22,8 @@ endpoints:
   - {name: Fleet MQTT (Edge Connector), group: defenseclaw, url: "tcp://192.168.86.44:8884", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   # 401 without a token means the proxy, the gateway and Fleet are all up. The homelab CA isn't in Gatus' image, so TLS isn't verified here.
   - {name: Fleet API, group: defenseclaw, url: "https://192.168.86.44:8971/api/v1/fleet/health", headers: {Host: fleet.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401", "[CERTIFICATE_EXPIRATION] > 336h"], alerts: [{type: ntfy}]}
+  # The wildcard cert from the homelab web CA (runbooks/web-https.md). Gatus doesn't have that CA, so TLS isn't verified here.
+  - {name: "*.nghodki.ai certificate", group: web, url: "https://192.168.86.44/", headers: {Host: webui.nghodki.ai}, client: {insecure: true}, interval: 1h, conditions: ["[STATUS] < 400", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
   - {name: dgx-1 ssh, group: hosts, url: "tcp://192.168.86.44:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: dgx-2 ssh, group: hosts, url: "tcp://192.168.86.36:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: jetson ssh, group: hosts, url: "tcp://192.168.86.211:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
