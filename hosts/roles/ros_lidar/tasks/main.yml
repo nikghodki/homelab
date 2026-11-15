@@ -1,0 +1,78 @@
+---
+- name: Account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ ros_lidar_user }}"
+
+- name: Account may open the serial port
+  ansible.builtin.user:
+    name: "{{ ros_lidar_user }}"
+    groups: dialout
+    append: true
+
+- name: RoboStack env and driver build (one-time manual step, runbooks/robot-ros.md)
+  ansible.builtin.stat:
+    path: "{{ ros_lidar_ws }}/install/oradar_lidar/lib/oradar_lidar/oradar_scan"
+  register: ros_lidar_driver
+
+- name: Driver missing
+  ansible.builtin.fail:
+    msg: "{{ ros_lidar_ws }} has no oradar_lidar build; follow runbooks/robot-ros.md first"
+  when: not ros_lidar_driver.stat.exists
+
+- name: Config, launch file, unit and CLI wrapper
+  become: true
+  become_user: "{{ ros_lidar_user }}"
+  vars:
+    ros_lidar_uid: "{{ ansible_facts.getent_passwd[ros_lidar_user][1] }}"
+  block:
+    - name: Folders (existing shared ones keep their mode)
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: "{{ item.mode | default(omit) }}"
+      loop:
+        - {path: "{{ ros_lidar_config_dir }}", mode: "0755"}
+        - {path: "{{ ros_lidar_home }}/.config/systemd/user"}
+        - {path: "{{ ros_lidar_home }}/.local/bin"}
+      loop_control: {label: "{{ item.path }}"}
+
+    - name: Default rmw_zenoh session config from the env
+      ansible.builtin.slurp:
+        src: "{{ ros_lidar_env }}/share/rmw_zenoh_cpp/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
+      register: ros_lidar_session_default
+
+    # RoboStack's rmw_zenoh 0.6.9 ships a config newer than its libzenohc 1.9.0: the
+    # transport/shared_memory "messages" key makes every node abort. Drop the keys listed here.
+    - name: Session config without the keys this libzenohc rejects
+      vars:
+        ros_lidar_drop_regex: '(?m)^[ \t]*({{ ros_lidar_session_drop_keys | join("|") }}):.*\n'
+      ansible.builtin.copy:
+        content: "{{ ros_lidar_session_default.content | b64decode | regex_replace(ros_lidar_drop_regex, '') }}"
+        dest: "{{ ros_lidar_config_dir }}/zenoh-session.json5"
+        mode: "0644"
+      notify: Restart ros-lidar
+
+    - name: Files
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - {src: zenoh.env.j2, dest: "{{ ros_lidar_config_dir }}/zenoh.env", mode: "0644"}
+        - {src: ms200.launch.py.j2, dest: "{{ ros_lidar_config_dir }}/ms200.launch.py", mode: "0644"}
+        - {src: ros-lidar.service.j2, dest: "{{ ros_lidar_home }}/.config/systemd/user/ros-lidar.service", mode: "0644"}
+        - {src: ros2-kilted.j2, dest: "{{ ros_lidar_home }}/.local/bin/ros2-{{ ros_lidar_distro }}", mode: "0755"}
+      loop_control: {label: "{{ item.dest | basename }}"}
+      notify: Restart ros-lidar
+
+    - name: Service is enabled and running
+      ansible.builtin.systemd_service:
+        name: ros-lidar
+        scope: user
+        enabled: true
+        state: started
+        daemon_reload: true
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ros_lidar_uid }}"
+      when: not ansible_check_mode

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Managed by homelab Ansible (role ros_lidar).
+# ROS 2 {{ ros_lidar_distro | capitalize }} CLI with the Zenoh settings, e.g. "ros2-{{ ros_lidar_distro }} topic list".
+set -a
+. "{{ ros_lidar_config_dir }}/zenoh.env"
+set +a
+exec "{{ ros_lidar_micromamba }}" run -p "{{ ros_lidar_env }}" \
+  sh -c '. "{{ ros_lidar_ws }}/install/setup.sh" && exec ros2 "$@"' ros2 "$@"

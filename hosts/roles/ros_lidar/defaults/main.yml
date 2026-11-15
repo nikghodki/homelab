@@ -1,0 +1,24 @@
+---
+# Oradar MS200 LiDAR as a ROS 2 node on the Pi (plan P5.1), using rmw_zenoh and the
+# Jetson's Zenoh router. The RoboStack env and the driver build are a one-time manual
+# step (runbooks/robot-ros.md); this role manages the config, launch file and user unit.
+ros_lidar_user: nikghodki-raspberry-1
+ros_lidar_home: "/home/{{ ros_lidar_user }}"
+ros_lidar_distro: kilted
+ros_lidar_micromamba: "{{ ros_lidar_home }}/.local/bin/micromamba"
+ros_lidar_env: "{{ ros_lidar_home }}/.local/share/mamba/envs/ros2_{{ ros_lidar_distro }}"
+ros_lidar_ws: "{{ ros_lidar_home }}/ros2_ws"
+ros_lidar_config_dir: "{{ ros_lidar_home }}/.config/homelab-ros"
+# LAN only for now; Tailscale comes later.
+ros_lidar_zenoh_router: tcp/192.168.86.211:7447
+ros_lidar_port: /dev/ttyUSB0
+ros_lidar_baudrate: 230400
+ros_lidar_scan_topic: scan
+ros_lidar_frame_id: laser_frame
+ros_lidar_motor_speed: 10
+ros_lidar_range_min: 0.05
+ros_lidar_range_max: 20.0
+# base_link -> laser_frame static transform (x y z yaw pitch roll), from the Oradar sample launch.
+ros_lidar_tf: ["0", "0", "0.18", "0", "0", "0"]
+# Keys dropped from the env's default rmw_zenoh session config (see tasks/main.yml).
+ros_lidar_session_drop_keys: [messages]

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Managed by homelab Ansible (role ros_zenoh_router).
+# ROS 2 CLI inside the router container, e.g. "ros2-{{ ros_zenoh_router_distro }} topic hz /scan".
+tty=""
+[ -t 0 ] && tty="-t"
+exec docker exec -i $tty {{ ros_zenoh_router_container }} /ros_entrypoint.sh ros2 "$@"

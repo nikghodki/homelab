@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (role ros_zenoh_router).
+FROM {{ ros_zenoh_router_base_image }}
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ros-{{ ros_zenoh_router_distro }}-rmw-zenoh-cpp \
+ && rm -rf /var/lib/apt/lists/*
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+# The base image's "ubuntu" account (uid 1000); nothing here needs root.
+USER ubuntu
+WORKDIR /home/ubuntu
+HEALTHCHECK NONE
+CMD ["ros2", "run", "rmw_zenoh_cpp", "rmw_zenohd"]

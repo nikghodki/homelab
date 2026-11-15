@@ -1,0 +1,11 @@
+---
+# ROS 2 Zenoh router on the Jetson (plan P5.1). ROS runs in a container so nothing
+# from ROS touches the JetPack host packages (runbooks/robot-ros.md).
+ros_zenoh_router_distro: kilted
+# ros:kilted-ros-base (arm64), pinned by digest; bump together with ros_zenoh_router_image_tag.
+ros_zenoh_router_base_image: "ros:kilted-ros-base@sha256:e03695c26eef219f86068a6aa6151fc7ce58b7afd677fc4f82df748dc0acc4a1"
+# Local image built from the pinned base plus ros-kilted-rmw-zenoh-cpp. Change the tag to force a rebuild.
+ros_zenoh_router_image_tag: "homelab/ros-zenoh:kilted-1"
+ros_zenoh_router_dir: /opt/homelab/ros-zenoh
+ros_zenoh_router_container: ros-zenoh-router
+ros_zenoh_router_port: 7447

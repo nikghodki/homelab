@@ -42,3 +42,4 @@ endpoints:
   - {name: jetson ssh, group: hosts, url: "tcp://192.168.86.211:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: omarchy ssh, group: hosts, url: "tcp://192.168.86.49:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: pi ssh, group: hosts, url: "tcp://192.168.86.39:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: Zenoh router (ROS 2), group: robot, url: "tcp://192.168.86.211:7447", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
