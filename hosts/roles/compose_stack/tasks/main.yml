@@ -45,6 +45,7 @@
     mode: "0644"
   loop: "{{ compose_stack_files.files }}"
   loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
+  register: compose_stack_copied
 
 - name: Render templates (secrets come from SOPS)
   ansible.builtin.template:
@@ -56,6 +57,7 @@
   loop: "{{ compose_stack_templates.files }}"
   loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
   no_log: true
+  register: compose_stack_rendered
 
 - name: Environment file
   ansible.builtin.copy:
@@ -83,3 +85,18 @@
     pull: missing
     remove_orphans: true
   register: compose_stack_result
+
+- name: Restart services whose config changed (a sub-folder is named after its service)
+  vars:
+    compose_stack_changed_dirs: >-
+      {{ ((compose_stack_copied.results | default([])) + (compose_stack_rendered.results | default([])))
+         | selectattr('changed') | map(attribute='item.path') | map('relpath', compose_stack_src)
+         | map('dirname') | reject('equalto', '') | map('split', '/') | map('first') | unique }}
+  community.docker.docker_compose_v2:
+    project_src: "{{ compose_stack_root }}/{{ compose_stack_name }}"
+    services: "{{ compose_stack_changed_dirs }}"
+    state: restarted
+  when:
+    - compose_stack_changed_dirs | length > 0
+    - not compose_stack_result is changed
+    - not ansible_check_mode
