@@ -1,0 +1,22 @@
+#!/bin/sh
+# Managed by homelab Ansible (roles/lynis)
+# Run a Lynis audit and log its summary and warnings to the journal (tag "lynis").
+set -u
+report=/var/log/lynis-report.dat
+rc=0
+lynis audit system --quiet --no-colors --report-file "$report" >/dev/null 2>&1 || rc=$?
+if [ ! -s "$report" ]; then
+  logger -t lynis -p user.err "audit_failed exit=$rc (no report)"
+  exit 1
+fi
+index=$(sed -n 's/^hardening_index=//p' "$report" | tail -n 1)
+tests=$(sed -n 's/^lynis_tests_done=//p' "$report" | tail -n 1)
+warnings=$(grep -c '^warning\[\]=' "$report" || true)
+suggestions=$(grep -c '^suggestion\[\]=' "$report" || true)
+version=$(sed -n 's/^lynis_version=//p' "$report" | tail -n 1)
+logger -t lynis "hardening_index=${index:-0} warnings=$warnings suggestions=$suggestions tests=${tests:-0} lynis=$version exit=$rc"
+# warning[]=TEST-ID|text|details|solution
+grep '^warning\[\]=' "$report" | sed 's/^warning\[\]=//' | while IFS='|' read -r id text _rest; do
+  logger -t lynis -p user.warning "warning test=$id $text"
+done
+exit 0

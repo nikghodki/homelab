@@ -1,0 +1,21 @@
+# DefenseClaw Edge Connector devices, from the Fleet gateway's metrics on dgx-1
+# (scraped by dgx-1's host collector, job defenseclaw-fleet). See runbooks/edge-connector.md.
+groups:
+  - name: edge-connector
+    rules:
+      - alert: EdgeDeviceOffline
+        expr: max(defenseclaw_fleet_devices_total{status="offline"}) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $value | humanize }} Edge Connector device(s) offline in Fleet for 10 minutes"
+      - alert: EdgeCanaryRollback
+        expr: sum(increase(defenseclaw_fleet_policy_rollback_total[15m])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "An Edge device rolled back a pushed policy (CANARY_ROLLBACK); check its log and the last push"
+      - alert: EdgeOtaRollback
+        expr: sum(increase(defenseclaw_fleet_ota_rollbacks_total[15m])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "An Edge device rolled back an OTA update"

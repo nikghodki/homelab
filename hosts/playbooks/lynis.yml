@@ -1,0 +1,6 @@
+# Weekly Lynis audit on every host (plan P1.3). Always --check --diff first.
+- name: Lynis
+  hosts: all
+  become: true
+  roles:
+    - role: lynis

@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (roles/lynis)
+[Unit]
+Description=Lynis security audit (summary to the journal, tag lynis)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/lynis-audit
+Nice=19
+CPUSchedulingPolicy=idle
+IOSchedulingClass=idle
+TimeoutStartSec=1h

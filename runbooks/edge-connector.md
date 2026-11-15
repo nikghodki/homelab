@@ -59,3 +59,13 @@ If the push returns `HTTP 500 compile/sign failed: trusted policy compiler Pytho
 - The shipped `picoclaw_hook.py` loads the engine in-process (FFI). It never uses the daemon, so picoclaw's calls never reach Fleet through it.
 
 Because of these limits, picoclaw keeps its in-process hook (`~/.defenseclaw/bin/picoclaw_hook.py`). The daemon and Fleet are live for registration, signed heartbeats, signed policy, emergency commands and audit. The `dclaw-ipc` group is ready for a daemon-backed hook when upstream gains an allow path and picoclaw tool mappings.
+
+## Metrics and alerts
+
+dgx-1's host collector scrapes `GET /api/v1/fleet/metrics` (job `defenseclaw-fleet`) with the admin token
+`dclaw_fleet_api_token`. `playbooks/collectors.yml` writes it to `/etc/otelcol-contrib/credentials/fleet-api-token`
+(root, 0600) and the unit passes it in with `LoadCredential`. Metrics are `defenseclaw_fleet_*` in VictoriaMetrics;
+the Grafana dashboard is "DefenseClaw IoT Fleet" (`/d/defenseclaw-fleet`, from the release bundle). vmalert rules in
+`hosts/stacks/observe/vmalert/rules/edge.yml`: `EdgeDeviceOffline` (offline devices > 0 for 10m), `EdgeCanaryRollback`
+(`defenseclaw_fleet_policy_rollback_total` went up) and `EdgeOtaRollback`. If the token is rotated, run
+`playbooks/collectors.yml --limit dgx-1`.

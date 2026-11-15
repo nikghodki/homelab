@@ -1,4 +1,9 @@
 defenseclaw_fleet_enabled: true
+# DefenseClaw Fleet gateway metrics (admin bearer token from secrets/fleet.enc.yaml, loaded by playbooks/collectors.yml)
+otel_host_collector_extra_scrapes: >-
+  {{ sparks_extra_scrapes + [{'job': 'defenseclaw-fleet', 'target': '127.0.0.1:18970',
+     'path': '/api/v1/fleet/metrics',
+     'bearer_token_file': '/run/credentials/otelcol-contrib.service/fleet-api-token'}] }}
 restic_backup_paths:
   - /home/nikghodki-dgx/edge-gateway/conf
   - /home/nikghodki-dgx/edge-gateway/dnsmasq

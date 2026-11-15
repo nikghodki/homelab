@@ -34,6 +34,11 @@ receivers:
         - job_name: {{ s.job }}
           scrape_interval: {{ s.interval | default('30s') }}
           metrics_path: {{ s.path | default('/metrics') }}
+{% if s.bearer_token_file is defined %}
+          authorization:
+            type: Bearer
+            credentials_file: {{ s.bearer_token_file }}
+{% endif %}
           static_configs:
             - targets: ["{{ s.target }}"]
 {% endfor %}

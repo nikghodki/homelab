@@ -1,0 +1,4 @@
+# Weekly Lynis audit (plan P1.3). The summary and warnings go to the journal as tag "lynis",
+# which the host collector ships to Loki.
+lynis_on_calendar: "Sun *-*-* 03:30:00"
+lynis_randomized_delay: 30min
