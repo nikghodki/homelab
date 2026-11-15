@@ -1,0 +1,30 @@
+---
+# Robot safety governor on the Pi (plan P5.2; runbooks/robot-safety.md). A ROS 2 node in the
+# RoboStack env ros2_kilted (role ros_lidar sets up Zenoh), plus a NATS client as user picoclaw.
+safety_governor_user: nikghodki-raspberry-1
+safety_governor_home: "/home/{{ safety_governor_user }}"
+safety_governor_micromamba: "{{ safety_governor_home }}/.local/bin/micromamba"
+safety_governor_env: "{{ safety_governor_home }}/.local/share/mamba/envs/ros2_kilted"
+safety_governor_zenoh_env: "{{ safety_governor_home }}/.config/homelab-ros/zenoh.env"
+safety_governor_code_dir: "{{ safety_governor_home }}/.local/lib/safety-governor"
+safety_governor_config_dir: "{{ safety_governor_home }}/.config/safety-governor"
+safety_governor_src: "{{ playbook_dir }}/../../robots/safety"
+# nats-py in the env, pinned (conda-forge, noarch)
+safety_governor_nats_py_version: 2.14.0
+
+# Limits come from robots/safety/limits.yaml (one source); override single keys here if needed.
+safety_governor_limits: "{{ lookup('ansible.builtin.file', safety_governor_src ~ '/limits.yaml') | from_yaml }}"
+safety_governor_limit_overrides: {}
+
+# Output side. Only "mock" is safe to leave running: the real sinks (http_velocity,
+# ros_cmd_vel) are used only when safety_governor_real_sink_enabled is true, which is
+# for the on-blocks test only (runbooks/robot-safety.md). Never enable it here by default.
+safety_governor_sink: mock
+safety_governor_real_sink_enabled: false
+safety_governor_http_url: ""   # the car, e.g. http://192.168.86.x (roboclaw.local does not resolve)
+
+safety_governor_nats_url: tls://nats.nghodki.ai:4222
+safety_governor_nats_ca: /usr/local/share/ca-certificates/homelab-ca.crt
+safety_governor_metrics_port: 9113   # 127.0.0.1 only; scraped by the host collector
+safety_governor_control_rate_hz: 10
+safety_governor_status_rate_hz: 2

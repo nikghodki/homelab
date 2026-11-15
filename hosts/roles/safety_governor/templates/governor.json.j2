@@ -1,0 +1,32 @@
+{{ {
+  'limits': safety_governor_limits | combine(safety_governor_limit_overrides),
+  'ros': {
+    'scan_topic': '/scan',
+    'cmd_in_topic': '/cmd_vel_in',
+    'cmd_out_topic': '/cmd_vel',
+    'estop_topic': '/safety/estop',
+    'reset_topic': '/safety/reset',
+    'heartbeat_topic': '/safety/heartbeat',
+    'status_topic': '/safety/status'
+  },
+  'nats': {
+    'enabled': true,
+    'url': safety_governor_nats_url,
+    'ca_file': safety_governor_nats_ca,
+    'credentials_file': safety_governor_config_dir ~ '/nats-credentials.json',
+    'estop_subject': 'robot.pi.safety.estop',
+    'reset_subject': 'robot.pi.safety.reset',
+    'status_subject': 'robot.pi.safety.status',
+    'heartbeat_subject': 'robot.pi.cmd.heartbeat'
+  },
+  'sink': {
+    'kind': safety_governor_sink,
+    'real_sink_enabled': safety_governor_real_sink_enabled | bool,
+    'http_url': safety_governor_http_url,
+    'http_timeout': 0.3,
+    'mock_log': ''
+  },
+  'control_rate_hz': safety_governor_control_rate_hz,
+  'status_rate_hz': safety_governor_status_rate_hz,
+  'metrics_port': safety_governor_metrics_port
+} | to_nice_json(indent=2) }}

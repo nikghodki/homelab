@@ -1,0 +1,22 @@
+# Managed by homelab Ansible (role safety_governor). runbooks/robot-safety.md
+[Unit]
+Description=Robot safety governor (e-stop, speed caps, obstacle stop, watchdog); sink {{ safety_governor_sink }}{{ ' REAL' if (safety_governor_real_sink_enabled | bool and safety_governor_sink != 'mock') else '' }}
+After=network-online.target ros-lidar.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+EnvironmentFile={{ safety_governor_zenoh_env }}
+Environment=PYTHONPATH={{ safety_governor_code_dir }}
+Environment=PYTHONUNBUFFERED=1
+ExecStart={{ safety_governor_micromamba }} run -p {{ safety_governor_env }} \
+  python -m safety_governor.node --config {{ safety_governor_config_dir }}/governor.json
+SyslogIdentifier=safety-governor
+KillSignal=SIGINT
+TimeoutStopSec=10
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

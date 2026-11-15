@@ -1,0 +1,26 @@
+# Safety-governor limits for the Pi robot (plan P5.2; runbooks/robot-safety.md).
+# The role safety_governor deploys these to the Pi as-is; the keys are core.Config's fields.
+# Changes reach the Pi only while the robot is docked (robots/README.md).
+
+# Speed caps: commands are clamped to these.
+max_linear: 0.20          # m/s, |vx| (and |vy| when strafing is allowed)
+max_angular: 1.0          # rad/s
+# Absolute ceiling: a command above this is rejected (zero), not clamped.
+ceiling_linear: 0.50      # m/s
+ceiling_angular: 2.5      # rad/s
+allow_strafe: false       # the car's /velocity API has no sideways motion
+
+# Obstacle stop (from /scan): no translation towards anything closer than stop_distance
+# within +-sector_half_width_deg of the direction of travel. Reversing away stays allowed.
+stop_distance: 0.35       # m
+sector_half_width_deg: 35.0
+lidar_yaw_deg: 0.0        # robot bearing of the LiDAR's angle 0 (check on blocks)
+self_filter_radius: 0.08  # m; closer returns are the robot's own body
+allow_rotation_when_blocked: true
+min_valid_fraction: 0.2   # fewer valid ranges than this = LiDAR fault
+
+# Watchdogs (s)
+heartbeat_timeout: 2.0    # no heartbeat from the commanding side -> zero
+heartbeat_required: true
+cmd_timeout: 0.5          # no fresh /cmd_vel_in -> zero
+scan_timeout: 1.0         # no /scan -> zero (fail safe)

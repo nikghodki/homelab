@@ -1,0 +1,5 @@
+#!/bin/sh
+# Managed by homelab Ansible (role safety_governor). E-stop over NATS: runbooks/robot-safety.md.
+#   safety-estop | safety-estop reset | safety-estop status
+export PYTHONPATH="{{ safety_governor_code_dir }}"
+exec "{{ safety_governor_micromamba }}" run -p "{{ safety_governor_env }}" python -m safety_governor.estop_cli "$@"

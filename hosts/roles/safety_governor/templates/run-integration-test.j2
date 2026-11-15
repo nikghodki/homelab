@@ -1,0 +1,9 @@
+#!/bin/sh
+# Managed by homelab Ansible (role safety_governor). On-Pi integration test, mock sink only,
+# in its own ROS domain (73) and on NATS subjects robot.pi.safety.test.*: runbooks/robot-safety.md.
+set -a
+. "{{ safety_governor_zenoh_env }}"
+set +a
+export ROS_DOMAIN_ID=73
+exec "{{ safety_governor_micromamba }}" run -p "{{ safety_governor_env }}" \
+  python "{{ safety_governor_code_dir }}/integration/pi_integration.py"
