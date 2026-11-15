@@ -1,0 +1,21 @@
+restic_backup_paths:
+  - /home/nikghodki-dgx/edge-gateway/conf
+  - /home/nikghodki-dgx/edge-gateway/dnsmasq
+  - /home/nikghodki-dgx/voice-assistant/nginx
+  - /home/nikghodki-dgx/litellm-setup
+  - /home/nikghodki-dgx/.defenseclaw
+  - /home/nikghodki-dgx/workspace/dgx-model-manager/data
+  - /home/nikghodki-dgx/workspace/dgx-model-manager/config.yaml
+  - /home/nikghodki-dgx/workspace/dgx-model-manager/secrets
+  - /var/lib/docker/volumes/open-webui_open-webui-data/_data
+restic_backup_excludes:
+  - /home/nikghodki-dgx/workspace/dgx-model-manager/data/dgxmm.sqlite3
+  - /home/nikghodki-dgx/workspace/dgx-model-manager/data/gguf
+  - /home/nikghodki-dgx/workspace/dgx-model-manager/data/hf
+  - /var/lib/docker/volumes/open-webui_open-webui-data/_data/webui.db
+  - /var/lib/docker/volumes/open-webui_open-webui-data/_data/cache
+restic_backup_sqlite:
+  - {name: dgxmm, path: /home/nikghodki-dgx/workspace/dgx-model-manager/data/dgxmm.sqlite3}
+  - {name: open-webui, path: /var/lib/docker/volumes/open-webui_open-webui-data/_data/webui.db}
+restic_backup_pre_commands:
+  - docker exec litellm-postgres pg_dump -U litellm -d litellm --no-owner | gzip > /var/backups/homelab/litellm-db.sql.gz

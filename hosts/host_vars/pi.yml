@@ -1,0 +1,11 @@
+restic_backup_paths:
+  - /home/nikghodki-raspberry-1/.picoclaw
+  - /home/nikghodki-raspberry-1/.defenseclaw
+  - /home/nikghodki-raspberry-1/maps
+  - /home/nikghodki-raspberry-1/workspace
+  - /home/nikghodki-raspberry-1/ros2-test/oradar_ws/src
+  - /home/nikghodki-raspberry-1/.config/systemd/user
+  - /home/nikghodki-raspberry-1/.config/picoclaw
+  - /home/nikghodki-raspberry-1/.config/defenseclaw-edge
+restic_backup_excludes:
+  - /home/nikghodki-raspberry-1/.picoclaw/logs

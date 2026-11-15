@@ -1,0 +1,44 @@
+# Backups (plan P1.10): server on dgx-2, nightly restic on every host. Always --check --diff first.
+- name: Backup server
+  hosts: observe
+  become: true
+  pre_tasks:
+    - name: Load secrets
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/{{ item }}.enc.yaml"
+        name: "{{ item }}_secrets"
+      loop: [backup, pki]
+      no_log: true
+    - name: Backup data folder
+      ansible.builtin.file:
+        path: /srv/homelab-backup
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+  vars:
+    restic_hosts: "{{ groups['all'] }}"
+    pki_backup_key: "{{ pki_secrets.pki_backup_key }}"
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: backup
+        compose_stack_src: "{{ playbook_dir }}/../stacks/backup"
+    - role: restic_install
+    - role: restic_prune
+
+- name: Nightly backups
+  hosts: all
+  become: true
+  pre_tasks:
+    - name: Load backup secrets
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/backup.enc.yaml"
+        name: backup_secrets
+      no_log: true
+  vars:
+    restic_backup_password: "{{ backup_secrets['restic_password_' ~ (inventory_hostname | replace('-', '_'))] }}"
+    restic_backup_rest_password: "{{ backup_secrets['rest_password_' ~ (inventory_hostname | replace('-', '_'))] }}"
+  roles:
+    - role: restic_install
+    - role: restic_backup

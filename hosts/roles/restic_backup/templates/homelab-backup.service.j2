@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (roles/restic_backup)
+[Unit]
+Description=Nightly restic backup of {{ inventory_hostname }} to {{ restic_backup_server }}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/restic/env
+ExecStartPre=/etc/restic/pre-backup.sh
+ExecStart=/usr/local/bin/restic backup --files-from /etc/restic/paths --exclude-file /etc/restic/excludes --exclude-caches --tag homelab --host {{ inventory_hostname }} --one-file-system
+Nice=10
+IOSchedulingClass=idle
+SyslogIdentifier=homelab-backup

@@ -1,0 +1,8 @@
+restic_backup_server: backup.nghodki.ai:8000
+restic_backup_paths: []
+restic_backup_excludes: []
+restic_backup_sqlite: []          # [{name, path}] snapshotted with SQLite's backup API before each run
+restic_backup_pre_commands: []    # shell commands run before each backup (e.g. a database dump)
+restic_backup_time: "*-*-* 02:30:00"
+# Live database side files (snapshots are taken instead), caches and rebuildable folders
+restic_backup_default_excludes: ["*.sqlite3-wal", "*.sqlite3-shm", "*.db-wal", "*.db-shm", "**/__pycache__", "**/.venv", "**/node_modules"]

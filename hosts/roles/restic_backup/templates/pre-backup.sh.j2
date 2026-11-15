@@ -1,0 +1,11 @@
+#!/bin/bash
+# Managed by homelab Ansible (roles/restic_backup)
+set -euo pipefail
+install -d -m 0700 /var/backups/homelab
+{% for c in restic_backup_pre_commands %}
+{{ c }}
+{% endfor %}
+{% if restic_backup_sqlite | length > 0 %}
+/usr/bin/python3 /etc/restic/sqlite-snapshot.py{% for s in restic_backup_sqlite %} '{{ s.name }}={{ s.path }}'{% endfor %}
+
+{% endif %}

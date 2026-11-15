@@ -1,0 +1,18 @@
+# Backup server on dgx-2 (plan P1.10): restic REST server, append-only, one private repo per host, TLS.
+name: backup
+
+services:
+  rest-server:
+    image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
+    restart: unless-stopped
+    environment:
+      OPTIONS: >-
+        --append-only --private-repos
+        --htpasswd-file /etc/rest-server/htpasswd
+        --tls --tls-cert /etc/rest-server/backup.crt --tls-key /etc/rest-server/backup.key
+        --prometheus --prometheus-no-auth
+    volumes:
+      - /srv/homelab-backup:/data
+      - ./rest-server:/etc/rest-server:ro
+    ports:
+      - "8000:8000"
