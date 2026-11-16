@@ -49,7 +49,7 @@ MQTT listener is 3.1.1. DefenseClaw's docs say 3.1.1 (upstream draft 04).
 | Audit key | `dclaw_audit_key_pi` → `DCLAW_AUDIT_KEY` |
 | Shared keys | `dclaw_ota_hmac_key` (signs policy), `dclaw_emergency_key` (emergency commands) |
 | Env file | `/etc/defenseclaw/edge-connector.env`, root 0600 (systemd reads it before dropping privileges) |
-| IPC | socket owned by group `dclaw-ipc`; `DCLAW_IPC_ALLOWED_UID/GID` = the agent user `nikghodki-raspberry-1` (`edge_connector_ipc_user`) |
+| IPC | socket owned by group `dclaw-ipc`; `DCLAW_IPC_ALLOWED_UID/GID` = `nikghodki-raspberry-1` (`edge_connector_ipc_user`). picoclaw itself (user `picoclaw` since #73) isn't in the group: its hook doesn't use the socket |
 | Mode | `DCLAW_STRICT_MODE=1`: an undecided call waits for Fleet and stays blocked without it |
 | Unit hardening | `User=defenseclaw`, `Group=dclaw-ipc`, `ProtectSystem=strict`, `ProtectHome=yes`, `NoNewPrivileges`, `MemoryMax=64M` |
 
@@ -130,7 +130,8 @@ After rotating the token: `playbooks/collectors.yml --limit dgx-1`.
 - **`picoclaw_hook.py` is FFI-only**: it loads the engine in-process and never uses the daemon socket, so picoclaw's
   calls never reach Fleet through it (draft 03; hook part in open upstream PR #1343).
 
-So picoclaw keeps its in-process hook (`~/.defenseclaw/bin/picoclaw_hook.py`). Fleet is live for registration, signed
+So picoclaw keeps its in-process hook (`/var/lib/picoclaw/.defenseclaw/bin/picoclaw_hook.py` since picoclaw got its
+own user, #73; picoclaw is not in `dclaw-ipc`). Fleet is live for registration, signed
 heartbeats, signed policy, emergency commands and audit. The `dclaw-ipc` group is ready for a daemon-backed hook.
 
 The old SSH tunnel to the Jetson's gateway (`dclaw-tunnel` user unit on the Pi) was supposed to be retired in P1.12;

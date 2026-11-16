@@ -78,8 +78,7 @@ Running pods and Docker services keep running; the k3s API is read-only or down.
 ## The robot misbehaves
 
 1. **E-stop:** `safety-estop` (Pi or dgx-1), or `ros2-kilted topic pub --once /safety/estop std_msgs/msg/Bool "{data: true}"`,
-   or the car's power switch. Remember picoclaw's tools bypass the governor: stop `picoclaw-gateway` on the Pi too
-   (`systemctl --user stop picoclaw-gateway`).
+   or the car's power switch. Also stop the agent: `sudo systemctl stop picoclaw` on the Pi.
 2. Check `safety-estop status` and `journalctl -t safety-governor`.
 3. Only a human resets: `safety-reset`.
 

@@ -18,7 +18,7 @@ the repo settings (which is why build-sign uses plain buildx/cosign binaries, PR
 | `kubernetes` | `check-kubernetes.sh`: kubeconform 0.8.0 `-strict` on `cluster/` (values files and `*.enc.yaml` skipped); Kyverno CLI 1.20.0 with a bad-pod fixture that must fail every policy; then `cluster/` against the policies | invalid manifests, unparsed or non-failing policies |
 | `ai-scanners` | `mcp-tool-hashes.py check tools`; `scan-mcp-tools.py tools` (mcp-scanner 4.8.7); `scan-skills.sh` (skill-scanner 2.3.2); `scan-agents.py --self-test` then `scan-agents.py` (a2a-scanner 1.0.1); Agentic Radar 0.14.2 in its own venv (report artifact) | hash drift, HIGH/CRITICAL findings |
 | `aibom` | Cisco AIBOM 1.10.1 in its own venv on the repo, deterministic (LLM at a closed port); summary in the job summary; artifact `aibom` (30 days) | tool errors |
-| `unit-tests` | pytest: fleet-metrics, LiteLLM guardrail, DefenseClaw fleet policy (and the MCP registry vs `server.yaml`), Pocket ID sync, safety governor, Cisco AIBOM fleet job, MCP drift check, CI scripts; `defenseclaw-bundle.py check` (vendored dashboards and rules match the release) | any failure |
+| `unit-tests` | pytest: fleet-metrics, LiteLLM guardrail, DefenseClaw fleet policy (and the MCP registry vs `server.yaml`), Pocket ID sync, safety governor, robot motion bridge, Cisco AIBOM fleet job, MCP drift check, CI scripts; `defenseclaw-bundle.py check` (vendored dashboards and rules match the release) | any failure |
 
 `concurrency` cancels older runs of the same ref.
 

@@ -90,6 +90,7 @@ yet (P2.4). Details: [Model plane](../agents/model-plane.mdx).
 
 ```mermaid
 flowchart LR
+  PC["picoclaw MCP motion tools"] --> MB["motion bridge socket"] --> CMD
   CMD["ROS /cmd_vel_in (Twist)"] --> G["safety governor (Pi)"]
   SCAN["ROS /scan from MS200 LiDAR (Pi)"] --> G
   HB["ROS /safety/heartbeat or NATS robot.pi.cmd.heartbeat"] --> G

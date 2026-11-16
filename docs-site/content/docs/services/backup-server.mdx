@@ -33,7 +33,7 @@ description: The append-only restic REST server on dgx-2 and the per-host backup
 | dgx-2 | `/opt/homelab` |
 | Jetson | `~/.hermes` (minus checkout, caches, logs), `~/hermes-homes`, Home Assistant config, `~/.defenseclaw`, `~/.config/livekit`, user units, `~/workspace/roboclaw` |
 | Dell | `~/Work`, `~/Documents`, `~/Projects` |
-| Pi | `~/.picoclaw`, `~/.defenseclaw`, `~/maps`, `~/workspace`, the Oradar driver source, user units, picoclaw and Edge configs |
+| Pi | `/var/lib/picoclaw`, `/etc/picoclaw`, `~/.picoclaw` (old copy), `~/.defenseclaw`, `~/maps`, `~/workspace`, the Oradar driver source, user units, picoclaw and Edge configs |
 
 Not covered by design: model weights, metrics/logs/traces, Docker volumes on dgx-2 other than `/opt/homelab` (so
 Postgres data in Docker volumes, Grafana, Pocket ID are **not** included), the age key (offline copies only).

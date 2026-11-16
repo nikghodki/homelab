@@ -69,7 +69,7 @@ ID). Nextra works too: it reads `_meta` files instead of `meta.json`, so those w
 Every role, playbook, stack, runbook and decision in the repo, and the page that covers it. Checked by script on
 2026-11-15: every item below appears by name on its page.
 
-### Roles (`hosts/roles/`, 25)
+### Roles (`hosts/roles/`, 26)
 
 | Role | Page |
 |---|---|
@@ -90,6 +90,7 @@ Every role, playbook, stack, runbook and decision in the repo, and the page that
 | `lynis` | [security/hardening](content/docs/security/hardening.mdx) |
 | `mcp_drift` | [security/defenseclaw](content/docs/security/defenseclaw.mdx), [agents/cards-and-tools](content/docs/agents/cards-and-tools.mdx) |
 | `otel_host_collector` | [observability/index](content/docs/observability/index.mdx) |
+| `picoclaw` | [agents/picoclaw](content/docs/agents/picoclaw.mdx) |
 | `restic_backup` | [services/backup-server](content/docs/services/backup-server.mdx) |
 | `restic_install` | [services/backup-server](content/docs/services/backup-server.mdx) |
 | `restic_prune` | [services/backup-server](content/docs/services/backup-server.mdx) |

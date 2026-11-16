@@ -72,7 +72,7 @@ prompts, datasets, endpoints, AI dependencies, secrets). Decision 0003; runbooks
 | dgx-1 | `~/workspace/dgx-model-manager`, `~/litellm-setup` | `litellm-proxy`, `open-webui` |
 | dgx-2 | — | `observe-phoenix-1` |
 | Jetson | both Hermes checkouts, `~/workspace/roboclaw` | — |
-| Pi | `~/.picoclaw`, `~/workspace/roboclaw` | — |
+| Pi | `/var/lib/picoclaw/.picoclaw`, `/var/lib/picoclaw/roboclaw`, `~/workspace/roboclaw` | — |
 
 Per host, not central: secrets found in scanned code never leave the host; only counts and names go to Loki (secret
 findings are counted, never named). dgx-2's Docker uses the containerd image store, so `docker save` fails there and

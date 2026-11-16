@@ -7,7 +7,7 @@ description: The agents in the fleet, the model plane under them, and the planne
 |---|---|---|---|---|---|---|
 | [Hermes](hermes.mdx), profile main | Jetson | `nikjetson`, user unit `hermes-gateway` | `qwen3.8-27b` via `http://model.nghodki.ai/v1` | MCP `homeassistant` | Hermes connector, action, fail closed | running; chat test waits for the model (DGXMM session) |
 | [Hermes](hermes.mdx), profile nikhil-ghodki | Jetson | `hermes-nikhil` | via LiteLLM (unverified which) | MCP `picoclaw_only`, `homeassistant` | own install, same policy | running |
-| [picoclaw](picoclaw.mdx) | Pi | `nikghodki-raspberry-1`, user unit `picoclaw-gateway` | via LiteLLM (unverified) | MCP `picoclaw-hardware` (drives the car directly) | in-process Edge engine hook + Edge Connector daemon | running; end-to-end reply over NATS waits for the model |
+| [picoclaw](picoclaw.mdx) | Pi | own user `picoclaw`, system unit `picoclaw` | via LiteLLM (key in `/etc/picoclaw/picoclaw.env`) | MCP `picoclaw-hardware` (motion through the safety governor's motion bridge) | in-process Edge engine hook + Edge Connector daemon | running; end-to-end reply over NATS waits for the model |
 | OpenBot / computer-use agent | Dell | — | — | — | — | [pending decision 0004](openbot.mdx) |
 | Coding agents (Claude Code, Codex, OpenCode) | dgx-1 | the operator | — | — | DefenseClaw on dgx-1 has no connectors yet | as used |
 
