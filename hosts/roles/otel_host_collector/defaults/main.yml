@@ -13,3 +13,8 @@ otel_host_collector_tarball: "otelcol-contrib_{{ otel_host_collector_version }}_
 # Root-only secrets handed to the collector with systemd LoadCredential: {name: value}.
 # Each one is readable by the service at /run/credentials/otelcol-contrib.service/<name>.
 otel_host_collector_credentials: {}
+# k3s pod logs to ship (CRI log files under /var/log/pods), one Loki stream per entry: service.name = service
+# (Loki label service_name), plus the pod/namespace/container from the file path. Pods matched by
+# /var/log/pods/<namespace>_<pod_prefix>-*/<container>/*.log. Only for hosts that run those pods (k3s nodes).
+# Gives the otelcol user read access to /var/log/pods with POSIX ACLs (inherited by new pod folders and files).
+otel_host_collector_pod_logs: []

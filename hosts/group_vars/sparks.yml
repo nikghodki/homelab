@@ -16,3 +16,6 @@ k3s_kubelet_args:
 # when little is left (both Sparks crashed from memory exhaustion on 2026-11-15).
 cisco_aibom_memory_max: 6G
 cisco_aibom_image_min_mem_gib: 20
+# The front door's access log (runbooks/edge.md, "Access log"): edge-caddy runs one pod per Spark.
+otel_host_collector_pod_logs:
+  - {service: edge-caddy, namespace: edge, pod_prefix: edge-caddy, container: caddy}
