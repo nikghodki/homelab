@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: pocket-id
+    namespace: console
+type: Opaque
+stringData:
+    encryption_key: ENC[AES256_GCM,data:SgfYzc5FXXJ+hbGeC2y/Vj9HuqsVOqZQRZTwAhzFNNVHnAM6fpZTh0tEof8T,iv:JWsQnrrt2iiMbdJXQVOUbcF2nqAxBXZFMSPmwSec2e4=,tag:mDQxzwgWqYXrNtj4iztNpQ==,type:str]
+    static_api_key: ENC[AES256_GCM,data:/WB+ut+KhfOOLhChskuGpS59zUrOc9BYtYiKPbnSxpi0Qud4nnZAf/PFcTjfinypXPsj1o3+jw==,iv:5fWMSgccGoU6Qx2BZ5jxl0fhsznMBHiHTJmA75q1yEg=,tag:KafZiaVM46ArwIsPoApgYQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAvT3hFY2lDSDRZcjZROFFy
+            YXUrTGFsNzMvelIrUVBVZ3A0eVhUUGtiQm5NCm5lNFRLeGpUT3A0MkY3eVRCQlk3
+            LzJTYkIzbVdxSHJscHhSaFZNZ3FTYWcKLS0tIE1WR0FTUXo4Sm5CZlU3VFdMRkdQ
+            OUhjSUNpSFpUMTZ1ZXRGVUdqWDhhQ0EK99b1ll/B8BB8aL8P6EhID7uJR+1wIwOC
+            6dv9LqnD/vJi5kslBv5zBlu8gdn/RRvGDB4p6K3vNAViWnCm7zByZg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T22:23:48Z"
+    mac: ENC[AES256_GCM,data:oMVV9CYVi6GmgqCXyLBIoHFVfLgBEUyewn1eqU5cFhEUxerJlrvuFHH7yApFQF/zClqKIZqfWspynFzR0kdGtOjayaNjpOUMu2KslUXzHb0DNcZrv4crDYZgJXn4QtftQlGRPSi9HGTtR3HYCZqLjOMhG2CT/dE4YCyR/4Cb9S0=,iv:ue4HS3JGNs1gYJPezt5p8qoYTlzuRLu04K//MIYQw30=,tag:zBdAJZ24XQIF3/3yQciGzw==,type:str]
+    version: 3.13.3

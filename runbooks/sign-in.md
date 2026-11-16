@@ -2,11 +2,44 @@
 
 | Piece | Where |
 |---|---|
-| Pocket ID 2.19.3 | dgx-2, `hosts/stacks/console` (`playbooks/console.yml`), LAN port 1411 |
+| Pocket ID 2.19.3 | k3s, `cluster/apps/pocket-id` (Argo CD app `pocket-id`, namespace `console`), pinned to dgx-2, fixed ClusterIP `10.43.0.155:1411` ([below](#pocket-id-in-k3s)). Until 2026-11-23 the stopped Docker copy on dgx-2 (`hosts/stacks/console`, LAN port 1411) is the fallback |
 | `https://id.nghodki.ai` | the front door (`cluster/platform/edge/caddy/Caddyfile`, `@id`); http is redirected because passkeys need HTTPS |
 | Sign-in for apps without their own login | `edge/edge-auth` (oauth2-proxy, client `edge-auth`, callback `https://auth.nghodki.ai`), called by the front door: [below](#apps-without-their-own-login-one-block-in-the-caddyfile), [decision 0011](../decisions/0011-one-sign-in-proxy.md) |
 | Groups, users, OIDC clients | `identity/pocket-id.yaml`, applied by `hosts/files/pocket-id/pocketid_sync.py`. A client with `groups` gets `isGroupRestricted` (Pocket ID 2.x ignores the allowed groups without it; set on every client on 2026-11-16) |
 | Secrets | `secrets/console.enc.yaml`: encryption key, static API key, `oidc_<client>_secret`, `edge_origin_token`; `cluster/platform/edge/edge-auth.enc.yaml` (KSOPS): edge-auth's client secret, cookie secret, origin token |
+
+## Pocket ID in k3s
+
+| | |
+|---|---|
+| Pod | `console/pocket-id`, 1 replica, **pinned to dgx-2** (its data is on that disk), `Recreate`; uid/gid 1000 (as in Docker), no capabilities, read-only root |
+| Image | `ghcr.io/pocket-id/pocket-id:v2.19.3` by digest (allowed in `policies/kyverno/restrict-registries.yaml`) |
+| Data | PVC `pocket-id-data` (local-path, 1 Gi) on dgx-2: `pocket-id.db` (SQLite: users, passkeys, OIDC clients, sessions, signing keys) and `uploads/` |
+| Secrets | KSOPS `cluster/apps/pocket-id/pocket-id.enc.yaml`: `encryption_key`, `static_api_key`, byte for byte as Ansible rendered them (with the trailing newline) from `pocketid_encryption_key` / `pocketid_static_api_key` in `secrets/console.enc.yaml`. A changed encryption key makes the stored data unreadable |
+| Front door | `id.nghodki.ai` → `10.43.0.155:1411` first, the Docker copy `192.168.86.36:1411` while the pod's `/healthz` fails (`lb_policy first`) |
+| Network policy | in: only the edge Caddy pods; out: DNS and HTTPS to the internet |
+| Guard | init container `data-present`: never starts without `pocket-id.db` (a fresh Pocket ID offers its first-run admin setup to whoever opens it) |
+
+The hostname stays `id.nghodki.ai`, so passkeys (bound to the relying party ID) and every OIDC client's issuer and
+callbacks are unchanged. `pocketid_sync.py` talks to `https://id.nghodki.ai` and needs no change.
+
+### Move or restore the data
+
+Pocket ID must be stopped while its files are copied (SQLite with a WAL):
+
+```bash
+export KUBECONFIG=~/.kube/config
+PV=$(kubectl -n console get pvc pocket-id-data -o jsonpath='{.spec.volumeName}')
+DST=$(kubectl get pv $PV -o jsonpath='{.spec.local.path}{.spec.hostPath.path}')        # on dgx-2
+# from a restic restore or the Docker volume /var/lib/docker/volumes/console_pocket-id-data/_data, on dgx-2:
+sudo rsync -aHAX --delete --chown=1000:1000 "$SRC/" "$DST/"
+kubectl -n console delete pod -l app.kubernetes.io/name=pocket-id                     # the guard runs again at once
+```
+
+Pocket ID refuses to start ("there's already one instance of Pocket ID running") while `francis_hosts` in the
+database holds another instance's recent health check. A clean stop removes it; after an unclean one (or on a copy
+of a running database), clear it in the copy before starting: `sqlite3 "$DST/pocket-id.db" 'delete from francis_hosts'`,
+only when no other Pocket ID uses that file.
 
 ## Change users or clients
 

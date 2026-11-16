@@ -168,8 +168,16 @@
 	handle @id {
 		@plain protocol http
 		redir @plain https://{host}{uri} 308
-		reverse_proxy 192.168.86.36:1411 {
+		# Pocket ID in k3s (console/pocket-id, fixed ClusterIP, pinned to dgx-2) first; the stopped Docker copy on dgx-2
+		# is the fallback until 2026-11-23 (runbooks/sign-in.md "Pocket ID in k3s").
+		reverse_proxy 10.43.0.155:1411 192.168.86.36:1411 {
 			import strip_session_cookie
+			lb_policy first
+			lb_try_duration 10s
+			health_uri /healthz
+			health_interval 5s
+			health_timeout 3s
+			fail_duration 10s
 		}
 	}
 
