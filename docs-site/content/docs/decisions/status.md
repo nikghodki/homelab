@@ -29,14 +29,14 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P0.4 | ✅ | Edge Connector 1.0.9 on the Pi, reporting to Fleet; picoclaw keeps its in-process hook |
 | P0.5 | ✅ | Work-managed DefenseClaw removed from dgx-1; OSS 1.0.9 |
 | P0.6 | ✅ | LiteLLM Postgres/Redis on 127.0.0.1 |
-| P0.7 | 🟡 | nginx-gateway fixed and kept; dead LiteLLM routes still there |
+| P0.7 | ✅ | nginx-gateway fixed and kept; dead LiteLLM routes and their containers removed (2026-11-15) |
 | P0.8 | ✅ | LiveKit key in a 0600 file; rotated |
 | P0.9 | ✅ | DHCP reservations (Wi-Fi MACs). But `pi.nghodki.ai` still points at .34 |
 | P0.10 | ✅ | Omarchy updated and on Tailscale (`tag:agent`) |
 | P0.11 | ⬜ | Ethernet for the Sparks — **you** |
 | P0.12 | ✅ | companion-agent retired; Jetson CDI fixed |
 | P0.13 | ✅ | LiteLLM 1.109.1 by digest |
-| P0.14 | ⬜ | LiteLLM master/salt key rotation into SOPS — after the DGXMM session |
+| P0.14 | ✅ | LiteLLM in Ansible; master and salt keys rotated into SOPS (2026-11-15) |
 | P0.15 | ✅ | Second Hermes profile as `hermes-nikhil` |
 | P0.16 | ✅ | HA reverse-proxy settings |
 | P0.17 | ✅ | LiteLLM keys reviewed |
@@ -55,7 +55,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 | P1.8 | ✅ | CI, hash-locked tools, Renovate |
 | P1.9 | ✅ | GitHub Free (0001) |
 | P1.10 | ⏸️ | backups "off" by 0002 — **but live** (see below) |
-| P1.11 | 🟡 | AIBOM (DefenseClaw + Cisco), policy in Git, bundle sync, MCP tool pinning; still: LLM judge via LiteLLM |
+| P1.11 | ✅ | AIBOM (DefenseClaw + Cisco, Cisco's agentic stage via LiteLLM), policy in Git, bundle sync, MCP tool pinning, LLM judge via LiteLLM (2026-11-15) |
 | P1.12 | 🟡 | Fleet live; picoclaw on its in-process hook (OSS Fleet can't allow calls); upstream drafts not posted |
 | P1.13 | 🟡 | Pocket ID for Grafana, Gatus, Phoenix, Temporal, Homepage, MLflow, Argo CD; LiteLLM UI, DGXMM UI, Open WebUI after DGXMM |
 | P1.14 | ✅ | one Alertmanager; Gatus posts to ntfy directly |
@@ -63,8 +63,8 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 
 ## Phase 2 (model plane)
 
-P2.0 ⬜ (**your decision**: models and aliases) · P2.4 🟡 (guardrail written, not enabled) · P2.6 🟡 (Phoenix up, no
-senders) · P2.1–P2.3, P2.5, P2.7, P2.8 ⬜ (DGXMM work).
+P2.0 ⬜ (**your decision**: models and aliases) · P2.4 ✅ (guardrail on, 2026-11-15) · P2.6 🟡 (Phoenix up; LiteLLM
+sends traces since 2026-11-15, agents not yet) · P2.1–P2.3, P2.5, P2.7, P2.8 ⬜ (DGXMM work).
 
 ## Phase 3 (cluster and GitOps)
 
@@ -115,14 +115,13 @@ P6.1, P6.6–P6.12 ⬜.
 
 ## After the DGXMM session
 
-- P0.14: rotate the LiteLLM master and salt keys into SOPS; remove dead routes (P0.7).
-- P2.4 guardrail plugin on, P2.6 LiteLLM → Phoenix, P1.11 LLM judge.
+- Done 2026-11-15: P0.14 (keys rotated into SOPS, dead routes removed), P2.4 guardrail on, P2.6 LiteLLM → Phoenix,
+  P1.11 LLM judge, the AIBOM key.
 - Skill scanner LLM judge back on for both Jetson users (`defenseclaw setup skill-scanner --use-llm`, then
   `skill scan all`).
 - picoclaw end-to-end reply over NATS, and the Hermes chat tests (both profiles).
 - P1.13 for LiteLLM UI, DGXMM UI and Open WebUI.
 - P2.0 models and aliases (you), then P2.1–P2.3, P2.5 (model supply chain), P2.7, P2.8.
-- A LiteLLM virtual key for Cisco AIBOM's LLM enrichment.
 
 ## Where §2a of the plan is behind
 

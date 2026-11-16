@@ -29,12 +29,19 @@ commit the SOPS file in a PR, merge, deploy the playbooks that use it, check, an
 | Argo CD deploy key | `argocd` → `argocd_deploy_key(_pub)` | re-create `argocd/repo-homelab` | `argocd --core ... repo list` |
 | restic passwords | `backup` → per host | `backups.yml` (a new repo password needs `restic key add/remove`) | a backup run |
 | LiveKit key | `voice` → `livekit_api_key`, `livekit_api_secret` | by hand on the Jetson ([Voice](../services/voice.md)) | old key refused |
+| LiteLLM master key | `litellm` → `litellm_master_key` | `litellm.yml`; DGXMM's `secrets/litellm_master_key` + `docker restart dgxmm` (no `/key/regenerate`: the salt key encrypts) | `/model/info` 401 with the old key |
+| LiteLLM salt key | `litellm` → `litellm_salt_key` | **two boots** with `LITELLM_MIGRATE_FROM_MASTER_KEY` (runbooks/litellm.md); `pg_dump` first | every DB route listed in `/model/info` |
+| LiteLLM virtual keys | `litellm` → `picoclaw_pi_litellm_key`, `defenseclaw_jetson_judge_litellm_key`, `cisco_aibom_litellm_key` | create the new key, deploy, then `/key/delete` the old | old key 401 |
+| LiteLLM Postgres / UI | `litellm` → `litellm_postgres_password`, `litellm_ui_password` | `ALTER USER` first, then `litellm.yml` | readiness `db: connected` |
+| Phoenix API key (LiteLLM) | `litellm` → `phoenix_api_key` (Phoenix system key `litellm-dgx-1`) | `litellm.yml`; delete the old key in Phoenix | a trace arrives |
 
 ## Not in SOPS / not rotated yet
 
-- LiteLLM master and salt keys (P0.14, after the DGXMM session).
 - Hermes `.env` files and the Home Assistant long-lived token on the Jetson.
-- The 13 LiteLLM virtual keys were reviewed (P0.17) and kept; narrowing `hermes` and `claude-code` waits for P2.0.
+- The LiteLLM virtual keys were reviewed (P0.17) and kept; narrowing `hermes` and `claude-code` waits for P2.0.
+  Their values live only in the consumers' configs, except the keys in `secrets/litellm.enc.yaml`.
+- An OpenRouter key was found in picoclaw's `.security.yml` (`custom-prefer`, unused) on 2026-11-15 and removed
+  from the live file; it still has to be revoked at OpenRouter (old copies: `.security.yml.bak-*`).
 
 ## If something leaked
 

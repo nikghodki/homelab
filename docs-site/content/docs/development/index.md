@@ -29,7 +29,7 @@ description: What lives where in nikghodki/homelab and who applies each folder.
 | Code | Language | Tests |
 |---|---|---|
 | `hosts/files/fleet-metrics/` (agent on every host) | Python stdlib | `pytest` (collect, server, services, fixtures) |
-| `hosts/files/litellm/defenseclaw_guardrail.py` | Python (httpx) | 8 tests |
+| `hosts/files/litellm/defenseclaw_guardrail.py` | Python (httpx) | 10 tests |
 | `hosts/files/pocket-id/pocketid_sync.py` | Python (httpx, yaml) | tests |
 | `hosts/roles/cisco_aibom/files/cisco-aibom-fleet.py` | Python | tests |
 | `hosts/roles/mcp_drift/files/mcp-drift.py` | Python (yaml) | tests |

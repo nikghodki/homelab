@@ -21,10 +21,10 @@ SOPS). All images are pinned by digest; Renovate keeps them current.
 | `jobs` | dgx-2 | `jobs.yml` | Temporal 1.32.2, PostgreSQL 17, admin-tools, UI 2.58.1 | `jobs`, `console` | `jobs` |
 | `ml` | dgx-2 | `ml.yml` | MLflow 3.18.0 (built locally), PostgreSQL 17, oauth2-proxy, Caddy job API | `ml`, `console` | `sim` |
 | `backup` | dgx-2 | `backups.yml` | restic rest-server 0.14.0 | `backup`, `pki` | stays on the host |
+| `litellm` | dgx-1 | `litellm.yml` | LiteLLM 1.109.1, PostgreSQL 16, Redis 7.4, DefenseClaw relay (socat) | `litellm` | `models` and `data` |
 | `sim` | dgx-2 | none (run by hand) | isaaclab (local image on NVIDIA's + MLflow client), mujoco (local image) (profile `jobs`) | — | `sim` |
 
-Outside the repo (hand-run): edge-gateway (`edge-caddy`, `edge-dnsmasq`; replaced for clients by `edge` in k3s at the P3.3 cutover, stopped 2026-11-15), LiteLLM + Postgres + Redis →
-`models` and `data`, Open WebUI → `agents` or `models`, DGXMM and engines (stay outside). nginx-gateway was stopped on 2026-11-15 (its routes are in k3s).
+Outside the repo (hand-run): edge-gateway (`edge-caddy`, `edge-dnsmasq`; replaced for clients by `edge` in k3s at the P3.3 cutover, stopped 2026-11-15), Open WebUI → `agents` or `models`, DGXMM and engines (stay outside). nginx-gateway was stopped on 2026-11-15 (its routes are in k3s).
 
 ## The `compose_stack` role
 
@@ -36,6 +36,8 @@ Used by every stack playbook with `compose_stack_name` and `compose_stack_src`.
 3. Copies plain files (0644) and renders `*.j2` templates without the suffix. Templates in a sub-folder listed in
    `compose_stack_private_templates` (`{service: uid}`) render 0600 owned by that uid (for example `oauth2-proxy: 65532`,
    `pocket-id: 1000`, `mosquitto: 1883`); others render 0644 root. Rendering is `no_log`.
+   `compose_stack_extra_files` (`[{src, dest}]`) copies files kept elsewhere in the repo into the stack (0644; the
+   first folder of `dest` names the service restarted on change), e.g. LiteLLM's guardrail plugin from `hosts/files/litellm`.
 4. Writes `.env` (0600) only when `compose_stack_env` has variables (an empty `.env` failed the bus deploy, PR #16).
 5. `docker_compose_v2` with `state: present`, `pull: missing`, **`remove_orphans: true`**.
 6. Restarts every service whose sub-folder (named after the service) had a changed file, because single-file bind

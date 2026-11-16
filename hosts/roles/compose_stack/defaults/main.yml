@@ -3,5 +3,6 @@ compose_stack_src: ""          # folder in hosts/stacks/
 compose_stack_root: /opt/homelab
 compose_stack_env: {}          # rendered to .env (mode 0600)
 compose_stack_private_templates: {}   # service sub-folder -> container uid; its templates render 0600 owned by that uid
-compose_stack_extra_files: []      # files kept elsewhere in the repo: [{src: path, dest: path in the stack}]; dest's
-                                    # first folder names the service restarted when the file changes
+# Files kept elsewhere in the repo: [{src: path, dest: path in the stack}]; the first folder of dest names the service
+# restarted when the file changes.
+compose_stack_extra_files: []

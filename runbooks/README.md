@@ -27,4 +27,5 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [docs-site.md](docs-site.md) (the private docs site on the Dell: build, hosting, updates, roll back, adding a page),
 [ci-scanners.md](ci-scanners.md) (what CI scans, accepted vulnerabilities with expiring ignores, shellcheck),
 [jetson-services.md](jetson-services.md) (Home Assistant and LiveKit on the Jetson: deploy, check, upgrade),
-[aibom.md](aibom.md) (Cisco AIBOM nightly inventory; the Jetson's images are scanned on dgx-2).
+[aibom.md](aibom.md) (Cisco AIBOM nightly inventory; the Jetson's images are scanned on dgx-2),
+[litellm.md](litellm.md) (the model gateway: keys and their rotation, routes, the DefenseClaw guardrail, Phoenix traces).
