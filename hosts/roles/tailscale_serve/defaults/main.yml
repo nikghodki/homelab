@@ -1,0 +1,4 @@
+# Publish a local HTTP service on the tailnet with Tailscale HTTPS (a Let's Encrypt cert for the node's
+# *.ts.net name, managed by tailscaled). The config lives in tailscaled's state and survives restarts.
+tailscale_serve_https_port: 443
+tailscale_serve_target: ""     # e.g. http://127.0.0.1:8085

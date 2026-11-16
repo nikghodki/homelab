@@ -1,0 +1,8 @@
+# SIGHUP makes logind re-read its config without ending sessions (a restart would log the desktop user out).
+- name: Reload logind
+  ansible.builtin.command: systemctl kill -s HUP systemd-logind
+  changed_when: true
+
+- name: Apply the charge threshold
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/always-on-battery.conf
+  changed_when: true

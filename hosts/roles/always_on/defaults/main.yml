@@ -1,0 +1,7 @@
+# Hosts that must never sleep (the Dell runs the alerting path, runbooks/alerting.md).
+# Screen blanking and locking are left alone; only suspend and hibernate are switched off.
+always_on_sleep_targets: [sleep.target, suspend.target, hibernate.target, hybrid-sleep.target]
+always_on_desktop_user: "{{ ansible_user }}"
+# Stop charging at this level where the firmware supports it (on mains all the time). Skipped where the
+# sysfs file is missing or can't be read (the Dell Inspiron 7348 answers EIO).
+always_on_charge_end_threshold: 80

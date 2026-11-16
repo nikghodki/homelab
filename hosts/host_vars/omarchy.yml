@@ -2,7 +2,7 @@ restic_backup_paths:
   - /home/nikghodki/Work
   - /home/nikghodki/Documents
   - /home/nikghodki/Projects
-# k3s agent (plan P3.2). A laptop: it may sleep (decisions/0005-k3s-over-wifi.md).
+# k3s agent (plan P3.2, decisions/0005-k3s-over-wifi.md). A laptop, but it no longer sleeps (role always_on).
 k3s_role: agent
 k3s_node_ip: 192.168.86.49
 k3s_flannel_iface: wlp1s0

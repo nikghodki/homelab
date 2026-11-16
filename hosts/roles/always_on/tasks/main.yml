@@ -1,0 +1,69 @@
+# Never sleep (role always_on). The lid, the suspend/hibernate keys and idle are ignored by logind, and the sleep
+# targets are masked, so `systemctl suspend` (and any desktop menu entry that calls it) is refused.
+- name: Logind ignores the lid, the sleep keys and idle
+  ansible.builtin.template:
+    src: logind.conf.j2
+    dest: /etc/systemd/logind.conf.d/50-always-on.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload logind
+
+- name: Sleep targets are masked
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    masked: true
+  loop: "{{ always_on_sleep_targets }}"
+
+# Omarchy's own idle service (Quickshell, ~/.config/omarchy/shell.json) only blanks and locks. Older Omarchy
+# releases used hypridle; comment out any listener there that suspends.
+- name: Desktop user's home
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ always_on_desktop_user }}"
+
+- name: Hypridle config
+  ansible.builtin.stat:
+    path: "{{ ansible_facts['getent_passwd'][always_on_desktop_user][4] }}/.config/hypr/hypridle.conf"
+  register: always_on_hypridle
+
+- name: Hypridle doesn't suspend
+  ansible.builtin.replace:
+    path: "{{ always_on_hypridle.stat.path }}"
+    regexp: '^(\s*)(on-timeout\s*=\s*(systemctl|loginctl)\s+(suspend|hibernate|hybrid-sleep|suspend-then-hibernate).*)$'
+    replace: '\1# always_on: \2'
+  when: always_on_hypridle.stat.exists
+
+- name: Battery charge-threshold files
+  ansible.builtin.find:
+    paths: /sys/class/power_supply
+    patterns: ["BAT*"]
+    file_type: link
+  register: always_on_batteries
+
+- name: Read the charge thresholds (unsupported firmware answers EIO)
+  ansible.builtin.slurp:
+    src: "{{ item.path }}/charge_control_end_threshold"
+  loop: "{{ always_on_batteries.files }}"
+  loop_control: {label: "{{ item.path }}"}
+  register: always_on_thresholds
+  failed_when: false
+
+- name: Charge threshold persists across boots
+  vars:
+    always_on_battery_files: >-
+      {{ always_on_thresholds.results | selectattr('content', 'defined') | map(attribute='source') | list }}
+  ansible.builtin.template:
+    src: battery.conf.j2
+    dest: /etc/tmpfiles.d/always-on-battery.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: always_on_battery_files | length > 0
+  notify: Apply the charge threshold
+
+- name: Report batteries without a usable charge threshold
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: no charge threshold on {{ item.item.path }} (skipped)"
+  loop: "{{ always_on_thresholds.results | rejectattr('content', 'defined') | list }}"
+  loop_control: {label: "{{ item.item.path }}"}

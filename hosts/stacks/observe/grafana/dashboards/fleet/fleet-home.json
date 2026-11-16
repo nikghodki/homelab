@@ -81,7 +81,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}) or vector(0)",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",
@@ -393,7 +393,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "ALERTS{alertstate=\"firing\"}",
+          "expr": "ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}",
           "legendFormat": "",
           "datasource": {
             "type": "prometheus",

@@ -6,3 +6,6 @@
     - role: base
     - role: tailscale
     - role: fleet_metrics
+
+- name: Hosts that never sleep
+  ansible.builtin.import_playbook: always-on.yml

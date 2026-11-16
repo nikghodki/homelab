@@ -1,0 +1,13 @@
+- name: Read the Tailscale serve config
+  ansible.builtin.command: tailscale serve status --json
+  register: tailscale_serve_status
+  changed_when: false
+  check_mode: false
+
+- name: Tailscale serves the target over HTTPS
+  vars:
+    tailscale_serve_current: "{{ tailscale_serve_status.stdout | default('{}', true) | from_json }}"
+    tailscale_serve_listening: "{{ (tailscale_serve_current.TCP | default({}))[tailscale_serve_https_port | string].HTTPS | default(false) }}"
+  ansible.builtin.command: tailscale serve --bg --https={{ tailscale_serve_https_port }} {{ tailscale_serve_target }}
+  changed_when: true
+  when: not (tailscale_serve_listening | bool and tailscale_serve_target in tailscale_serve_status.stdout)

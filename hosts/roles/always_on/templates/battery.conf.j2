@@ -1,0 +1,4 @@
+# Managed by Ansible (role always_on): stop charging at {{ always_on_charge_end_threshold }}%.
+{% for path in always_on_battery_files %}
+w {{ path }} - - - - {{ always_on_charge_end_threshold }}
+{% endfor %}

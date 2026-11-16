@@ -26,8 +26,12 @@ hosts). That CA has no name constraint, so it must never be installed on phones 
   There's no :80 → :443 redirect yet, so devices without the CA keep working over http.
 - `conf/certs/web.{crt,key}` (key 0600, from SOPS). `conf/ca/` is a copy of `hosts/files/web-ca/`.
 - `dnsmasq/dnsmasq.conf`: `ca.nghodki.ai` → dgx-1.
-- `@id` (Pocket ID) and `@ops` (Homepage behind oauth2-proxy, dgx-2 `192.168.86.36:4180`) redirect http → https:
+- `@id` (Pocket ID, dgx-2 `192.168.86.36:1411`) and `@ops` (Homepage behind oauth2-proxy, on the Dell `192.168.86.49:4180`)
+  redirect http → https:
   passkeys need HTTPS and oauth2-proxy's cookie is `Secure`. `ops.nghodki.ai` is in dnsmasq for the LAN and the tailnet.
+- `@status` (Gatus) and `@ntfy` go to the Dell too: `192.168.86.49:8081` and `192.168.86.49:8085` (`flush_interval -1`
+  so ntfy's streams aren't buffered). The phone doesn't use `ntfy.nghodki.ai`: it reaches ntfy on the Dell over Tailscale
+  HTTPS, which needs neither the front door nor dgx-1's DNS ([alerting.md](alerting.md)).
 - Apply changes with `docker restart edge-caddy` (`caddy reload` hasn't always taken effect).
 
 ## Renew (before December 2027; Gatus alerts 30 days ahead)
