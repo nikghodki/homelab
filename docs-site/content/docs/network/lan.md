@@ -40,7 +40,6 @@ Services that publish on all interfaces or on a LAN address (full list in [Ports
 |---|---|---|---|
 | dgx-1 | 80, 443 | front door | per route |
 | dgx-1 | 4000 | LiteLLM | API keys |
-| dgx-1 | 3100 | Open WebUI | its own accounts |
 | dgx-1 | 4222, 8883 | NATS, MQTT (TLS) | users, deny by default |
 | dgx-1 | 8884 | Fleet MQTT (TLS) | per-device users and ACLs |
 | dgx-1 | 8971 | Fleet API (TLS) | bearer token |

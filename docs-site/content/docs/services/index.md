@@ -7,7 +7,7 @@ description: "Every service in the fleet in one table: URL, host, port, how it i
 |---|---|---|---|---|---|---|
 | LiteLLM | `model.nghodki.ai`, `litellm-admin.nghodki.ai` | dgx-1 | 4000 | hand (`~/litellm-setup`) | Gatus `model.nghodki.ai (LiteLLM)` | [LiteLLM](litellm.md) |
 | DGXMM | `dgxmanager.nghodki.ai` | dgx-1 | 127.0.0.1:8090 | DGXMM project | Gatus `dgxmanager.nghodki.ai` | [Model plane](../agents/model-plane.md) |
-| Open WebUI | `webui.nghodki.ai` | dgx-1 | 3100 | hand | Gatus `webui.nghodki.ai` | [Open WebUI](open-webui.md) |
+| Open WebUI | `webui.nghodki.ai` | dgx-1 (k3s) | ClusterIP 10.43.0.130:8080 | Argo CD | Gatus `webui.nghodki.ai` | [Open WebUI](open-webui.md) |
 | NATS | `nats.nghodki.ai` | dgx-1 | 4222, 8883 | `bus.yml` | Gatus `NATS (TLS)`, `NATS MQTT` | [NATS](nats.md) |
 | Fleet broker and API | `fleet.nghodki.ai` | dgx-1 | 8884, 8971 | `fleet.yml` | Gatus `Fleet MQTT`, `Fleet API` | [Fleet broker](fleet-broker.md) |
 | Pocket ID | `id.nghodki.ai` | dgx-2 | 1411 | `console.yml` | Homepage monitor `/healthz` | [Pocket ID](pocket-id.md) |

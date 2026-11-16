@@ -38,7 +38,8 @@ Never use the laptop's `gh` or `git`: they are a work account.
 | kubectl | dgx-1 `~/.kube/config` |
 | Deployed stacks | `/opt/homelab/<stack>` on each host |
 | Front door and DNS | dgx-1 `~/edge-gateway` (outside the repo) |
-| LiteLLM, Open WebUI, DGXMM | dgx-1, hand-run (outside the repo; owned by the DGXMM session) |
+| LiteLLM, DGXMM | dgx-1 (LiteLLM: `hosts/stacks/litellm`; DGXMM: its own repo) |
+| Open WebUI | k3s, `cluster/apps/open-webui` (since 2026-11-16) |
 | Hermes | Jetson, users `nikjetson` and `hermes-nikhil` |
 | Robot | Pi user units |
 | Runbooks | `~/homelab/runbooks/` |
