@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: pr-checks-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push cancels an older PR run; runs on main always finish (code review #56).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
@@ -242,6 +243,10 @@ jobs:
         run: python -m pytest -q hosts/roles/cisco_aibom/files/tests
       - name: MCP drift check
         run: python -m pytest -q hosts/roles/mcp_drift/files/tests
+      - name: DefenseClaw AIBOM nightly diff
+        run: python -m pytest -q hosts/roles/defenseclaw_aibom/files/tests
+      - name: Sim job sampler and watchdog (measure.sh, stub docker/nvidia-smi)
+        run: python -m pytest -q robots/sim/tests
       - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
         run: python -m pytest -q .github/scripts/tests
       - name: DefenseClaw dashboards and rules match the pinned release
