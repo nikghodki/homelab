@@ -1,0 +1,50 @@
+# The kernel has no NFLOG or physdev: k3s gets iptables-restore wrappers that drop kube-router's rules using them
+# (logging rules and duplicates). runbooks/k3s.md "Known issues". Adding or removing the PATH drop-in restarts k3s;
+# the wrappers are read on every call, so changing them doesn't.
+- name: NFLOG shim folder
+  ansible.builtin.file:
+    path: "{{ k3s_nflog_shim_dir }}"
+    state: "{{ 'directory' if k3s_netpol_iptables_shim else 'absent' }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart k3s
+
+- name: NFLOG shim, iptables-restore and ip6tables-restore
+  when: k3s_netpol_iptables_shim
+  ansible.builtin.template:
+    src: nflog-shim.sh.j2
+    dest: "{{ k3s_nflog_shim_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop: [iptables-restore, ip6tables-restore]
+
+- name: Unit drop-in folder
+  when: k3s_netpol_iptables_shim
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ k3s_service }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: The k3s unit finds the shim first (k3s puts its own bin folder in front; it has no iptables-restore)
+  ansible.builtin.copy:
+    content: |
+      # Managed by homelab Ansible (roles/k3s, k3s_netpol_iptables_shim). See runbooks/k3s.md "Known issues".
+      [Service]
+      Environment=PATH={{ k3s_nflog_shim_dir }}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+    dest: "/etc/systemd/system/{{ k3s_service }}.service.d/10-nflog-shim.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: k3s_netpol_iptables_shim
+  notify: Restart k3s
+
+- name: No drop-in without the shim
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ k3s_service }}.service.d/10-nflog-shim.conf"
+    state: absent
+  when: not k3s_netpol_iptables_shim
+  notify: Restart k3s

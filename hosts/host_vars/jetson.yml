@@ -54,6 +54,8 @@ k3s_min_mem_available_mb: 2048
 # The member on Wi-Fi waits twice as long as the Sparks (5 s) before it calls an election, so after a Spark dies the
 # other Spark becomes leader, not the Jetson (runbooks/k3s.md "etcd leader"; role etcd_leader_pin covers handovers).
 k3s_etcd_args: [election-timeout=10000]
+# The tegra kernel has no NFLOG or physdev; without this no NetworkPolicy is enforced here (runbooks/k3s.md "Known issues").
+k3s_netpol_iptables_shim: true
 # About 2.3 GiB allocatable; pods are evicted before host processes run out of memory.
 k3s_kubelet_args:
   - system-reserved=cpu=1500m,memory=4Gi

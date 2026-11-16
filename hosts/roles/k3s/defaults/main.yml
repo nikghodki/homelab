@@ -42,6 +42,13 @@ k3s_ufw_sources: [192.168.86.0/24, 10.100.136.0/24]
 # Refuse a first install when MemAvailable is below this (MiB); 0 = no check
 k3s_min_mem_available_mb: 0
 
+# Kernels without the NFLOG target and physdev match (the Jetson's tegra kernel): k3s's network policy controller fails
+# to load any rule, so no NetworkPolicy is enforced on that node. true = k3s runs iptables-restore through a wrapper
+# that drops kube-router's NFLOG (logging) and physdev (duplicate) rules (runbooks/k3s.md "Known issues").
+# Check: zcat /proc/config.gz | grep -E 'XT_TARGET_NFLOG|XT_MATCH_PHYSDEV'
+k3s_netpol_iptables_shim: false
+k3s_nflog_shim_dir: /usr/local/libexec/k3s-nflog-shim
+
 # Write an admin kubeconfig for this user (servers with an API server only), pointing at k3s_kubeconfig_server
 k3s_kubeconfig_user: ""
 k3s_kubeconfig_server: https://k8s.nghodki.ai:6443

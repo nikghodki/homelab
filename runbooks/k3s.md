@@ -181,6 +181,34 @@ each. A changed node IP on the Jetson means remove-and-rejoin (above).
   --sysname-match=flannel.1 --settle`, then check again. UDP test from Docker:
   `sudo docker run --rm --network <a compose network> busybox@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec nslookup kubernetes.default.svc.cluster.local 10.43.0.10`.
 
+- **NetworkPolicies not enforced on the Jetson** (fixed 2026-11-16). The tegra kernel (JetPack 7.2.1,
+  6.8.12-1021-tegra) is built without the iptables `NFLOG` target (`CONFIG_NETFILTER_XT_TARGET_NFLOG`,
+  `CONFIG_NETFILTER_NETLINK_LOG` unset) and the `physdev` match (`CONFIG_NETFILTER_XT_MATCH_PHYSDEV` unset); there are
+  no `.ko` files to load. k3s's network policy controller (kube-router v2.11.1-k3s1) always writes both: NFLOG rules
+  that log dropped packets, and `-m physdev --physdev-is-bridged` copies of its FORWARD jumps to the pod chains.
+  Neither can be turned off (no flag in kube-router or k3s). Its iptables-restore (the whole filter table, atomic)
+  failed every sync (`npc_iptables.go ... Aborting sync. Failed to run iptables-restore: exit status 4 (Warning:
+  Extension NFLOG revision 0 not supported` in `journalctl -u k3s`, then the same for `physdev`), so no policy
+  applied to pods on the Jetson: a default-deny test pod there accepted everything. The Sparks and the Dell were fine.
+  Fix (`k3s_netpol_iptables_shim: true` in `host_vars/jetson.yml`, `roles/k3s/tasks/nflog_shim.yml`): a drop-in
+  `/etc/systemd/system/k3s.service.d/10-nflog-shim.conf` puts `/usr/local/libexec/k3s-nflog-shim` first in k3s's
+  `PATH` (after k3s's own bin folder, which has no `iptables-restore`), and its `iptables-restore`/`ip6tables-restore`
+  wrappers delete those two kinds of line and pass the rest to `/usr/sbin/iptables-restore`. Nothing is lost but the
+  drop logging: NFLOG doesn't end a rule's traversal, and each physdev rule repeats the rule before it without the
+  match, which also catches bridged traffic (`br_netfilter`, `bridge-nf-call-iptables=1`). Only k3s's processes see
+  the wrappers. Adding the drop-in restarts k3s; changing the wrappers doesn't (they're read on every call).
+  After a k3s restart the controller starts only when the kubelet next refreshes the node's Ready heartbeat, up to
+  ~5 min later (k3s waits for it). Check:
+  `sudo journalctl -u k3s --since -10min | grep -c 'Aborting sync'` is 0 and
+  `sudo iptables-save -t filter | grep -c KUBE-POD-FW` is non-zero when pods run there. Proof (2026-11-16): a
+  `default-deny` namespace with a server pod on the Jetson; unlabelled clients (on the Jetson and on dgx-1) and a
+  client with an empty egress policy were accepted before and refused after; the allowed clients connected both times.
+  Real alternatives, not done: a kernel with these options (rebuild + reboot, and lose it at every JetPack kernel
+  update), or out-of-tree `xt_NFLOG`/`nfnetlink_log`/`nft_log`/`xt_physdev` modules built against the headers
+  (unsigned, loadable live but taint the kernel; a bug in them can panic the etcd member and the robot host).
+  Re-check after a JetPack upgrade: `zcat /proc/config.gz | grep -E 'XT_TARGET_NFLOG|XT_MATCH_PHYSDEV'`; if both are
+  `=m` or `=y`, set `k3s_netpol_iptables_shim: false`.
+
 ## Installed on top (from Git, by Argo CD)
 
 | What | Since | Runbook |

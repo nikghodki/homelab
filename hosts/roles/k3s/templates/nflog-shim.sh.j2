@@ -1,0 +1,14 @@
+#!/bin/sh
+# Managed by homelab Ansible (roles/k3s, k3s_netpol_iptables_shim). See runbooks/k3s.md "Known issues".
+# This kernel lacks two iptables extensions that k3s's network policy controller (kube-router) always uses, so its
+# whole iptables-restore failed and no NetworkPolicy was enforced on this node:
+#   NFLOG   (CONFIG_NETFILTER_XT_TARGET_NFLOG, CONFIG_NETFILTER_NETLINK_LOG unset): rules that only log dropped
+#           packets. NFLOG doesn't end a rule's traversal, so dropping them changes no verdict.
+#   physdev (CONFIG_NETFILTER_XT_MATCH_PHYSDEV unset): "-A KUBE-ROUTER-FORWARD -m physdev --physdev-is-bridged ...
+#           -d|-s <pod IP> -j KUBE-POD-FW-..." rules. Each one repeats the rule written just before it without the
+#           physdev match, which also catches bridged packets (br_netfilter, bridge-nf-call-iptables=1).
+# Everything else goes to the real {{ item }} unchanged. Only k3s uses this copy (PATH in
+# /etc/systemd/system/{{ k3s_service }}.service.d/10-nflog-shim.conf); it is read on every call, so a change here
+# needs no k3s restart.
+/usr/bin/sed -e '/ -j NFLOG\( \|$\)/d' -e '/^-A KUBE-ROUTER-FORWARD -m physdev --physdev-is-bridged /d' \
+  | exec /usr/sbin/{{ item }} "$@"
