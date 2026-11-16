@@ -2,13 +2,14 @@
 
 Design and test results: [decision 0007](../decisions/0007-edge-in-cluster.md). Certificates: [web-https.md](web-https.md).
 
-**Status (2026-11-15): built and tested in parallel; clients still use the old door** (edge-dnsmasq + edge-caddy in
-Docker on dgx-1, `~/edge-gateway`). The [cutover](#cutover) is a separate, approved step.
+**Status: cut over (P3.3).** The tailnet (every client) uses the in-cluster door on both Sparks' Tailscale IPs; the
+LAN view is on the VIP. edge-caddy on dgx-1 stays as the relay to nginx-gateway and, with edge-dnsmasq (its sockets
+are still open but no longer reached on dgx-1's Tailscale IP), as the [rollback](#cutover).
 
-| | Old door (live for clients) | New door (k3s) |
+| | Old door (relay + rollback) | New door (k3s, live) |
 |---|---|---|
-| DNS | edge-dnsmasq: `192.168.86.44:53`, `100.65.137.82:53` | `edge/edge-dns` (CoreDNS, 2 replicas): VIP `192.168.86.11:53` (LAN view), Sparks' Tailscale IPs `:53` (tailnet view; only dgx-2's `100.124.175.23` until the cutover) |
-| HTTPS | edge-caddy: `0.0.0.0:80/443` on dgx-1 | `edge/edge-caddy` (Caddy, 2 replicas): VIP `192.168.86.11:80/443`, Tailscale IPs `:80/443` (dgx-2's until the cutover) |
+| DNS | edge-dnsmasq: `192.168.86.44:53` (dgx-1's Tailscale IP is the cluster's since the cutover) | `edge/edge-dns` (CoreDNS, 2 replicas): VIP `192.168.86.11:53` (LAN view), both Sparks' Tailscale IPs `:53` (tailnet view) |
+| HTTPS | edge-caddy: dgx-1's LAN IP `:80/443` (the nginx-gateway relay) | `edge/edge-caddy` (Caddy, 2 replicas): VIP `192.168.86.11:80/443`, both Sparks' Tailscale IPs `:80/443` |
 | Floating IPs | none | kube-vip (`kube-system`, DaemonSet on the Sparks): `192.168.86.10` (k3s API), `192.168.86.11` (edge) |
 | Config | `~/edge-gateway/conf/Caddyfile`, `dnsmasq/dnsmasq.conf` (not in Git) | `cluster/platform/edge/`: `names.txt` (every name), `caddy/Caddyfile`, generated `coredns/*.db`, `web-tls.enc.yaml` |
 | Argo CD apps | | `kube-vip`, `edge`, `kube-state-metrics` (project `platform`) |
@@ -29,7 +30,8 @@ Docker on dgx-1, `~/edge-gateway`). The [cutover](#cutover) is a separate, appro
 
 ## Add or change a route
 
-**Until the cutover, change both doors** (clients still use the old one):
+**Since the cutover, only the in-cluster door** (steps 1–3 and 5). Step 4 (the old door) is needed only for a route
+behind nginx-gateway, or to keep the rollback complete:
 
 1. A new name: add `<name>  edge` (or a host target, see the file's header) to `cluster/platform/edge/names.txt`, then
    `.github/scripts/edge-zone.py generate` (writes the zones; CI runs `check`).
@@ -42,7 +44,7 @@ Docker on dgx-1, `~/edge-gateway`). The [cutover](#cutover) is a separate, appro
    `docker restart edge-caddy edge-dnsmasq`. Check with `edge-zone.py diff-dnsmasq ~/edge-gateway/dnsmasq/dnsmasq.conf`.
 5. `.github/scripts/compare-front-doors.sh` on dgx-1 must say `RESULT: same`.
 
-**After the cutover**: steps 1–3 and 5 only.
+
 
 ## Checks
 
@@ -138,10 +140,12 @@ LAN and tailnet, from the Air; `edge-zone.py diff-dnsmasq ~/edge-gateway/dnsmasq
    - Gatus: the `web` group's front-door checks go to `192.168.86.11` instead of `.44`; one check stays on `.44:80`
      (Host `model.nghodki.ai`) for the edge-caddy relay. vmalert `KubeVipDown` and `EdgeFrontDoorDown` → critical.
    - Docs: this section's status, architecture §4.1, web-https.md.
-4. **Agent, verify:** `dig @100.65.137.82 grafana.nghodki.ai` returns one Tailscale IP (the tailnet view, not
-   dnsmasq's two addresses) and AAAA is NOERROR/empty; `compare-front-doors.sh -n 100.65.137.82 -o 192.168.86.44
-   -v tailnet` from the Air: `RESULT: same` (the old door is still on dgx-1's LAN IP); plain `curl
-   https://grafana.nghodki.ai/api/health` from the Air via MagicDNS; Argo CD's Pocket ID sign-in works; Gatus green.
+4. **Agent, verify:** `.github/scripts/verify-cutover.sh` on dgx-1 and, with `-r`, on the Air (streamed as in
+   "Checks"); both must end `CUTOVER VERIFIED`. It checks that both Tailscale IPs answer from the cluster (one
+   Tailscale IP per answer, AAAA NOERROR/empty, other zones REFUSED, which edge-dnsmasq would forward), every route
+   on dgx-1's Tailscale IP against the old door on its LAN IP, the client's own MagicDNS resolution end to end, and on
+   dgx-1: kube-dns → edge-dns (VIP answers), both Services' externalIPs, the apps, Argo CD's Pocket ID redirect, Gatus.
+   Before the cutover it fails on exactly those dnsmasq checks (tested).
 5. **User:** from a family device, Home Assistant and Open WebUI open; ntfy alerts still arrive.
 6. **Agent, a day later:** a failover drill on the tailnet path (delete the CoreDNS and Caddy pods on one Spark,
    probe from the Air through MagicDNS) and record it in decision 0007.

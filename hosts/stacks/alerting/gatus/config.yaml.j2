@@ -1,5 +1,6 @@
 # Uptime checks (plan P1.7). Failures post to ntfy. Runs on the Dell (stacks/alerting, runbooks/alerting.md), so every
-# check uses a LAN address (192.168.86.x) or the front door, never a container name on a Spark.
+# check uses a LAN address (192.168.86.x) or the front door (the edge VIP 192.168.86.11 since P3.3), never a container
+# name on a Spark.
 metrics: true
 storage: {type: sqlite, path: /data/gatus.db}
 # No `security:` here: Gatus' OIDC panics at start without Pocket ID. The sign-in is oauth2-proxy (status-proxy) in front.
@@ -12,28 +13,28 @@ alerting:
     default-alert: {enabled: true, failure-threshold: 3, success-threshold: 2, send-on-resolved: true}
 x-web: &web {interval: 1m, conditions: ["[STATUS] < 400"], alerts: [{type: ntfy}]}
 endpoints:
-  - {name: model.nghodki.ai (LiteLLM), group: web, url: "http://192.168.86.44/health/liveliness", headers: {Host: model.nghodki.ai}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
-  - {name: webui.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: webui.nghodki.ai}, <<: *web}
-  - {name: dgxmanager.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: dgxmanager.nghodki.ai}, <<: *web}
-  - {name: ha.nghodki.ai, group: web, url: "http://192.168.86.44/", headers: {Host: ha.nghodki.ai}, <<: *web}
+  - {name: model.nghodki.ai (LiteLLM), group: web, url: "http://192.168.86.11/health/liveliness", headers: {Host: model.nghodki.ai}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
+  - {name: webui.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: webui.nghodki.ai}, <<: *web}
+  - {name: dgxmanager.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: dgxmanager.nghodki.ai}, <<: *web}
+  - {name: ha.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: ha.nghodki.ai}, <<: *web}
   # Homepage behind oauth2-proxy (P1.15). Signed out, oauth2-proxy answers 302 to Pocket ID; ignore-redirect checks that 302.
-  - {name: ops.nghodki.ai (Homepage), group: web, url: "https://192.168.86.44/", headers: {Host: ops.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
+  - {name: ops.nghodki.ai (Homepage), group: web, url: "https://192.168.86.11/", headers: {Host: ops.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
   # The alerting stack's own routes through the front door (the phone uses Tailscale HTTPS to the Dell instead).
-  - {name: ntfy.nghodki.ai, group: web, url: "https://192.168.86.44/v1/health", headers: {Host: ntfy.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[BODY].healthy == true"], alerts: [{type: ntfy}]}
-  - {name: status.nghodki.ai, group: web, url: "https://192.168.86.44/health", headers: {Host: status.nghodki.ai}, client: {insecure: true}, <<: *web}
+  - {name: ntfy.nghodki.ai, group: web, url: "https://192.168.86.11/v1/health", headers: {Host: ntfy.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[BODY].healthy == true"], alerts: [{type: ntfy}]}
+  - {name: status.nghodki.ai, group: web, url: "https://192.168.86.11/health", headers: {Host: status.nghodki.ai}, client: {insecure: true}, <<: *web}
   - {name: Home Assistant (direct), group: home, url: "http://192.168.86.211:8123/", <<: *web}
   # dgx-2's observe stack, watched from outside. VictoriaMetrics and Alertmanager aren't on the LAN, so they're checked
   # by a heartbeat: vmalert's always-firing Watchdog -> Alertmanager -> this external endpoint every 5 min. Silence for
   # 15 min means VictoriaMetrics, vmalert or Alertmanager (or dgx-2) is down.
   - {name: Phoenix, group: observe, url: "http://192.168.86.36:6006/healthz", <<: *web}
   - {name: Grafana, group: observe, url: "http://192.168.86.36:3000/api/health", interval: 1m, conditions: ["[STATUS] == 200", "[BODY].database == ok"], alerts: [{type: ntfy}]}
-  - {name: grafana.nghodki.ai, group: observe, url: "https://192.168.86.44/api/health", headers: {Host: grafana.nghodki.ai}, client: {insecure: true}, <<: *web}
+  - {name: grafana.nghodki.ai, group: observe, url: "https://192.168.86.11/api/health", headers: {Host: grafana.nghodki.ai}, client: {insecure: true}, <<: *web}
   # Temporal in the jobs stack (plan P4.7, runbooks/temporal.md). The UI check goes through the front door; TLS isn't verified (no homelab CA in Gatus).
   - {name: Temporal frontend (gRPC), group: jobs, url: "tcp://192.168.86.36:7233", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
-  - {name: temporal.nghodki.ai, group: jobs, url: "https://192.168.86.44/healthz", headers: {Host: temporal.nghodki.ai}, client: {insecure: true}, <<: *web}
+  - {name: temporal.nghodki.ai, group: jobs, url: "https://192.168.86.11/healthz", headers: {Host: temporal.nghodki.ai}, client: {insecure: true}, <<: *web}
   # MLflow in the ml stack (plan P6.5, runbooks/mlflow.md). Signed out, oauth2-proxy answers 302 to Pocket ID; the job API's
   # /health is the one path without basic auth.
-  - {name: mlflow.nghodki.ai, group: ml, url: "https://192.168.86.44/", headers: {Host: mlflow.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
+  - {name: mlflow.nghodki.ai, group: ml, url: "https://192.168.86.11/", headers: {Host: mlflow.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
   - {name: MLflow job API, group: ml, url: "http://192.168.86.36:5000/health", interval: 1m, conditions: ["[STATUS] == 200", "[BODY] == OK"], alerts: [{type: ntfy}]}
   - {name: NATS (TLS), group: bus, url: "tcp://192.168.86.44:4222", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: NATS MQTT (picoclaw), group: bus, url: "tcp://192.168.86.44:8883", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
@@ -41,7 +42,7 @@ endpoints:
   # 401 without a token means the proxy, the gateway and Fleet are all up. The homelab CA isn't in Gatus' image, so TLS isn't verified here.
   - {name: Fleet API, group: defenseclaw, url: "https://192.168.86.44:8971/api/v1/fleet/health", headers: {Host: fleet.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401", "[CERTIFICATE_EXPIRATION] > 336h"], alerts: [{type: ntfy}]}
   # The wildcard cert from the homelab web CA (runbooks/web-https.md). Gatus doesn't have that CA, so TLS isn't verified here.
-  - {name: "*.nghodki.ai certificate", group: web, url: "https://192.168.86.44/", headers: {Host: webui.nghodki.ai}, client: {insecure: true}, interval: 1h, conditions: ["[STATUS] < 400", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
+  - {name: "*.nghodki.ai certificate", group: web, url: "https://192.168.86.11/", headers: {Host: webui.nghodki.ai}, client: {insecure: true}, interval: 1h, conditions: ["[STATUS] < 400", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
   - {name: dgx-1 ssh, group: hosts, url: "tcp://192.168.86.44:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: dgx-2 ssh, group: hosts, url: "tcp://192.168.86.36:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: jetson ssh, group: hosts, url: "tcp://192.168.86.211:22", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
@@ -62,9 +63,11 @@ endpoints:
   # NAT'd UDP with a bad outer VXLAN checksum; runbooks/edge.md "Known issues"). So these check that CoreDNS answers on
   # :53; the answers themselves are checked by .github/scripts/compare-front-doors.sh.
   - {name: edge DNS (VIP), group: edge, url: "tcp://192.168.86.11:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
-  - {name: edge DNS tailnet view, group: edge, url: "tcp://100.124.175.23:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: edge DNS tailnet view (dgx-1), group: edge, url: "tcp://100.65.137.82:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: edge DNS tailnet view (dgx-2), group: edge, url: "tcp://100.124.175.23:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: edge Caddy (VIP), group: edge, url: "https://192.168.86.11/", headers: {Host: ca.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
-  - {name: grafana.nghodki.ai (VIP), group: edge, url: "https://192.168.86.11/api/health", headers: {Host: grafana.nghodki.ai}, client: {insecure: true}, <<: *web}
+  # edge-caddy on dgx-1 stays as the relay to nginx-gateway (model, dgxmanager, ha) until those move into the cluster.
+  - {name: edge-caddy relay (dgx-1), group: edge, url: "http://192.168.86.44/health/liveliness", headers: {Host: model.nghodki.ai}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
   - {name: API (VIP), group: edge, url: "https://192.168.86.10:6443/readyz", client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401"], alerts: [{type: ntfy}]}
 external-endpoints:
   # Key observe_alert-pipeline-heartbeat (Alertmanager posts to /api/v1/endpoints/<key>/external?success=true).

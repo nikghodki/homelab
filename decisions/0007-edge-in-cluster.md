@@ -1,7 +1,7 @@
 # 0007: The front door in k3s: kube-vip ARP on Wi-Fi, CoreDNS + Caddy in `edge`, the tailnet via the Sparks' Tailscale IPs
 
 - Date: 2026-11-15
-- Status: decided (nikghodki); built and tested in parallel, **cutover pending approval** ([runbooks/edge.md](../runbooks/edge.md#cutover))
+- Status: decided (nikghodki); built and tested in parallel; cutover approved and applied in the P3.3 cutover PR ([runbooks/edge.md](../runbooks/edge.md#cutover))
 
 ## Context
 

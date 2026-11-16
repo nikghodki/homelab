@@ -16,11 +16,12 @@
 # NXDOMAIN). Exit 1 on any difference. Runs with bash 3 (macOS) and needs curl, and dig or python3. On a host
 # without the repo, copy names.txt, the coredns/*.db zones and web-ca.crt into one directory and pass it as -r.
 set -u
-NEW=192.168.86.11 OLD=192.168.86.44 VIEW=lan DNS="" CA="" REPO=""
-while getopts "n:o:v:d:c:r:" f; do
+NEW=192.168.86.11 OLD=192.168.86.44 VIEW=lan DNS="" CA="" REPO="" QUERY=0
+while getopts "n:o:v:d:c:r:Q" f; do
   case $f in n) NEW=$OPTARG ;; o) OLD=$OPTARG ;; v) VIEW=$OPTARG ;; d) DNS=$OPTARG ;; c) CA=$OPTARG ;; r) REPO=$OPTARG ;;
-    *) sed -n '2,16p' "$0"; exit 2 ;; esac
+    Q) QUERY=1 ;; *) sed -n '2,16p' "$0"; exit 2 ;; esac
 done
+shift $((OPTIND - 1))
 [ -n "$REPO" ] || REPO=$(cd "$(dirname "$0")/../.." && pwd)
 [ -n "$DNS" ] || DNS=$NEW
 zdir=$REPO/cluster/platform/edge/coredns names=$REPO/cluster/platform/edge/names.txt
@@ -28,7 +29,7 @@ zdir=$REPO/cluster/platform/edge/coredns names=$REPO/cluster/platform/edge/names
 [ -n "$CA" ] || CA=$REPO/hosts/files/pki/web-ca.crt
 [ -f "$CA" ] || CA=$REPO/web-ca.crt
 case $VIEW in lan) zones=$zdir/lan.db ;; tailnet) zones=$(ls "$zdir"/tailnet-*.db 2>/dev/null) ;; *) echo "bad view" >&2; exit 2 ;; esac
-for f in "$names" $zones "$CA"; do [ -f "$f" ] || { echo "missing $f" >&2; exit 2; }; done
+[ "$QUERY" = 1 ] || for f in "$names" $zones "$CA"; do [ -f "$f" ] || { echo "missing $f" >&2; exit 2; }; done
 fail=0
 
 # probe SCHEME HOST IP -> "CODE [redirect target without query]" (OAuth state and PKCE values change every time)
@@ -83,6 +84,9 @@ print(rcode, an, *ips)
 PYDNS
   fi
 }
+
+# `compare-front-doors.sh -Q SERVER TYPE NAME`: print one query's result and exit (used by verify-cutover.sh).
+if [ "$QUERY" = 1 ]; then q "$@"; exit 0; fi
 
 echo "## HTTP(S): old $OLD vs new $NEW"
 printf '%-28s %-6s %-36s %-36s %s\n' name scheme old new same

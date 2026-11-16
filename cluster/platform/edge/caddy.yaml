@@ -109,14 +109,15 @@ spec:
     - {name: http, port: 80, targetPort: http, protocol: TCP}
     - {name: https, port: 443, targetPort: https, protocol: TCP}
 ---
-# Tailnet: the Sparks' Tailscale IPs. Only dgx-2's until the cutover (dgx-1's :80/:443 are edge-caddy's).
+# Tailnet: both Sparks' Tailscale IPs (dgx-1's since the P3.3 cutover, taking it over from edge-caddy, which keeps
+# serving dgx-1's LAN IP as the nginx-gateway relay and for the rollback).
 apiVersion: v1
 kind: Service
 metadata:
   name: edge-caddy-tailnet
 spec:
   type: ClusterIP
-  externalIPs: [100.124.175.23]
+  externalIPs: [100.65.137.82, 100.124.175.23]
   selector: {app.kubernetes.io/name: edge-caddy}
   ports:
     - {name: http, port: 80, targetPort: http, protocol: TCP}

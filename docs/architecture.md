@@ -150,8 +150,8 @@ Not moved: DGXMM and its engines (§3.2). Coolify stays a host app.
 - Every device is reached by **Tailscale MagicDNS** name.
 - `*.nghodki.ai` resolves, on the LAN, to the **kube-vip floating IP** `192.168.86.11`, which lives on whichever
   Spark is up; on the tailnet, to the Tailscale IP of a Spark that is up (Tailscale split DNS lists both Sparks;
-  each CoreDNS replica answers with its own Spark). Decision 0007, runbooks/edge.md. Until the P3.3 cutover,
-  `edge-dnsmasq` on dgx-1 resolves the names to dgx-1 (.44 and its Tailscale IP).
+  each CoreDNS replica answers with its own Spark). Decision 0007, runbooks/edge.md. edge-caddy on dgx-1
+  remains only as the relay to nginx-gateway (and the rollback).
 
 | Name | Service |
 |---|---|

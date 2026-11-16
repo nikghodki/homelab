@@ -97,16 +97,16 @@ spec:
     - {name: dns, port: 53, targetPort: dns-lan, protocol: UDP}
     - {name: dns-tcp, port: 53, targetPort: dns-lan-tcp, protocol: TCP}
 ---
-# Tailnet: the Sparks' Tailscale IPs, port 53 (kube-proxy DNATs them on the node the packet arrives at). Until the
-# cutover only dgx-2's: dgx-1's 100.65.137.82:53 belongs to edge-dnsmasq, which the tailnet uses today, and a
-# kube-proxy DNAT would take it over (decision 0007).
+# Tailnet: both Sparks' Tailscale IPs, port 53 (kube-proxy DNATs them on the node the packet arrives at). dgx-1's
+# 100.65.137.82 joined at the P3.3 cutover: the DNAT takes it over from edge-dnsmasq, whose socket stays open for the
+# rollback (decision 0007, runbooks/edge.md "Rollback").
 apiVersion: v1
 kind: Service
 metadata:
   name: edge-dns-tailnet
 spec:
   type: ClusterIP
-  externalIPs: [100.124.175.23]
+  externalIPs: [100.65.137.82, 100.124.175.23]
   selector: {app.kubernetes.io/name: edge-dns}
   ports:
     - {name: dns, port: 53, targetPort: dns-ts, protocol: UDP}
