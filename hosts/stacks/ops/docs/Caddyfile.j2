@@ -1,0 +1,57 @@
+# Static docs server (stacks/ops service `docs`, runbooks/docs-site.md). Rendered 0600 for uid 65534 (the container
+# user): it holds the edge origin token. The site is /srv/docs/current (a symlink that docs-build swaps atomically).
+#   :8080  the stack network only (Homepage's siteMonitor); no published port
+#   :4181  published on 192.168.86.49 for the front door, which signs people in (edge-auth, decision 0011) and adds
+#          X-Edge-Origin; without that header only /healthz answers
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+(files) {
+	root * /srv/docs/current
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Frame-Options DENY
+		# Everything the site loads is its own (system fonts, local Mermaid and search); Material uses inline scripts.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+	file_server
+}
+
+(not_found) {
+	handle_errors 404 {
+		root * /srv/docs/current
+		rewrite * /404.html
+		file_server
+	}
+}
+
+:8080 {
+	# Homepage's siteMonitor; no file access
+	handle /healthz {
+		respond "ok" 200
+	}
+	handle {
+		import files
+	}
+	import not_found
+}
+
+:4181 {
+	@door header X-Edge-Origin "{{ edge_origin_token }}"
+	handle /healthz {
+		respond "ok" 200
+	}
+	handle @door {
+		request_header -X-Edge-Origin
+		import files
+	}
+	handle {
+		respond "Use https://docs.nghodki.ai" 403
+	}
+	import not_found
+}

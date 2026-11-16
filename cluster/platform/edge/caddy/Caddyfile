@@ -53,6 +53,43 @@
 	}
 }
 
+# Sign-in for apps without their own login (decision 0011, runbooks/sign-in.md): one oauth2-proxy, edge-auth, for
+# every name. `import signed_in <backend> <group>` is the whole route: http -> https, the session check (edge-auth's
+# /oauth2/auth?allowed_groups=<group>), then the backend with the edge origin token (the backends refuse requests
+# without it) and without the session cookie. Signed out, edge-auth's /oauth2/start answers here: a CSRF cookie and a
+# 302 to Pocket ID; after the passkey the browser comes back through https://auth.nghodki.ai/oauth2/callback to the
+# URL it asked for. The cookie is for .nghodki.ai, so one sign-in covers every signed-in route.
+(signed_in) {
+	@plain protocol http
+	redir @plain https://{host}{uri} 308
+	reverse_proxy edge-auth.edge.svc.cluster.local:4180 {
+		# forward auth, written out (forward_auth can't pass the refreshed session cookie back to the browser)
+		method GET
+		rewrite /oauth2/auth?allowed_groups={args[1]}
+		header_up X-Forwarded-Method {method}
+		header_up X-Forwarded-Uri {uri}
+		@ok status 2xx
+		handle_response @ok {
+			copy_response_headers {
+				include Set-Cookie
+			}
+		}
+		@signin status 401
+		handle_response @signin {
+			reverse_proxy edge-auth.edge.svc.cluster.local:4180 {
+				method GET
+				rewrite /oauth2/start?
+				header_up X-Forwarded-Uri {http.request.orig_uri}
+			}
+		}
+		# anything else (403: signed in, not in the group; 5xx: edge-auth down) goes back to the browser as it is
+	}
+	reverse_proxy {args[0]} {
+		header_up X-Edge-Origin {env.EDGE_ORIGIN_TOKEN}
+		header_up Cookie "_edge_auth[^;]*(;\s*)?" ""
+	}
+}
+
 (nghodki_routes) {
 	# Pocket ID (dgx-2, console stack). Passkeys need HTTPS, so http is redirected.
 	@id host id.nghodki.ai
@@ -70,13 +107,24 @@
 		reverse_proxy 192.168.86.49:4180
 	}
 
-	# Private docs site (Dell ops stack, runbooks/docs-site.md) behind oauth2-proxy-docs + Pocket ID (client docs).
-	# Session cookies are Secure, so http is redirected.
-	@docs host docs.nghodki.ai
-	handle @docs {
+	# Sign-in (decision 0011): edge-auth's callback, sign-out (/oauth2/sign_out) and probe. Anything else goes to Homepage.
+	@auth host auth.nghodki.ai
+	handle @auth {
 		@plain protocol http
 		redir @plain https://{host}{uri} 308
-		reverse_proxy 192.168.86.49:4181
+		@proxy path /oauth2/* /ping
+		handle @proxy {
+			reverse_proxy edge-auth.edge.svc.cluster.local:4180
+		}
+		handle {
+			redir https://ops.nghodki.ai/ 302
+		}
+	}
+
+	# Private docs site (Dell ops stack, runbooks/docs-site.md): the docs Caddy's gate on :4181.
+	@docs host docs.nghodki.ai
+	handle @docs {
+		import signed_in 192.168.86.49:4181 admins
 	}
 
 	@ca host ca.nghodki.ai

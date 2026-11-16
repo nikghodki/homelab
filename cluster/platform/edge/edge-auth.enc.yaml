@@ -1,0 +1,28 @@
+# edge-auth (decision 0011): the Pocket ID client secret (a copy of oidc_edge-auth_secret in secrets/console.enc.yaml),
+# the session cookie secret (only here; rotating it signs everyone out) and the edge origin token (a copy of
+# edge_origin_token, which the backends check). SOPS encrypts stringData only. Rotate: runbooks/sign-in.md.
+apiVersion: v1
+kind: Secret
+metadata:
+    name: edge-auth
+    namespace: edge
+type: Opaque
+stringData:
+    client-secret: ENC[AES256_GCM,data:SCGNq3zKJ1vz/iWlKliveibs7rxYc00GqoJ2WD6GpLI=,iv:FMoyFW1jIBUI98k/E2b7Pa6ZsM2yz4KicSlpE6Au/Vg=,tag:AYEU5Ha7JHOgjvPfDamlDw==,type:str]
+    cookie-secret: ENC[AES256_GCM,data:dLid4mdxGGIGL0/3HrcWSC/7Uz4eusF8fU/XwCbjQD3G65j1fleAyNm6p+I=,iv:IjTQVFZQuKBM/24HytG9gNuNP95tCUbvAytRuiJL3JQ=,tag:JglGUXtK6/VwEVHi3yy9+g==,type:str]
+    origin-token: ENC[AES256_GCM,data:KIJEf+Fh7nnkV/3YRTUSlOWNkM3t0e8aaHuviqZV3azTFS1hoz1dj0gMXw==,iv:v/N4rhXrMZXp0xEQJEJm7/qJ15sT6qyVyFZQmIGpUeU=,tag:Y1HAMciZltYne+Hsg9EcNw==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFZDJDUURKWWxIcUZOTUE3
+            cDNQWk1VTU5LRjdVc21tUGUwVE1Jck03REdzClJRdkdYU1cyZkJ2dlZ5bmM2ay9R
+            RE80RUdYeDdndDlKQzZRMisrV1JwM2sKLS0tIFpEamFlRC9WQU0vcGsrTmJ2Zlhj
+            OHNMVDJ2OGI1clpDSHhFQStkN1hHM2sKXaGXBuGtzo+mPCcyz8rJ+EUahsWtzUcE
+            RAMUZxjn3/izhDpKNgnB9G/i5yOhH36ly7RUS0FSRHyfWTBjQKLavA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T03:51:34Z"
+    mac: ENC[AES256_GCM,data:W2NRPTR/N5U2Vn8JGMjh8UB+xm7RoYFIyYKJYQ//gQrSqaox0Z+081V7VY3+h9FzQeESEzvmYv4daa28TOL0FT7GHPx9zCWakvEkpLnptxz+uOG47nWMOax+uQkCX9C1MEEbeMOHEceldTLK8bFUN2iScZCHgo2nFDcAu9EnogQ=,iv:JU6itJGULxhIcEwrFQ9aJfyJdLfc7i6X2isQRzgGsUc=,tag:WRIc3iuHZAVSFAtd2mFg1Q==,type:str]
+    version: 3.13.3

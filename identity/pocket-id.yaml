@@ -45,8 +45,15 @@ clients:
     callbackURLs: [https://argocd.nghodki.ai/auth/callback]
     launchURL: https://argocd.nghodki.ai
     groups: [admins]      # Argo CD RBAC also maps admins -> role:admin; PKCE S256 (enablePKCEAuthentication)
-  - id: docs
-    name: Docs
-    callbackURLs: [https://docs.nghodki.ai/oauth2/callback]
-    launchURL: https://docs.nghodki.ai
-    groups: [admins]      # oauth2-proxy (oauth2-proxy-docs on the Dell) also checks allowed_groups = admins; PKCE S256
+  # The one sign-in proxy (decision 0011): edge-auth in k3s, called by the front door for every app without its own
+  # login. One callback for all of them; each Caddy route also checks its group (allowed_groups). PKCE S256.
+  - id: edge-auth
+    name: Sign-in (front door)
+    callbackURLs: [https://auth.nghodki.ai/oauth2/callback]
+    launchURL: https://ops.nghodki.ai
+    groups: [admins]
+
+# Deleted from Pocket ID (and their oidc_<id>_secret from SOPS) by the sync: the per-app oauth2-proxy clients that
+# edge-auth replaced.
+removedClients:
+  - docs

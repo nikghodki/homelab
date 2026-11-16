@@ -2,8 +2,9 @@
 # playbooks/ops.yml to /opt/homelab/ops. Homepage at https://ops.nghodki.ai: only oauth2-proxy is on the LAN; it signs
 # people in through Pocket ID (client `ops`, admins only; id.nghodki.ai stays on dgx-2) and forwards to homepage on the
 # stack network.
-# Docs at https://docs.nghodki.ai (runbooks/docs-site.md): oauth2-proxy-docs (client `docs`) in front of a static Caddy
-# that serves /srv/docs/current, which the docs-build timer (role docs_site) swaps atomically.
+# Docs at https://docs.nghodki.ai (runbooks/docs-site.md): a static Caddy that serves /srv/docs/current, which the
+# docs-build timer (role docs_site) swaps atomically. Signed in by the front door (edge-auth, decision 0011); the docs
+# Caddy answers on the LAN only to requests that carry the front door's X-Edge-Origin token.
 name: ops
 
 services:
@@ -51,8 +52,9 @@ services:
       - "192.168.86.49:4180:4180"   # LAN only: dgx-1's Caddy is the only client (ops.nghodki.ai)
     depends_on: [homepage]
 
-  # The docs site (runbooks/docs-site.md). Static files only, read-only; reachable only from oauth2-proxy-docs and
-  # Homepage on the stack network. /srv/docs/current is a relative symlink to releases/<tree>, swapped by the build.
+  # The docs site (runbooks/docs-site.md). Static files only, read-only. :8080 for Homepage on the stack network;
+  # :4181 on the LAN for the front door (X-Edge-Origin required). /srv/docs/current is a relative symlink to
+  # releases/<tree>, swapped by the build.
   docs:
     image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     restart: unless-stopped
@@ -67,18 +69,6 @@ services:
     volumes:
       - ./docs/Caddyfile:/etc/caddy/Caddyfile:ro
       - /srv/docs:/srv/docs:ro
-    # no ports: only oauth2-proxy-docs (and Homepage's siteMonitor) reach it, on the stack network
     expose: ["8080"]
-
-  # A second oauth2-proxy: one instance signs in with one OIDC client, and the docs have their own (`docs`).
-  oauth2-proxy-docs:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
-    restart: unless-stopped
-    command: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
-    volumes:
-      - ./oauth2-proxy-docs/oauth2-proxy.cfg:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
-      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
     ports:
-      - "192.168.86.49:4181:4180"   # LAN only: dgx-1's Caddy is the only client (docs.nghodki.ai)
-    depends_on: [docs]
+      - "192.168.86.49:4181:4181"   # LAN only: the front door (docs.nghodki.ai); refuses requests without its token

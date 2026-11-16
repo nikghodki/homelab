@@ -45,6 +45,8 @@ class FakeAPI:
             self.client_groups[path.split("/")[3]] = body["userGroupIds"]; return {}
         if method == "PUT" and path.startswith("/oidc/clients/"):
             self.clients[path.split("/")[3]].update(body); return {}
+        if method == "DELETE" and path.startswith("/oidc/clients/"):
+            del self.clients[path.split("/")[3]]; return {}
         if method == "POST" and path.endswith("/secrets"):
             return {"secret": "s3cret-" + path.split("/")[3]}
         raise AssertionError(f"unexpected {method} {path}")
@@ -55,6 +57,7 @@ def stored(monkeypatch):
     store = {}
     monkeypatch.setattr(sync_mod, "sops_get", lambda k: store.get(k))
     monkeypatch.setattr(sync_mod, "sops_set", lambda k, v: store.__setitem__(k, v))
+    monkeypatch.setattr(sync_mod, "sops_unset", lambda k: store.pop(k))
     return store
 
 
@@ -113,3 +116,30 @@ def test_sops_set_keeps_the_secret_off_the_command_line(monkeypatch):
     (cmd, kw), = calls
     assert not any("s3cret-value" in part for part in cmd)
     assert "--value-stdin" in cmd and kw["input"] == '"s3cret-value"' and kw["check"] is True
+
+
+def test_removed_client_is_deleted_with_its_secret(stored):
+    api = FakeAPI()
+    spec = yaml.safe_load(yaml.safe_dump(REAL_SPEC))
+    spec["removedClients"] = []
+    spec["clients"].append({"id": "old", "name": "Old", "callbackURLs": ["https://old.nghodki.ai/cb"], "groups": ["admins"]})
+    sync_mod.sync(api, spec, log=lambda *_: None)
+    assert "old" in api.clients and "oidc_old_secret" in stored
+    spec["clients"].pop()
+    spec["removedClients"] = ["old"]
+    sync_mod.sync(api, spec, log=lambda *_: None)
+    assert "old" not in api.clients and "oidc_old_secret" not in stored
+    api.writes.clear()
+    sync_mod.sync(api, spec, log=lambda *_: None)   # already gone: nothing to delete
+    assert not any(m == "DELETE" for m, _ in api.writes)
+
+
+def test_a_client_cannot_be_both_listed_and_removed(stored):
+    spec = yaml.safe_load(yaml.safe_dump(REAL_SPEC))
+    spec["removedClients"] = [spec["clients"][0]["id"]]
+    with pytest.raises(ValueError):
+        sync_mod.sync(FakeAPI(), spec, log=lambda *_: None)
+
+
+def test_removed_clients_are_not_listed():
+    assert not set(REAL_SPEC.get("removedClients", [])) & {c["id"] for c in REAL_SPEC["clients"]}

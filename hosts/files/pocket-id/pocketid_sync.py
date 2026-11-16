@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Make Pocket ID match identity/pocket-id.yaml (groups, users, OIDC clients).
 
-Idempotent. New client secrets go straight into SOPS (never printed). With
+Idempotent. New client secrets go straight into SOPS (never printed). Clients listed under removedClients are
+deleted from Pocket ID and their oidc_<id>_secret is dropped from SOPS. With
 --login-link USER it prints a one-time sign-in link so USER can add a passkey.
 
 Usage: pocketid_sync.py [--dry-run] [--login-link USER]
@@ -28,6 +29,10 @@ def sops_get(key):
     out = subprocess.run(["sops", "-d", "--extract", f'["{key}"]', str(SECRETS)],
                          capture_output=True, text=True)
     return out.stdout.strip() if out.returncode == 0 else None
+
+
+def sops_unset(key):
+    subprocess.run(["sops", "unset", str(SECRETS), f'["{key}"]'], capture_output=True, text=True, check=True)
 
 
 def sops_set(key, value):
@@ -83,6 +88,18 @@ def sync(api, spec, log=print):
             log(f"user {u['username']}: groups set")
 
     clients = {c["id"]: c for c in api.all("/oidc/clients")}
+    removed = spec.get("removedClients", [])
+    both = set(removed) & {c["id"] for c in spec.get("clients", [])}
+    if both:
+        raise ValueError(f"clients both listed and removed: {sorted(both)}")
+    for cid in removed:
+        if cid in clients:
+            api.send("DELETE", f"/oidc/clients/{cid}")
+            log(f"client {cid}: deleted")
+        key = f"oidc_{cid}_secret"
+        if not api.dry_run and sops_get(key) is not None:
+            sops_unset(key)
+            log(f"client {cid}: {key} removed from SOPS")
     for c in spec.get("clients", []):
         body = {"id": c["id"], "name": c["name"], "callbackURLs": c["callbackURLs"],
                 "logoutCallbackURLs": c.get("logoutCallbackURLs", []), "launchURL": c.get("launchURL"),
