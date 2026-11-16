@@ -157,8 +157,11 @@ spec:
       ports:
         - {port: 53, protocol: UDP}
         - {port: 53, protocol: TCP}
+    # LiteLLM: Docker DNATs dgx-1's :4000 to the container (network `gateway`, 172.23.0.0/16) before the policy sees
+    # the packet, so the rule needs the container side too (the pod is on dgx-1).
     - to:
         - ipBlock: {cidr: 10.100.136.1/32}
+        - ipBlock: {cidr: 172.23.0.0/16}
       ports:
         - {port: 4000, protocol: TCP}
     - to:
