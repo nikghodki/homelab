@@ -1,0 +1,20 @@
+#!/bin/sh
+# Managed by homelab Ansible (role safety_governor). Hermes' motion path, mock sink only, in ROS domain 73 with a
+# throw-away governor and bridge: the Jetson's patched MCP copy (built here from the same original and patch) ->
+# fake MQTT broker -> PicoClaw stand-in -> picoclaw's real MCP server (as {{ safety_governor_mcp_user }}) -> test
+# bridge -> test governor -> mock sink; fake cars on 127.0.0.1 record every HTTP request. runbooks/robot-safety.md.
+set -a
+. "{{ safety_governor_zenoh_env }}"
+set +a
+export ROS_DOMAIN_ID=73
+export MOTION_IT_MCP_USER="{{ safety_governor_mcp_user }}"
+export MOTION_IT_MCP_NODE="{{ safety_governor_mcp_node }}"
+export MOTION_IT_MCP_SERVER="{{ safety_governor_mcp_server }}"
+export HERMES_IT_SRC_DIR="{{ safety_governor_hermes_mcp_src_dir }}"
+export HERMES_IT_NODE="{{ safety_governor_hermes_mcp_node }}"
+export HERMES_IT_PATCH="{{ safety_governor_code_dir }}/integration/picoclaw-hardware-mcp.hermes.patch"
+export HERMES_IT_ORIGINAL_SHA256="{{ safety_governor_hermes_mcp_defaults.hermes_robot_mcp_original_sha256 }}"
+export HERMES_IT_PATCHED_SHA256="{{ safety_governor_hermes_mcp_defaults.hermes_robot_mcp_patched_sha256 }}"
+export PYTHONPATH="{{ safety_governor_code_dir }}"
+exec "{{ safety_governor_micromamba }}" run -p "{{ safety_governor_env }}" \
+  python "{{ safety_governor_code_dir }}/integration/hermes_motion_integration.py"

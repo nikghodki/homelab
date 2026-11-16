@@ -1,0 +1,77 @@
+---
+# Hermes' picoclaw-hardware MCP copy: motion goes to PicoClaw (and its safety governor), never to the car.
+# The file stays the user's (nikjetson); these tasks run as that user, without become.
+- name: Accounts (for the Hermes restart)
+  ansible.builtin.getent:
+    database: passwd
+
+- name: Hermes' MCP server file
+  become: false
+  ansible.builtin.stat:
+    path: "{{ hermes_robot_mcp_file }}"
+    checksum_algorithm: sha256
+  register: hermes_robot_mcp_stat
+
+- name: It is the reviewed original or the patched file (anything else needs a new review and export)
+  ansible.builtin.assert:
+    that:
+      - hermes_robot_mcp_stat.stat.exists
+      - hermes_robot_mcp_stat.stat.checksum in [hermes_robot_mcp_original_sha256, hermes_robot_mcp_patched_sha256]
+    fail_msg: >-
+      {{ hermes_robot_mcp_file }} is missing or an unknown version
+      (sha256 {{ hermes_robot_mcp_stat.stat.checksum | default('none') }}). Review it, re-export tools/picoclaw_only,
+      rebase the patch and update the hashes in roles/hermes_robot_mcp/defaults.
+    quiet: true
+
+- name: Keep the original once (picoclaw-hardware-mcp.js.pre-governor, as on the Pi)
+  become: false
+  ansible.builtin.copy:
+    src: "{{ hermes_robot_mcp_file }}"
+    dest: "{{ hermes_robot_mcp_file }}.pre-governor"
+    remote_src: true
+    force: false
+    mode: "0644"
+  when: hermes_robot_mcp_stat.stat.checksum == hermes_robot_mcp_original_sha256
+
+- name: Motion tools ask PicoClaw, not the car (patch)
+  become: false
+  ansible.posix.patch:
+    src: picoclaw-hardware-mcp.hermes.patch
+    dest: "{{ hermes_robot_mcp_file }}"
+  notify: Restart Hermes
+
+- name: File mode
+  become: false
+  ansible.builtin.file:
+    path: "{{ hermes_robot_mcp_file }}"
+    mode: "0644"
+  when: not ansible_check_mode
+
+- name: Read-only access for the Hermes accounts that run it
+  become: false
+  ansible.posix.acl:
+    path: "{{ hermes_robot_mcp_file }}"
+    entity: "{{ item }}"
+    etype: user
+    permissions: r
+    state: present
+  loop: "{{ hermes_robot_mcp_readers }}"
+  when: not ansible_check_mode
+
+- name: No direct motion calls are left (car /drive, /turn, /velocity; Nav2; follow-me)
+  become: false
+  ansible.builtin.command:
+    argv: [grep, -nE, "{{ hermes_robot_mcp_forbidden }}", "{{ hermes_robot_mcp_file }}"]
+  register: hermes_robot_mcp_direct_motion
+  changed_when: false
+  failed_when: hermes_robot_mcp_direct_motion.rc != 1
+  when: not ansible_check_mode
+
+- name: Patched file is the one the Pi's integration test runs
+  become: false
+  ansible.builtin.stat:
+    path: "{{ hermes_robot_mcp_file }}"
+    checksum_algorithm: sha256
+  register: hermes_robot_mcp_after
+  failed_when: hermes_robot_mcp_after.stat.checksum != hermes_robot_mcp_patched_sha256
+  when: not ansible_check_mode

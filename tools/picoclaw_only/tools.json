@@ -33,7 +33,7 @@
     {
       "name": "stop",
       "title": "Stop",
-      "description": "Emergency stop — halt all motion immediately.",
+      "description": "Emergency stop — halt all motion immediately. Latches the robot's safety governor e-stop over NATS (a person must run safety-reset before the robot can move again) and also sends the car its own stop.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
@@ -67,7 +67,7 @@
     {
       "name": "drive",
       "title": "Drive",
-      "description": "Move in a direction. Forward motion gets firmware obstacle avoidance + edge protection when avoid=true (default).",
+      "description": "Move in a direction for a while. Sent to the PicoClaw agent on the Pi, which drives through the robot's safety governor (speed caps, LiDAR obstacle stop, e-stop). A refused or blocked move is an error. Strafing is not supported.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -92,11 +92,11 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000,
-            "description": "Move this long then stop; omit for open-ended (deadman stops it)."
+            "description": "Move this long then stop (default 1000)."
           },
           "avoid": {
             "type": "boolean",
-            "description": "Obstacle/edge avoidance for forward motion (default true)."
+            "description": "Ignored: the safety governor's LiDAR obstacle stop is always on."
           }
         },
         "required": [
@@ -112,7 +112,7 @@
     {
       "name": "turn",
       "title": "Turn",
-      "description": "Rotate in place by degrees (open-loop, approximate).",
+      "description": "Rotate in place by degrees (open-loop, approximate). Sent to the PicoClaw agent on the Pi, which turns through the robot's safety governor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -169,7 +169,7 @@
     {
       "name": "map_room",
       "title": "Map the room",
-      "description": "Rotate in place and ultrasonic-sweep to build a coarse 360° distance map, flagging open directions. Approximate.",
+      "description": "Rotate in place and ultrasonic-sweep to build a coarse 360° distance map, flagging open directions. Approximate. Run by the PicoClaw agent on the Pi, through the robot's safety governor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -190,7 +190,7 @@
     {
       "name": "go_to_room",
       "title": "Go to a room",
-      "description": "Best-effort navigation toward and through the largest opening (doorway). Time-boxed. No metric/named-room navigation.",
+      "description": "Best-effort navigation toward and through the largest opening (doorway). Time-boxed. No metric/named-room navigation. Run by the PicoClaw agent on the Pi, through the robot's safety governor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -217,7 +217,7 @@
     {
       "name": "explore",
       "title": "Explore",
-      "description": "Roam autonomously for a while using firmware obstacle/edge avoidance. Time-boxed.",
+      "description": "Roam autonomously for a while. Time-boxed. Run by the PicoClaw agent on the Pi, through the robot's safety governor (LiDAR obstacle stop, speed caps).",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -244,7 +244,7 @@
     {
       "name": "follow_nearest",
       "title": "Follow the nearest thing",
-      "description": "Track the NEAREST object by ultrasonic: center it, hold a target distance. Runs a few correction cycles then returns.",
+      "description": "Track the NEAREST object by ultrasonic: center it, hold a target distance. Runs a few correction cycles then returns. Run by the PicoClaw agent on the Pi, through the robot's safety governor.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -277,7 +277,7 @@
     {
       "name": "navigate_to",
       "title": "Navigate to a pose",
-      "description": "Drive to a map-frame (x, y, yaw) goal via Nav2's NavigateToPose action. Requires the navigation stack (ros2-nav/launch/navigation.launch.py) already running with a previously-saved map -- this tool does not start it.",
+      "description": "DISABLED until Nav2 drives through the safety governor. Drive to a map-frame (x, y, yaw) goal via Nav2's NavigateToPose action. Requires the navigation stack (ros2-nav/launch/navigation.launch.py) already running with a previously-saved map -- this tool does not start it.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -316,7 +316,7 @@
     {
       "name": "explore_frontier",
       "title": "Autonomously explore",
-      "description": "Launch explore_lite for a bounded time to autonomously map unexplored space, then stop it. Requires the navigation/mapping stack already running.",
+      "description": "DISABLED until Nav2 drives through the safety governor. Launch explore_lite for a bounded time to autonomously map unexplored space, then stop it. Requires the navigation/mapping stack already running.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -337,7 +337,7 @@
     {
       "name": "follow_start",
       "title": "Start following",
-      "description": "Begin following the enrolled person using the Pi's camera. Fails if no face is enrolled yet.",
+      "description": "DISABLED: vision-ai's follow-me drives the car itself, around the safety governor. Begin following the enrolled person using the Pi's camera.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",

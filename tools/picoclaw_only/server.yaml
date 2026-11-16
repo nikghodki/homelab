@@ -5,6 +5,8 @@ host: jetson
 command: /home/hermes-nikhil/.hermes/tools/node-26.7.0-linux-arm64/bin/node
 args: [/home/nikjetson/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js]
 source: /home/nikjetson/workspace/roboclaw/mcp-server (jetson)
+# Patched by role hermes_robot_mcp (2026-11-15): motion tools go to PicoClaw and the Pi's safety governor, stop
+# latches the governor's e-stop, Nav2/follow-me disabled (runbooks/robot-safety.md). Export the patched file.
 agents:
   hermes-nikhil:
     # Hermes config.yaml `tools.include`; the rest of the server's tools are pinned too, because the

@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import pathlib
+import re
 import shutil
 import sys
 
@@ -56,10 +57,12 @@ def setup(tmp_path):
     hermes = tmp_path / "hermes"
     hermes.mkdir()
 
-    def make(live_tools, extra_servers=None, args=None):
+    def make(live_tools, extra_servers=None, args=None, forbidden_source=None):
         rule = {"name": "fake", "transport": "stdio", "command": sys.executable, "args_prefix": [str(server)]}
-        doc = {"asset_policy": {"mcp": {"registry": [rule]}},
-               "drift_check": {"fake": {"env": {"FAKE_TOOLS": json.dumps(live_tools)}}}}
+        probe = {"env": {"FAKE_TOOLS": json.dumps(live_tools)}}
+        if forbidden_source:
+            probe["forbidden_source"] = forbidden_source
+        doc = {"asset_policy": {"mcp": {"registry": [rule]}}, "drift_check": {"fake": probe}}
         (lib / "mcp-servers.yaml").write_text(yaml.safe_dump(doc))
         servers = {"fake": {"command": sys.executable, "args": args or [str(server)]}, **(extra_servers or {})}
         (hermes / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": servers}))
@@ -125,3 +128,66 @@ def test_repo_registry_matches_tools_server_yaml():
             assert rule["url"] == server["url"]
         else:
             assert (rule["command"], rule["args_prefix"]) == (server["command"], server["args"])
+
+
+POLICY = yaml.safe_load((ROOT / "policies/defenseclaw/mcp-servers.yaml").read_text())
+GUARD = POLICY["drift_check"]["picoclaw_only"]["forbidden_source"]
+PATCH = ROOT / "hosts/roles/hermes_robot_mcp/files/picoclaw-hardware-mcp.hermes.patch"
+
+
+def _guard_for(path):
+    return {**GUARD, "file": str(path)}
+
+
+def test_forbidden_source_clean(setup, tmp_path):
+    src = tmp_path / "server.js"
+    src.write_text('const r = await post("/stop");\n// sends ros2 launch notes\n')
+    code, lines = setup(TOOLS, forbidden_source=_guard_for(src))
+    assert code == 0
+    summary = next(f for f in lines if f["event"] == "mcp-drift")
+    assert summary["status"] == "ok" and summary["forbidden_lines"] == 0
+    assert not [f for f in lines if f["event"] == "mcp-drift.source"]
+
+
+@pytest.mark.parametrize("call", [
+    'tool(async (a) => post("/drive", a)));',
+    "await post('/turn', { direction, degrees });",
+    "fetch(`${CAR}` + `/velocity`)",
+    'piPost("/follow/start")',
+    "runRos2Shell(`ros2 action send_goal /navigate_to_pose x`)",
+    "runRos2Shell(`ros2 launch explore_lite explore.launch.py`)",
+])
+def test_forbidden_source_direct_motion_is_drift(setup, tmp_path, call):
+    src = tmp_path / "server.js"
+    src.write_text("// ok\n" + call + "\n")
+    code, lines = setup(TOOLS, forbidden_source=_guard_for(src))
+    assert code == 1
+    hit = next(f for f in lines if f["event"] == "mcp-drift.source")
+    assert hit["change"] == "forbidden_call" and hit["lines"] == [2]
+    assert next(f for f in lines if f["event"] == "mcp-drift")["status"] == "drift"
+    assert lines[-1]["drift"] == 1
+
+
+def test_forbidden_source_unreadable_is_error(setup, tmp_path):
+    code, lines = setup(TOOLS, forbidden_source=_guard_for(tmp_path / "missing.js"))
+    assert code == 2
+    assert next(f for f in lines if f["event"] == "mcp-drift.source")["status"] == "error"
+
+
+def test_hermes_patch_removes_every_direct_motion_call():
+    """Role hermes_robot_mcp's patch: every line that matches the guard is removed, none is added or kept as
+    context, so the patched file has no direct motion call (the role also checks the patched file's sha256)."""
+    pattern = re.compile(GUARD["pattern"])
+    removed, kept = [], []
+    for line in PATCH.read_text().splitlines():
+        if line.startswith(("---", "+++", "@@")):
+            continue
+        if pattern.search(line[1:]):
+            (removed if line.startswith("-") else kept).append(line)
+    assert len(removed) == 8, removed  # /turn x2, /drive x3, send_goal, explore_lite, /follow/start
+    assert kept == []
+
+
+def test_guard_file_is_the_registry_launch():
+    rule = next(r for r in POLICY["asset_policy"]["mcp"]["registry"] if r["name"] == "picoclaw_only")
+    assert GUARD["file"] == rule["args_prefix"][0]

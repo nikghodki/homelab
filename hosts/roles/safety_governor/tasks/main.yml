@@ -129,6 +129,8 @@
       loop:
         - {src: "{{ safety_governor_src }}/governor/integration/pi_integration.py"}
         - {src: "{{ safety_governor_src }}/motion_bridge/integration/motion_integration.py"}
+        - {src: "{{ safety_governor_src }}/motion_bridge/integration/hermes_motion_integration.py"}
+        - {src: "{{ safety_governor_hermes_mcp_role }}/files/picoclaw-hardware-mcp.hermes.patch"}
       loop_control: {label: "{{ item.src | basename }}"}
 
     - name: Motion bridge config and its integration test wrapper
@@ -139,6 +141,7 @@
       loop:
         - {src: motion-bridge.json.j2, dest: "{{ safety_governor_config_dir }}/motion-bridge.json", mode: "0600"}
         - {src: run-motion-integration-test.j2, dest: "{{ safety_governor_code_dir }}/run-motion-integration-test", mode: "0755"}
+        - {src: run-hermes-motion-integration-test.j2, dest: "{{ safety_governor_code_dir }}/run-hermes-motion-integration-test", mode: "0755"}
       loop_control: {label: "{{ item.dest | basename }}"}
       notify: Restart robot-motion-bridge
 

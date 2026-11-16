@@ -8,6 +8,9 @@ For this account's Hermes config (~/.hermes/config.yaml):
 - every approved server that Hermes runs is asked for tools/list the way tools/<name>/tools.json was made
   (export-mcp-tools.py), each tool is hashed as mcp-tool-hashes.py does, and the result is compared with
   tools/<name>/tools.sha256.
+- a server with `drift_check.<name>.forbidden_source` (file + regex) must not contain that pattern in its own
+  file: for picoclaw_only, any direct call to the car's motion endpoints, which would bypass the robot's safety
+  governor (runbooks/robot-safety.md). A match is drift; an unreadable file is an error.
 
 Every finding, one line per server and one per run go to the journal as JSON through `logger -t mcp-drift`, so
 they reach Loki (Grafana "AI inventory"). Exit 0: no drift; 1: drift or an unapproved server; 2: a check failed.
@@ -73,6 +76,13 @@ def describe(entry: dict) -> str:
     return os.path.basename(str(entry.get("command", "")))
 
 
+def forbidden_lines(guard: dict) -> list[int]:
+    """Line numbers of the server's own file that match its forbidden pattern (OSError if unreadable)."""
+    pattern = re.compile(guard["pattern"])
+    text = pathlib.Path(guard["file"]).read_text(errors="replace")
+    return [n for n, line in enumerate(text.splitlines(), 1) if pattern.search(line)]
+
+
 def compare(live: dict[str, str], pinned: dict[str, str]) -> list[dict]:
     rows = [{"tool": n, "change": "added", "live": live[n][:12]} for n in sorted(live.keys() - pinned.keys())]
     rows += [{"tool": n, "change": "removed", "pinned": pinned[n][:12]} for n in sorted(pinned.keys() - live.keys())]
@@ -134,10 +144,25 @@ def run(lib: pathlib.Path, hermes_home: pathlib.Path, emit) -> int:
             emit("err", **base, status="error", error=f"no tools/{name}/tools.sha256")
             continue
         totals["checked"] += 1
+        probe = probes.get(name) or {}
+        hits: list[int] = []
+        if probe.get("forbidden_source"):
+            guard = probe["forbidden_source"]
+            try:
+                hits = forbidden_lines(guard)
+            except (OSError, re.error) as exc:
+                totals["errors"] += 1
+                emit("err", event="mcp-drift.source", account=account, server=name, status="error",
+                     file=str(guard.get("file")), error=str(exc)[:300] or type(exc).__name__)
+            if hits:
+                emit("warning", event="mcp-drift.source", account=account, server=name, change="forbidden_call",
+                     file=str(guard["file"]), lines=hits[:20], count=len(hits),
+                     reason=str(guard.get("reason", "forbidden pattern in the server's code")))
         try:
-            tools = list_tools(export, rule, entry, dotenv, (probes.get(name) or {}).get("env") or {})
+            tools = list_tools(export, rule, entry, dotenv, probe.get("env") or {})
         except (Exception, SystemExit) as exc:  # noqa: BLE001 - the export helpers exit on protocol errors
             totals["errors"] += 1
+            totals["drift"] += bool(hits)
             emit("err", **base, status="error", error=str(exc)[:300] or type(exc).__name__)
             continue
         live = {t["name"]: hashes.tool_hash(t) for t in tools}
@@ -146,9 +171,10 @@ def run(lib: pathlib.Path, hermes_home: pathlib.Path, emit) -> int:
         for row in rows:
             emit("warning", event="mcp-drift.tool", account=account, server=name, **row)
         counts = {c: sum(r["change"] == c for r in rows) for c in ("changed", "added", "removed")}
-        totals["drift"] += bool(rows)
-        emit("warning" if rows else "info", **base, status="drift" if rows else "ok",
-             tools=len(live), pinned=len(pinned), **counts)
+        totals["drift"] += bool(rows or hits)
+        source = {"forbidden_lines": len(hits)} if probe.get("forbidden_source") else {}
+        emit("warning" if rows or hits else "info", **base, status="drift" if rows or hits else "ok",
+             tools=len(live), pinned=len(pinned), **counts, **source)
 
     status = "error" if totals["errors"] else "drift" if totals["drift"] or totals["unapproved"] else "ok"
     emit("info" if status == "ok" else "warning", event="mcp-drift.run", account=account, status=status,

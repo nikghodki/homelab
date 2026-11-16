@@ -26,3 +26,10 @@
   become: true
   roles:
     - role: picoclaw
+
+# Hermes' copy of the same MCP server on the Jetson (picoclaw_only, hermes-nikhil): its motion tools ask PicoClaw
+# over MQTT/NATS instead of calling the car, so every move goes through the governor (runbooks/robot-safety.md).
+- name: Hermes robot MCP (motion via PicoClaw)
+  hosts: jetson_group
+  roles:
+    - role: hermes_robot_mcp
