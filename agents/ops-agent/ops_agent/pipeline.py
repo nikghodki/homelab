@@ -71,6 +71,7 @@ async def analyse(incident_id: int, *, engine: str = "own-loop", as_of: dt.datet
                                              may_continue=go, engine=engine)
             known = {r["ref"] for r in db.all_("SELECT ref FROM evidence WHERE incident_id = %s", incident_id)}
             rca = own_loop.self_check(res.rca, known) if res.rca else deterministic_rca(inc, ctx, res.notes)
+            rca["trace"] = res.trace[-30:]
             rca_id = store_rca(incident_id, engine if res.rca else "deterministic", settings().model_deep, rca,
                                res.notes, res.tokens, res.tool_calls, res.seconds)
     finally:

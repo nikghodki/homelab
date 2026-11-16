@@ -25,6 +25,7 @@ class LoopResult:
     seconds: float = 0.0
     refs: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    trace: list[str] = field(default_factory=list)   # per turn: finish reason, tool names, the start of any text
 
 
 def client() -> AsyncOpenAI:
@@ -33,7 +34,7 @@ def client() -> AsyncOpenAI:
 
 
 async def chat(llm: AsyncOpenAI, model: str, messages: list[dict], tools: list[dict] | None = None,
-               tool_choice=None, max_tokens: int = 4096, engine: str = "own-loop"):
+               tool_choice=None, max_tokens: int = 12000, engine: str = "own-loop"):
     kw = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": 0.2}
     if tools:
         kw["tools"] = [{"type": "function", "function": t} for t in tools]
@@ -69,6 +70,7 @@ async def investigate(gw: Gateway, ctx: ToolContext, brief: str, first_look: str
                                             f"RECALL (runbooks, past incidents):\n{recall}\n\nInvestigate, then call submit_rca."}]
     tools = TOOL_SPECS + [prompts.SUBMIT_RCA]
     forced = False
+    length_retries = 0
     last_prompt = 0
     while True:
         # stop before the next call would cross the cap (each call re-sends the conversation)
@@ -97,6 +99,13 @@ async def investigate(gw: Gateway, ctx: ToolContext, brief: str, first_look: str
         last_prompt = (r.usage.prompt_tokens if r.usage else 0) or last_prompt
         msg = r.choices[0].message
         calls = msg.tool_calls or []
+        res.trace.append(f"{r.choices[0].finish_reason}: {[c.function.name for c in calls]} {(msg.content or '')[:160]!r}")
+        if not calls and r.choices[0].finish_reason == "length" and length_retries < 2:
+            # the reasoning used up the output budget before any answer: ask for the next step without the long think
+            messages.append({"role": "user", "content": "Your reasoning ran out of space. Decide now: call the next "
+                             "tool, or submit_rca if the evidence is enough. Keep any reasoning short."})
+            length_retries += 1
+            continue
         if not calls:
             got = _json_answer(msg.content or "")
             if got:
@@ -142,9 +151,12 @@ async def investigate(gw: Gateway, ctx: ToolContext, brief: str, first_look: str
                              "ruled_out, fix_options[{description, kind, risk}], verification, follow_ups, needs)."})
             r, n = await chat(llm, s.model_fast, messages, max_tokens=3000, engine=engine)
             res.tokens += n
-            res.rca = _json_answer(r.choices[0].message.content or "")
+            text = r.choices[0].message.content or ""
+            res.rca = _json_answer(text)
             if res.rca:
                 res.notes.append("RCA returned as text after the tool budget")
+            else:
+                res.notes.append("no RCA: the final answer wasn't the JSON asked for: " + redact.clean(text, 400))
         except Exception as e:
             res.notes.append(f"final answer failed: {type(e).__name__}")
     if res.rca:
@@ -208,12 +220,18 @@ def self_check(rca: dict, known_refs: set[str]) -> dict:
 
 
 def to_markdown(rca: dict, engine: str, notes: list[str] | None = None) -> str:
+    def item(x) -> str:
+        if isinstance(x, dict):
+            return " ".join(str(v) for v in x.values() if v not in (None, "", []))
+        if isinstance(x, list):
+            return "; ".join(item(v) for v in x)
+        return str(x)
     if not rca:
         return "No RCA: " + "; ".join(notes or ["the model gave no answer"])
     L = [f"**{rca.get('summary', '')}**", "", f"Confidence: **{rca.get('confidence', '?')}** ({engine})", ""]
     if rca.get("impact"):
-        L += [f"Impact: {rca['impact']}", ""]
-    L += ["Root cause: " + str(rca.get("root_cause", "")), ""]
+        L += [f"Impact: {item(rca['impact'])}", ""]
+    L += ["Root cause: " + item(rca.get("root_cause", "")), ""]
     if rca.get("claims"):
         L.append("Claims:")
         L += [f"- {c.get('claim')} [{', '.join(c.get('evidence') or [])}]" for c in rca["claims"]]
@@ -221,10 +239,6 @@ def to_markdown(rca: dict, engine: str, notes: list[str] | None = None) -> str:
     if rca.get("uncited"):
         L.append("Removed (no valid evidence): " + "; ".join(c.get("claim", "") for c in rca["uncited"]))
         L.append("")
-    def item(x) -> str:
-        if isinstance(x, dict):
-            return " ".join(str(v) for v in x.values() if v not in (None, "", []))
-        return str(x)
     for k, title in (("timeline", "Timeline"), ("ruled_out", "Ruled out"), ("follow_ups", "Follow-ups"), ("needs", "Would need")):
         if rca.get(k):
             L.append(title + ":")
@@ -236,9 +250,10 @@ def to_markdown(rca: dict, engine: str, notes: list[str] | None = None) -> str:
               if isinstance(f, dict) else f"- {f}" for f in rca["fix_options"]]
         L.append("")
     if rca.get("verification"):
-        L += ["Verify: " + rca["verification"], ""]
+        v = rca["verification"]
+        L += ["Verify: " + ("; ".join(map(item, v)) if isinstance(v, list) else item(v)), ""]
     if rca.get("second_look"):
-        L += ["Second look: " + rca["second_look"], ""]
+        L += ["Second look: " + str(rca["second_look"]), ""]
     if notes:
         L += ["Notes: " + "; ".join(notes)]
     return "\n".join(L)
