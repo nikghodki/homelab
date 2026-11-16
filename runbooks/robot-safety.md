@@ -320,7 +320,7 @@ ROS reset was refused (22/22 checks).
 
 ## Tests
 
-- **Unit** (CI, `pr-checks` → unit-tests, standard library + pytest):
+- **Unit** (CI, `pr-checks` → checks, standard library + pytest):
   `cd robots/safety/governor && PYTHONPATH=. python -m pytest -q tests`. They cover the e-stop latch and
   reset, clamping, the ceiling, the obstacle sector (edges, reversing, strafing, LiDAR yaw, the real MS200
   geometry, invalid ranges), the watchdogs, stale/invalid scans, the order of precedence and the sinks.

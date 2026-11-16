@@ -10,7 +10,7 @@ and Tailscale. Never GitHub Pages. Full procedure: `runbooks/docs-site.md`.
 |---|---|
 | URL | `https://docs.nghodki.ai` (http → https) |
 | Source | `docs-site/` (MkDocs Material: `mkdocs.yml`, `content/docs/`, `hooks/mermaid.py`, `requirements-docs.txt`) |
-| CI | `pr-checks.yml` job `docs`: `mkdocs build --strict` fails a PR on a broken link, anchor or nav entry |
+| CI | `pr-checks.yml` job `checks`: `mkdocs build --strict` fails a PR on a broken link, anchor or nav entry |
 | Build | role `docs_site` on the Dell (`playbooks/ops.yml`): `docs-build.timer` every 15 min and at boot; only when `main` moved and `docs-site/` changed; pinned Python image by digest, hash-locked requirements |
 | Fetch | read-only deploy key `docs-dell` (`secrets/docs.enc.yaml` → `docs_deploy_key`, root-only on the Dell), shallow sparse clone of `docs-site/` |
 | Files | `/srv/docs/current` → `releases/<docs tree hash>/`, swapped atomically; the last 5 releases kept for rollback |

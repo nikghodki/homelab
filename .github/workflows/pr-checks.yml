@@ -1,17 +1,24 @@
 name: pr-checks
 
+# Two jobs, each a sequence of steps, because GitHub bills every job rounded up to a whole minute (8 parallel jobs of
+# 12-146 s billed 12-14 min a run). Runs on PRs; once a day on main, the full suite (it catches merge skew and saves the
+# pip and Trivy caches where every PR can restore them: a cache saved on a PR ref is visible to that PR only); and
+# manually. No push to main: a squash merge pushes the tree the PR run passed (infra-optimization review 2026-11 §4).
+# A PR that changes only docs runs the docs build, secret scanning, SOPS, the edge-zone check (and yamllint if it
+# touches YAML); everything else is skipped (.github/scripts/ci-scope.sh). Later steps run after a failed one
+# (`!cancelled()`), so one run reports every failure; any failed step fails the job.
 on:
   pull_request:
-  push:
-    branches: [main]
+  schedule:
+    - cron: "47 8 * * *"  # 00:47 PST, before nightly-scan
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: pr-checks-${{ github.ref }}
-  # A newer push cancels an older PR run; runs on main always finish (code review #56).
+  # A newer push to a PR cancels its older run; the daily and manual runs each get their own group and always finish.
+  group: pr-checks-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -26,87 +33,204 @@ env:
   SHELLCHECK_IMAGE: koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
 
 jobs:
-  lint:
-    name: Lint (workflows, YAML, Ansible)
+  checks:
+    name: Checks (lint, docs, secrets, Kubernetes, unit tests)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-      - name: Install Python tools
-        run: pip install --require-hashes -r .github/requirements-ci.txt
-      - name: Every scanner image is pinned by digest
-        # tags can be moved (the March 2026 Trivy release and trivy-action tags were): docker run only by digest
-        run: |
-          if grep -nE '^\s+[A-Z_]+_IMAGE:' .github/workflows/*.yml | grep -vE '@sha256:[a-f0-9]{64}$'; then
-            echo "::error::image not pinned by digest (above)"; exit 1
-          fi
-      - name: actionlint
-        run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
-      - name: shellcheck (*.sh and shell templates)
-        run: .github/scripts/shellcheck.sh "$SHELLCHECK_IMAGE"
-      - name: yamllint
-        run: yamllint -c .yamllint.yaml .
-      - name: ansible-lint
-        if: hashFiles('hosts/**/*.yml', 'hosts/**/*.yaml') != ''
-        working-directory: hosts
-        run: |
-          ansible-galaxy collection install -r requirements.yml
-          ansible-lint playbooks/site.yml roles
-
-  docs:
-    # The private docs site (docs-site/, runbooks/docs-site.md) as the Dell builds it, without publishing anything:
-    # broken links, anchors and nav entries fail the PR.
-    name: Docs site (mkdocs build --strict)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       NO_MKDOCS_2_WARNING: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0  # the secret scanners read the PR's commits (or main's history)
           persist-credentials: false
+      - name: What this run covers (PR commits, docs-only or code)
+        id: scope
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: .github/scripts/ci-scope.sh
+
+      # --- secrets: the PR's own commits (base..head), not every branch; the daily run and nightly-scan read history
+      - name: gitleaks (PR commits; full history outside a PR)
+        if: ${{ !cancelled() && steps.scope.outcome == 'success' }}
+        env:
+          BASE: ${{ steps.scope.outputs.base }}
+          HEAD_SHA: ${{ steps.scope.outputs.head }}
+        run: |
+          range=HEAD; [ -z "$BASE" ] || range="$BASE..$HEAD_SHA"
+          docker run --rm -v "$PWD:/repo:ro" "$GITLEAKS_IMAGE" git /repo --redact --verbose --exit-code 1 --log-opts="$range"
+      - name: TruffleHog (verified secrets; PR commits, full history outside a PR)
+        if: ${{ !cancelled() && steps.scope.outcome == 'success' }}
+        env:
+          BASE: ${{ steps.scope.outputs.base }}
+          HEAD_SHA: ${{ steps.scope.outputs.head }}
+        # TruffleHog exits 0 on an unknown ref, so ci-scope.sh has already checked that both commits exist
+        run: |
+          if [ -n "$BASE" ]; then range=(--since-commit "$BASE" --branch "$HEAD_SHA"); else range=(); fi
+          docker run --rm -v "$PWD:/repo:ro" "$TRUFFLEHOG_IMAGE" git file:///repo "${range[@]}" --only-verified --fail --no-update
+      - name: secrets/ is SOPS-encrypted
+        if: ${{ !cancelled() }}
+        run: .github/scripts/check-sops.sh
+      - name: Every scanner image is pinned by digest
+        # tags can be moved (the March 2026 Trivy release and trivy-action tags were): docker run only by digest
+        if: ${{ !cancelled() }}
+        run: |
+          if grep -nE '^\s+[A-Z_]+_IMAGE:' .github/workflows/*.yml | grep -vE '@sha256:[a-f0-9]{64}$'; then
+            echo "::error::image not pinned by digest (above)"; exit 1
+          fi
+      - name: edge zone and CA page match cluster/platform/edge/names.txt and hosts/files/web-ca
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/edge-zone.py check
+
+      # --- docs site (docs-site/, runbooks/docs-site.md) as the Dell builds it, without publishing anything
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        id: py
+        if: ${{ !cancelled() }}
         with:
           python-version: "3.12"
+          cache: pip  # downloads, for a venv cache miss; --require-hashes still checks every file
+          cache-dependency-path: |
+            .github/requirements-ci.txt
+            docs-site/requirements-docs.txt
+      - name: Tool venvs cache (built from the hash-locked files; key = Python version + lock hashes)
+        if: ${{ !cancelled() }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/venvs/ci
+            ~/venvs/docs
+          key: venvs-checks-${{ steps.py.outputs.python-version }}-${{ hashFiles('.github/requirements-ci.txt', 'docs-site/requirements-docs.txt') }}
       - name: Install MkDocs (pinned with hashes)
+        id: mkdocs
+        if: ${{ !cancelled() }}
         run: |
-          python -m venv /tmp/docs
-          /tmp/docs/bin/pip install --require-hashes --only-binary=:all: -r docs-site/requirements-docs.txt
-      - name: Build the site (fails on any warning, broken link or anchor)
-        run: /tmp/docs/bin/mkdocs build --strict -f docs-site/mkdocs.yml -d /tmp/docs-site
+          .github/scripts/ci-venv.sh "$HOME/venvs/docs" docs-site/requirements-docs.txt --only-binary=:all:
+      - name: Docs site (mkdocs build --strict; fails on any warning, broken link or anchor)
+        if: ${{ !cancelled() && steps.mkdocs.outcome == 'success' }}
+        run: ~/venvs/docs/bin/mkdocs build --strict -f docs-site/mkdocs.yml -d /tmp/docs-site
 
-  secrets:
-    name: Secret scanning
+      # --- lint (yamllint also on a docs-only PR that touches YAML)
+      - name: Install Python tools
+        id: pyci
+        if: ${{ !cancelled() && (steps.scope.outputs.code == 'true' || steps.scope.outputs.yaml == 'true') }}
+        run: |
+          .github/scripts/ci-venv.sh "$HOME/venvs/ci" .github/requirements-ci.txt
+          echo "$HOME/venvs/ci/bin" >> "$GITHUB_PATH"
+      - name: yamllint
+        if: ${{ !cancelled() && steps.pyci.outcome == 'success' }}
+        run: yamllint -c .yamllint.yaml .
+      - name: actionlint
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
+      - name: shellcheck (*.sh and shell templates)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        run: .github/scripts/shellcheck.sh "$SHELLCHECK_IMAGE"
+      - name: Ansible collections cache (per day and hosts/requirements.yml, so new collection releases still arrive)
+        # PRs may fall back to an earlier day's copy; the daily run on main never does, so it installs the current
+        # releases and saves them for the day (ansible-galaxy keeps whatever satisfies requirements.yml)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ansible/collections
+          key: ansible-collections-${{ hashFiles('hosts/requirements.yml', '.github/requirements-ci.txt') }}-${{ steps.scope.outputs.day }}
+          restore-keys: >-
+            ${{ github.event_name == 'pull_request'
+            && format('ansible-collections-{0}-', hashFiles('hosts/requirements.yml', '.github/requirements-ci.txt')) || '' }}
+      - name: ansible-lint
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' && hashFiles('hosts/**/*.yml', 'hosts/**/*.yaml') != '' }}
+        working-directory: hosts
+        run: |
+          ansible-galaxy collection install -r requirements.yml
+          ansible-lint playbooks/site.yml roles
+
+      # --- Kubernetes manifests
+      - name: kubeconform + Kyverno CLI
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        run: .github/scripts/check-kubernetes.sh "$KUBECONFORM_IMAGE" "$KYVERNO_IMAGE"
+
+      # --- unit tests
+      - name: "Unit tests: fleet-metrics"
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: hosts/files/fleet-metrics
+        run: python -m pytest -q
+      - name: DefenseClaw LiteLLM guardrail
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: cluster/apps/litellm/proxy
+        run: PYTHONPATH=. python -m pytest -q tests/test_defenseclaw_guardrail.py
+      - name: LiteLLM request hook (system merge, file attachments as text)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: cluster/apps/litellm/proxy
+        run: PYTHONPATH=. python -m pytest -q tests/test_documents_to_text.py
+      - name: DefenseClaw fleet policy
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: policies/defenseclaw
+        run: python -m pytest -q tests
+      - name: Pocket ID sync
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: hosts/files/pocket-id
+        run: python -m pytest -q tests
+      - name: Robot safety governor (pure logic and sinks; no ROS or NATS)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: robots/safety/governor
+        run: PYTHONPATH=. python -m pytest -q tests
+      - name: Robot motion bridge (pure logic; no ROS)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: robots/safety/motion_bridge
+        run: PYTHONPATH=. python -m pytest -q tests
+      - name: Cisco AIBOM fleet job
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q hosts/roles/cisco_aibom/files/tests
+      - name: MCP drift check
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q hosts/roles/mcp_drift/files/tests
+      - name: DefenseClaw AIBOM nightly diff
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q hosts/roles/defenseclaw_aibom/files/tests
+      - name: Sim job sampler and watchdog (measure.sh, stub docker/nvidia-smi)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q robots/sim/tests
+      - name: LiteLLM usage exporter
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q hosts/roles/litellm_usage_exporter/files/tests
+      - name: Ops agent host access (ops-ro dispatcher and root helper)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q hosts/roles/ops_agent_access/files/tests
+      - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q .github/scripts/tests
+      - name: DefenseClaw dashboards and rules match the pinned release
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python .github/scripts/defenseclaw-bundle.py check
+      # Last: the agent's own pinned dependencies (with hashes) go into a directory ahead of the tools venv on
+      # PYTHONPATH, not into the venv itself (it is cached and shared by every run)
+      - name: Ops agent (correlation, redaction, tools, notifications)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: agents/ops-agent
+        run: |
+          pip install -q --require-hashes --no-deps --target "$RUNNER_TEMP/ops-agent-deps" -r requirements.txt
+          PYTHONPATH=".:$RUNNER_TEMP/ops-agent-deps" python -m pytest -q tests
+
+  scans:
+    name: Scans (code, dependencies, AI scanners, AIBOM)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 2  # the merge commit and its parents: what the PR changes
           persist-credentials: false
-      - name: gitleaks (full history)
-        run: docker run --rm -v "$PWD:/repo:ro" "$GITLEAKS_IMAGE" git /repo --redact --verbose --exit-code 1
-      - name: TruffleHog (verified secrets)
-        run: docker run --rm -v "$PWD:/repo:ro" "$TRUFFLEHOG_IMAGE" git file:///repo --only-verified --fail --no-update
-      - name: secrets/ is SOPS-encrypted
-        run: .github/scripts/check-sops.sh
+      - name: What this run covers (docs-only PRs skip the scans)
+        id: scope
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: .github/scripts/ci-scope.sh
 
-  code:
-    name: Code, dependency and config scanning
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      # --- code, dependency and config scanning
       - name: Semgrep
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         run: docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" semgrep scan --config p/default --metrics=off --error
       - name: OSV-Scanner (dependencies)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         run: |
           set +e
           docker run --rm -v "$PWD:/src:ro" "$OSV_IMAGE" scan source -r /src
@@ -115,149 +239,101 @@ jobs:
           if [ "$rc" -eq 128 ]; then echo "no dependency manifests yet"; exit 0; fi
           exit "$rc"
       - name: Trivy ignore file (reasons, 30-day expiry)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         run: python3 .github/scripts/check-trivy-ignores.py --no-expiry
+      - name: Trivy DB and checks cache (one per day; a stale DB is refreshed by Trivy itself)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ steps.scope.outputs.day }}
+          restore-keys: trivy-db-
       - name: Trivy (vulnerabilities, misconfigurations)
-        # No `secret` scanner: gitleaks (full history) and TruffleHog (verified) in the secrets job cover it
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        # No `secret` scanner: gitleaks and TruffleHog (verified) in the checks job cover it
         run: >
-          docker run --rm -v "$PWD:/src:ro" "$TRIVY_IMAGE" fs
+          mkdir -p "$RUNNER_TEMP/trivy-cache" &&
+          docker run --rm -v "$RUNNER_TEMP/trivy-cache:/cache" -v "$PWD:/src:ro" "$TRIVY_IMAGE" fs --cache-dir /cache
           --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --no-progress
           --ignorefile /src/.trivyignore.yaml /src
 
-  kubernetes:
-    name: Kubernetes manifests
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: kubeconform + Kyverno CLI
-        run: .github/scripts/check-kubernetes.sh "$KUBECONFORM_IMAGE" "$KYVERNO_IMAGE"
-      - name: edge zone and CA page match cluster/platform/edge/names.txt and hosts/files/web-ca
-        run: python3 .github/scripts/edge-zone.py check
-
-  ai-scanners:
-    name: AI scanners (MCP tools, skills, agent cards, agent code)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      # --- AI scanners (MCP tools, skills, agent cards, agent code)
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        id: py
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         with:
           python-version: "3.12"
+          cache: pip  # downloads, for a venv cache miss; --require-hashes still checks every file
+          cache-dependency-path: |
+            .github/requirements-ci.txt
+            .github/requirements-aibom.txt
+            .github/requirements-radar.txt
+      - name: Tool venvs cache (built from the hash-locked files; key = Python version + lock hashes)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/venvs/ci
+            ~/venvs/aibom
+            ~/venvs/radar
+          key: >-
+            venvs-scans-${{ steps.py.outputs.python-version }}-${{ hashFiles('.github/requirements-ci.txt',
+            '.github/requirements-aibom.txt', '.github/requirements-radar.txt') }}
       - name: Install scanners
-        run: pip install --require-hashes -r .github/requirements-ci.txt
+        id: pyci
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        run: |
+          .github/scripts/ci-venv.sh "$HOME/venvs/ci" .github/requirements-ci.txt
+          echo "$HOME/venvs/ci/bin" >> "$GITHUB_PATH"
       - name: MCP tool definitions match their reviewed hashes
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python3 .github/scripts/mcp-tool-hashes.py check tools
       - name: mcp-scanner (static, YARA)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python3 .github/scripts/scan-mcp-tools.py tools
       - name: skill-scanner
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: .github/scripts/scan-skills.sh
       - name: a2a-scanner still flags a known-bad agent card
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python3 .github/scripts/scan-agents.py --self-test
       - name: a2a-scanner (agent cards, offline analyzers)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python3 .github/scripts/scan-agents.py
       - name: Agentic Radar (own venv; it pins rich<14)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: |
-          python3 -m venv /tmp/radar
-          /tmp/radar/bin/pip install --require-hashes -r .github/requirements-radar.txt
-          PATH=/tmp/radar/bin:$PATH .github/scripts/scan-agent-code.sh
+          .github/scripts/ci-venv.sh "$HOME/venvs/radar" .github/requirements-radar.txt
+          PATH=$HOME/venvs/radar/bin:$PATH .github/scripts/scan-agent-code.sh
       - name: Agentic Radar reports
-        if: always()
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: agentic-radar
           path: reports/agentic-radar
           if-no-files-found: ignore
 
-  aibom:
-    name: AI BOM (Cisco AIBOM)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
+      # --- AI BOM (Cisco AIBOM)
       - name: Install cisco-aibom (own venv)
-        run: |
-          python3 -m venv /tmp/aibom
-          /tmp/aibom/bin/pip install --require-hashes -r .github/requirements-aibom.txt
+        id: aibom-install
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        run: .github/scripts/ci-venv.sh "$HOME/venvs/aibom" .github/requirements-aibom.txt
       - name: AI BOM of the repo
         # `analyze` requires an LLM; CI has none, so it points at a closed port and the BOM is deterministic-only
         # (agentic_status "degraded" in the report). The fleet job (runbooks/aibom.md) works the same way.
+        # aibom-ci.py is cisco-aibom without the fixed 60 s of retry cool-down that cannot help with no LLM.
+        if: ${{ !cancelled() && steps.aibom-install.outcome == 'success' }}
         run: |
           mkdir -p reports
-          /tmp/aibom/bin/cisco-aibom --log-level WARNING analyze . -o json -O reports/aibom.json \
+          ~/venvs/aibom/bin/python .github/scripts/aibom-ci.py --log-level WARNING analyze . -o json -O reports/aibom.json \
             --llm-model none --llm-provider openai --llm-api-base http://127.0.0.1:9 --llm-api-key unused \
             --agentic-max-retry-seconds 0 --agentic-timeout 5 --no-progress --no-show-summary
           python3 -c 'import json; s = json.load(open("reports/aibom.json"))["aibom_analysis"]["summary"]; print(json.dumps(s))' \
             | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         with:
           name: aibom
           path: reports/aibom.json
           if-no-files-found: ignore
           retention-days: 30
-
-  unit-tests:
-    name: Unit tests (fleet-metrics, LiteLLM guardrail, DefenseClaw, Pocket ID sync, safety governor, motion bridge, AIBOM, CI scripts)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.12"
-      - name: Install test tools
-        run: pip install --require-hashes -r .github/requirements-ci.txt
-      - name: fleet-metrics
-        working-directory: hosts/files/fleet-metrics
-        run: python -m pytest -q
-      - name: DefenseClaw LiteLLM guardrail
-        working-directory: cluster/apps/litellm/proxy
-        run: PYTHONPATH=. python -m pytest -q tests/test_defenseclaw_guardrail.py
-      - name: LiteLLM request hook (system merge, file attachments as text)
-        working-directory: cluster/apps/litellm/proxy
-        run: PYTHONPATH=. python -m pytest -q tests/test_documents_to_text.py
-      - name: DefenseClaw fleet policy
-        working-directory: policies/defenseclaw
-        run: python -m pytest -q tests
-      - name: Pocket ID sync
-        working-directory: hosts/files/pocket-id
-        run: python -m pytest -q tests
-      - name: Robot safety governor (pure logic and sinks; no ROS or NATS)
-        working-directory: robots/safety/governor
-        run: PYTHONPATH=. python -m pytest -q tests
-      - name: Robot motion bridge (pure logic; no ROS)
-        working-directory: robots/safety/motion_bridge
-        run: PYTHONPATH=. python -m pytest -q tests
-      - name: Cisco AIBOM fleet job
-        run: python -m pytest -q hosts/roles/cisco_aibom/files/tests
-      - name: MCP drift check
-        run: python -m pytest -q hosts/roles/mcp_drift/files/tests
-      - name: DefenseClaw AIBOM nightly diff
-        run: python -m pytest -q hosts/roles/defenseclaw_aibom/files/tests
-      - name: Sim job sampler and watchdog (measure.sh, stub docker/nvidia-smi)
-        run: python -m pytest -q robots/sim/tests
-      - name: LiteLLM usage exporter
-        run: python -m pytest -q hosts/roles/litellm_usage_exporter/files/tests
-      - name: Ops agent host access (ops-ro dispatcher and root helper)
-        run: python -m pytest -q hosts/roles/ops_agent_access/files/tests
-      - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
-        run: python -m pytest -q .github/scripts/tests
-      - name: DefenseClaw dashboards and rules match the pinned release
-        run: python .github/scripts/defenseclaw-bundle.py check
-      # Last: it installs the agent's own pinned dependencies (with hashes) into this job's Python.
-      - name: Ops agent (correlation, redaction, tools, notifications)
-        working-directory: agents/ops-agent
-        run: |
-          pip install --require-hashes --no-deps -r requirements.txt
-          PYTHONPATH=. python -m pytest -q tests
