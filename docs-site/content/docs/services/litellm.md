@@ -33,7 +33,7 @@ removed on 2026-11-15 (P0.7). Aliases (`smart`, `guard`, …) wait for P2.0.
 
 | Key | Models | Limits | Used by |
 |---|---|---|---|
-| `defenseclaw-jetson-judge` | `qwen3.8-27b` | 60 rpm, 3 in flight | DefenseClaw judge and skill-scanner LLM analyzer, both Jetson users |
+| `defenseclaw-jetson-judge` | `qwen3.8-27b` | 60 rpm, 6 in flight | DefenseClaw judge and skill-scanner LLM analyzer, both Jetson users |
 | `defenseclaw-dgx1` | `qwen3.8-27b` | 20 rpm, 2 in flight | dgx-1 DefenseClaw judge |
 | `cisco-aibom` | `qwen3.8-27b` | 10 rpm, 1 in flight | Cisco AIBOM agentic stage (every host) |
 | `picoclaw-pi` | `qwen3.8-27b` | — | picoclaw (rotated 2026-11-15 after a leak) |
@@ -54,6 +54,16 @@ a socat relay on the docker0 address (172.17.0.1:18970, not the LAN) lets the co
 
 LiteLLM's `arize_phoenix` callback sends a trace per request to Phoenix on dgx-2 (`http://192.168.86.36:6006`,
 project `litellm`, system API key `litellm-dgx-1`): model, key alias, token counts, prompt and reply.
+
+## Who called the model API
+
+- **Spend logs** on the admin UI's Logs page: key alias and hash, user, team, model, tokens, status, client IP; no
+  prompts; kept 30 days (LiteLLM's own cleanup).
+- **Phoenix**, project `litellm`, by key alias (with prompts and replies).
+- **The front door's access log** in Loki (`service=edge-caddy`).
+
+The client IP is the front door's `X-Forwarded-For`; while the LAN Service uses `externalTrafficPolicy: Cluster` it is
+a pod-network address (`10.42.x.x`), and direct callers on :4000 can forge it. Trust the key alias.
 
 ## Gotchas
 

@@ -67,7 +67,7 @@ backstop only; the rate limits are what bound a scanner):
 |---|---|---|---|
 | `picoclaw-pi` | `qwen3.8-27b` | — | picoclaw on the Pi (`/etc/picoclaw/picoclaw.env`, `.security.yml` entry `dgx-qwen`); rotated 2026-11-15 |
 | `defenseclaw-dgx1` | `qwen3.8-27b` | 20 rpm, 100k tpm, 2 in flight, $5/day | dgx-1 DefenseClaw LLM judge (`DEFENSECLAW_LLM_KEY`) |
-| `defenseclaw-jetson-judge` | `qwen3.8-27b` | 60 rpm, 600k tpm, 3 in flight, $5/day | both Jetson DefenseClaw installs: skill-scanner LLM analyzer and guardrail judge |
+| `defenseclaw-jetson-judge` | `qwen3.8-27b` | 60 rpm, 600k tpm, 6 in flight, $5/day | both Jetson DefenseClaw installs: skill-scanner LLM analyzer and guardrail judge |
 | `cisco-aibom` | `qwen3.8-27b` | 10 rpm, 100k tpm, 1 in flight, $5/day | Cisco AIBOM agentic stage, every host (`/etc/cisco-aibom/llm.env`) |
 | `hermes`, `claude-code`, `open-webui`, … | all | — | reviewed and kept (P0.17) |
 
@@ -124,6 +124,15 @@ model: about 4.5 minutes for `qwen3.8-27b` (265 s on 2026-11-15), about 2 s warm
 The static routes `qwen3.6-35b` (`vllm-qwen`) and `whisper-large-v3-turbo` (`vllm-whisper`) were removed on
 2026-11-15 with their stopped containers.
 
+`qwen3.8-27b-nothink` (added 2026-11-16 through the admin API, not by DGXMM): the same DGXMM route as `qwen3.8-27b`
+with `extra_body: {chat_template_kwargs: {enable_thinking: false}}`. The key `defenseclaw-jetson-judge` has the key
+alias `qwen3.8-27b` → `qwen3.8-27b-nothink`, so the Jetson scanners keep asking for `qwen3.8-27b` (decision 0012)
+but get answers without the reasoning pass. Why: with thinking on, one skill or plugin analysis took 2–5 minutes
+under load, and DefenseClaw 1.0.9's plugin watcher kills its LLM call after a fixed 120 s and then quarantines the
+plugin ("the LLM judge did not run", fail closed). If DGXMM re-registers `qwen3.8-27b` with a new id, recreate the
+clone the same way (copy the decrypted `litellm_params` inside the container, add `extra_body`, `POST /model/new`).
+To undo: `/key/update` with `aliases: {}`, then `/model/delete` the clone.
+
 ## DefenseClaw guardrail (P2.4)
 
 `hosts/files/litellm/defenseclaw_guardrail.py`, mounted at `/app/defenseclaw_guardrail.py`, global
@@ -160,6 +169,32 @@ the LAN), `PHOENIX_PROJECT_NAME=litellm`, `PHOENIX_API_KEY` = the system key (Ph
 `admin@localhost` with the GraphQL `createSystemApiKey` mutation). Every request is a trace in project `litellm` with
 the model, the key alias (`metadata.user_api_key_alias`) and token counts; prompts and replies are included (Phoenix
 is the LLM trace store). To revoke the key: Phoenix → Settings → System keys.
+LiteLLM sets more span attributes than the OTel default limit of 128, and the SDK then drops the oldest ones (the key
+alias among them; the proxy logs `Attributes dict is full`), so the compose file raises `OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`.
+Per-request rows without prompts are in the spend log (below); daily per-key totals in `LiteLLM_DailyUserSpend`.
+
+## Who called the model API
+
+Three places, from the most direct:
+
+1. **Spend logs** (since 2026-11-16; `disable_spend_logs: false`): one row per request in `LiteLLM_SpendLogs`, shown on
+   the admin UI's **Logs** page (`/spend/logs/ui`): key alias (`metadata.user_api_key_alias`), key hash (`api_key`),
+   user, team, model, tokens, status and `requester_ip_address`. No prompts or replies
+   (`store_prompts_in_spend_logs: false`). LiteLLM's own cleanup job deletes rows older than 30 days
+   (`maximum_spend_logs_retention_period: 30d`, checked daily; free in 1.109, the job shows as
+   `spend_log_cleanup_job` in the proxy's start-up log), so Postgres doesn't grow without bound.
+   From the shell: `docker exec litellm-postgres psql -U litellm -d litellm -c 'select "startTime", metadata->>$$user_api_key_alias$$, model, status, requester_ip_address from "LiteLLM_SpendLogs" order by "startTime" desc limit 20'`.
+2. **Phoenix**, project `litellm`, filter `metadata['user_api_key_alias'] == '<alias>'` (with prompts and replies).
+3. **The front door's access log** in Loki, label `service=edge-caddy` (client address, host, path, status).
+
+Client IP: `use_x_forwarded_for: true`, so `requester_ip_address` is the `X-Forwarded-For` header. The front door
+(Caddy) sets it fresh on every request (it ignores a client's own header, no `trusted_proxies`), but today it can only
+pass on what it sees: the LAN Service `edge-caddy-lan` has `externalTrafficPolicy: Cluster`, so kube-proxy SNATs
+clients to a node's pod-network address and the log shows `10.42.x.0`/`10.42.x.1` for everything that comes through
+`model.nghodki.ai`. The real client needs `externalTrafficPolicy: Local` on the edge Services (cluster/platform/edge,
+the front door's owner); until then use the key alias and the Caddy log. LiteLLM is also bound on the LAN at
+:4000: a direct caller there is logged with its own address (e.g. `192.168.86.49`), and one that sends its own
+`X-Forwarded-For` is logged with whatever it wrote (tested: `203.0.113.7`). The key alias is the reliable field.
 
 ## Redis
 
@@ -172,4 +207,6 @@ Kept as Redis 7.4 (`redis:7-alpine`, pinned to the digest it ran): RSALv2/SSPL i
 - `docker exec -i` inside an `ssh … 'bash -s' <<EOF` script eats the rest of the script; use `-i` only with a
   redirect.
 - Old `~/litellm-setup` files still contain the old (revoked) master key; they're a backup copy, not used.
-- `disable_spend_logs: true`: per-request history is in Phoenix, not in LiteLLM's spend logs.
+- Spend logs keep no prompts or replies (`store_prompts_in_spend_logs: false`); Phoenix has those.
+- Skill and plugin scans send many parallel requests: with 2 to 4 in flight the scanners hit 429s and, after 4
+  retries, fail closed ("the LLM judge did not run"), which quarantines what they scan.

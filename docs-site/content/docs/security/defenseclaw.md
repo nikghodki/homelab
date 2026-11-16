@@ -102,14 +102,11 @@ What happened (2026-11-15): on the Jetson, 76 of 77 skills were quarantined with
    `quarantine_records` in `~/.defenseclaw/audit.db`) and rescan. The stale quarantine record stays listed.
 4. A few skills stay blocked for real static findings.
 
-Upstream draft 07 describes this. Status now: the skill scanner runs **static-only** for both Jetson accounts
-(`scanners.skill_scanner.use_llm: false`) because the LLM behind LiteLLM is down during the DGXMM work. Static-only is
-stricter (it can't clear false positives). After the DGXMM session, as each account:
-
-```bash
-defenseclaw setup skill-scanner --use-llm
-defenseclaw skill scan all
-```
+Upstream draft 07 describes this. Status now (2026-11-16): the LLM analyzer and the judge are back on for both
+Jetson accounts (`qwen3.8-27b` through LiteLLM, key `defenseclaw-jetson-judge`, thinking off for that key). An LLM
+rescan of every quarantine restored 47 + 81 Hermes plugins and the skills quarantined for scanner failure; the skills
+blocked for findings (roboclaw, github-code-review, ocr-and-documents, godmode, touchdesigner-mcp, …) stay blocked with
+the findings confirmed. Details and the per-skill reasons: `runbooks/hermes-profiles.md`.
 
 ## Fleet gateway (for the Edge Connector)
 
