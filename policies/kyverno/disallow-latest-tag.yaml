@@ -16,7 +16,8 @@ spec:
       - apiGroups: [""]
         apiVersions: [v1]
         operations: [CREATE, UPDATE]
-        resources: [pods]
+        # pods/ephemeralcontainers: `kubectl debug` adds containers through this subresource (code review #10)
+        resources: [pods, pods/ephemeralcontainers]
   variables:
     - name: images
       expression: >-
