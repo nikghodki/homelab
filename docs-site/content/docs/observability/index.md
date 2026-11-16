@@ -49,6 +49,7 @@ also in `site.yml`) and `otel_host_collector` (`otelcol-contrib` with its config
 |---|---|---|---|
 | Host metrics (CPU, load, memory, paging, network, processes, disk, filesystems) | every host | `hostmetrics` receiver, 30 s | VictoriaMetrics (`system_*`) |
 | Journal (priority info and up) | every host | `journald` receiver | Loki (stream label `host_name` = OS hostname; other resource attributes such as `fleet.host` as structured metadata, unverified) |
+| Front door access log (Caddy, JSON) | Sparks, `/var/log/pods/edge_edge-caddy-*/caddy/*.log` | `filelog` receiver with the CRI `container` parser, `otel_host_collector_pod_logs` | Loki (`service_name="edge-caddy"`, plus `host_name`, `k8s_pod_name`); body is Caddy's JSON line (`\| json`). `runbooks/edge.md`, "Access log" |
 | fleet-metrics | every host, `:9109/metrics/prometheus` | 30 s | VictoriaMetrics (`fleet_cpu_percent`, `fleet_memory_*`, `fleet_gpu_percent`, `fleet_temperature_celsius{zone}`, `fleet_power_watts{rail}`, `fleet_uptime_seconds`) |
 | GPU (GB10) | Sparks, dcgm-exporter 127.0.0.1:9400 | extra scrape | VictoriaMetrics (`DCGM_FI_DEV_*`: utilization, temperature, power, SM clock, energy). GPU memory is unified: use fleet-metrics |
 | Jetson GPU, temperatures, power rails (INA3221) | Jetson | fleet-metrics (sysfs; the GPU load file is per-mille, divided by 10 since #74) | VictoriaMetrics |

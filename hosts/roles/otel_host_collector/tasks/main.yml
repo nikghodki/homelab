@@ -98,6 +98,61 @@
       no_log: true
       notify: Restart otelcol
 
+    - name: Pod log access (POSIX ACLs, read-only)
+      when: otel_host_collector_pod_logs | length > 0
+      block:
+        # /var/log/pods is 0750 root: the collector may list it, and new pod folders and log files inherit read.
+        - name: Pod log folder ACL for the collector
+          ansible.posix.acl:
+            path: /var/log/pods
+            entity: otelcol
+            etype: user
+            permissions: rx
+            default: "{{ item }}"
+            state: present
+          loop: [false, true]
+
+        - name: Find the existing log folders and files of the shipped pods
+          ansible.builtin.find:
+            paths: /var/log/pods
+            recurse: true
+            file_type: any
+          register: otel_host_collector_pod_files
+
+        - name: The shipped pods' folders and files among them
+          ansible.builtin.set_fact:
+            otel_host_collector_pod_paths: >-
+              {{ otel_host_collector_pod_files.files | selectattr('path', 'match', otel_host_collector_pod_logs_regex) }}
+          vars:
+            # /var/log/pods/<namespace>_<pod_prefix>-<hash>_<uid>[/<container>[/<n>.log]]
+            otel_host_collector_pod_logs_regex: >-
+              ^/var/log/pods/({% for p in otel_host_collector_pod_logs %}{{ p.namespace }}_{{ p.pod_prefix
+              }}{{ '|' if not loop.last }}{% endfor %})-[^/]+(/[^/]+(/[^/]+\.log)?)?$
+
+        # Existing ones only: new pod folders and files inherit the ACL from /var/log/pods.
+        - name: Existing pod log folders readable by the collector
+          ansible.posix.acl:
+            path: "{{ item.0.path }}"
+            entity: otelcol
+            etype: user
+            permissions: rx
+            default: "{{ item.1 }}"
+            state: present
+          loop: "{{ otel_host_collector_pod_paths | selectattr('isdir') | product([false, true]) }}"
+          loop_control:
+            label: "{{ item.0.path }}{{ ' (default)' if item.1 else '' }}"
+
+        - name: Existing pod log files readable by the collector
+          ansible.posix.acl:
+            path: "{{ item.path }}"
+            entity: otelcol
+            etype: user
+            permissions: r
+            state: present
+          loop: "{{ otel_host_collector_pod_paths | rejectattr('isdir') }}"
+          loop_control:
+            label: "{{ item.path }}"
+
     - name: Service unit
       ansible.builtin.template:
         src: otelcol-contrib.service.j2

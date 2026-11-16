@@ -86,6 +86,16 @@ Since the cutover, in Git (`runbooks/edge.md`, "Add or change a route"):
 
 Roll back a route: revert the PR.
 
+## Access log
+
+Since 2026-11-16 Caddy logs every request on :80 and :443 as JSON to stdout; the host collectors on the Sparks ship
+it to Loki as `{service_name="edge-caddy"}` ([Observability](../observability/index.md#what-is-collected)). A line has
+the method, host, URI, status, duration, size, `User-Agent` and `api_key_hash` (the first 8 hex digits of the
+SHA-256 of the caller's API key, the start of LiteLLM's token hash). `Authorization`, `Cookie` and `Set-Cookie` are
+`REDACTED`, other key headers and key-like query parameters are hashed, and the `X-Edge-Origin` token is never logged.
+`remote_ip` is **not** the client: kube-proxy masquerades both paths, so it's the pod network's address on the Spark
+that took the connection. LogQL and details: `runbooks/edge.md`, "Access log".
+
 ## Gotchas
 
 - The default route sends unknown names to the model plane (as nginx-gateway did): a typo in a hostname gets

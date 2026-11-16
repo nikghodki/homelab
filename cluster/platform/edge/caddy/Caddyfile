@@ -12,6 +12,32 @@
 	grace_period 10s
 }
 
+# Access log (runbooks/edge.md, "Access log"): one JSON line per request on stdout, for :80 and :443, every host.
+# The node's collector ships it to Loki ({service_name="edge-caddy"}). Caddy already writes Authorization, Cookie,
+# Proxy-Authorization and Set-Cookie as REDACTED (log_credentials stays off). The filters below also hash the other
+# headers that carry an API key and the key-like query parameters. api_key_hash (set in nghodki_routes) is the first
+# 8 hex digits of the SHA-256 of the caller's key, the start of LiteLLM's hashed token: who called, not the key.
+(access_log) {
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				api_key_hash hash
+				request>headers>X-Api-Key hash
+				request>headers>Api-Key hash
+				request>headers>X-Goog-Api-Key hash
+				request>uri query {
+					hash key
+					hash api_key
+					hash access_token
+					hash token
+				}
+			}
+		}
+	}
+}
+
 # The model plane, as nginx-gateway served it (model.nghodki.ai and the door by IP,
 # which were nginx's default server): LiteLLM's /v1/ and /health*, DGXMM's UI and API under /dgxmm/.
 (dgxmm_ui) {
@@ -105,6 +131,15 @@
 }
 
 (nghodki_routes) {
+	# The caller's API key (Bearer, or Anthropic-style x-api-key), only for the access log's api_key_hash (hashed
+	# by the log filter in access_log, never logged as it is).
+	map {http.request.header.Authorization} {api_key} {
+		~^Bearer\s+(.+)$ "${1}"
+		default {http.request.header.X-Api-Key}
+	}
+	@caller expression `{http.request.header.Authorization}.startsWith("Bearer ") || {http.request.header.X-Api-Key} != ""`
+	log_append @caller api_key_hash {api_key}
+
 	# Pocket ID (dgx-2, console stack). Passkeys need HTTPS, so http is redirected.
 	@id host id.nghodki.ai
 	handle @id {
@@ -281,11 +316,13 @@
 }
 
 :80 {
+	import access_log
 	import nghodki_routes
 }
 
 :443 {
 	tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
+	import access_log
 	import nghodki_routes
 }
 
