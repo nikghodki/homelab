@@ -1,0 +1,4 @@
+{
+  "title": "Robotics and simulation",
+  "pages": ["index", "ros-zenoh", "safety-governor", "simulation"]
+}

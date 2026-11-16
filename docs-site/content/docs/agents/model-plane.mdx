@@ -1,0 +1,67 @@
+---
+title: Model plane (DGXMM and LiteLLM)
+description: The role of DGXMM and LiteLLM, how a model call flows, routes and aliases (still pending P2.0), memory reserves, and what waits for the DGXMM session.
+---
+
+**DGXMM** (DGX Model Manager) is a separate project on dgx-1 (`~/workspace/dgx-model-manager`), being worked on in its own
+session. This page describes its role and interfaces only; don't change it from fleet work.
+
+## Roles
+
+| Piece | Role | Where |
+|---|---|---|
+| DGXMM | Owns the GPUs (D3). Plans what fits in GB10 unified memory, starts and stops engines (vLLM, llama.cpp) as Docker containers, holds requests while an on-demand model loads, downloads weights | dgx-1 container `dgxmm` (127.0.0.1:8090), UI at `dgxmanager.nghodki.ai/dgxmm/`; a probe container on dgx-2 |
+| LiteLLM | OpenAI-compatible gateway with keys and budgets; agents call it, never engines (D4) | dgx-1 `litellm-proxy` :4000, `model.nghodki.ai` |
+| nginx-gateway | Routes `model.nghodki.ai` paths: `/v1/` and `/health` → LiteLLM, `/dgxmm/` → DGXMM, `/tts/` → kokoro-tts | dgx-1 |
+| KServe backend | Optional later (PK.1–PK.4); a draft lives on DGXMM branch `feature/kserve-backend` | — |
+
+## A call
+
+`agent → http(s)://model.nghodki.ai/v1/chat/completions → edge-caddy → nginx-gateway → litellm-proxy → engine`. Caddy
+and nginx both allow 30-minute reads and don't buffer, because an on-demand model can take minutes to start.
+
+## Routes and aliases: pending P2.0
+
+The repo's `models/` folder is meant for DGXMM catalog entries (source, pinned revision, alias, mode). It is empty
+until P2.0.
+
+The models and alias names are **your decision** (P2.0, design open question 2). Placeholders in the architecture:
+
+| Placeholder alias | Kind | Mode |
+|---|---|---|
+| `robot-fast` | small fast model for the robot | always on |
+| `guard` | Prompt Guard 2 + a small safety model | always on, fail closed |
+| `embed`, `stt`, `tts` | embeddings, speech | always on |
+| `smart` | main chat model (example: qwen3.8-27b) | on demand |
+| `coder` | coding model | on demand |
+| `vision` | VLM | on demand |
+| `big` | a model split across both Sparks over RDMA | pooled |
+| `batch-*` | dgx-2 queue | queued |
+
+Until then clients use model names (Hermes: `qwen3.8-27b`). DGXMM should register and remove LiteLLM routes itself so
+no route points at nothing (P2.8); two dead routes remain (P0.7).
+
+## Memory reserves (P2.7, not enforced yet)
+
+- dgx-1 keeps ≥ 8 GiB free; dgx-2 reserves 15–23 GiB for services.
+- On 2026-11-15 two-Spark model work exhausted unified memory and took both Sparks down
+  ([incident](../operations/incident-gpu-oom.mdx)). Since then `earlyoom` and a `gpu-oom-guard` (kills the largest GPU
+  process below 6 GiB available) run on both Sparks, installed outside this repo.
+- Fleet jobs cap themselves: AIBOM 6 GiB on the Sparks with a 20 GiB image guard; sim jobs 16 GiB with JAX at 15%.
+
+## Model supply chain (P2.5, design only)
+
+`docs/model-supply-chain.md` describes checks to add to DGXMM's download step, between the last file and clearing the
+download marker: a format gate for pickle-capable files (also through `include`), a pickle scan (picklescan or
+ModelScan) for overrides, safetensors and GGUF header checks, and an advisory provenance check with
+model-provenance-kit. pickle-fuzzer would self-test the chosen scanner weekly. None is implemented: it waits for the
+DGXMM session.
+
+## Waiting for the DGXMM session ("After the DGXMM session")
+
+- P0.14: LiteLLM master and salt keys into SOPS; remove dead routes (P0.7).
+- P2.4 guardrail on; P2.6 LiteLLM → Phoenix; P1.11 LLM judge via LiteLLM.
+- Skill scanner LLM judge back on for both Jetson users.
+- picoclaw end-to-end reply over NATS; Hermes chat tests.
+- P1.13 for LiteLLM UI, DGXMM UI, Open WebUI.
+- P2.0 models and aliases (you), then P2.1–P2.3, P2.5, P2.7, P2.8.

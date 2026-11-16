@@ -1,0 +1,4 @@
+{
+  "title": "Observability and alerting",
+  "pages": ["index", "dashboards", "alert-rules", "gatus", "alert-delivery", "failure-scenarios"]
+}

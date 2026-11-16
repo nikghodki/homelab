@@ -1,0 +1,42 @@
+---
+title: "What happens when X is down"
+description: "For each host and key service: what keeps working, what breaks, which alert fires, and where it shows up."
+---
+
+This is the as-built behaviour on 2026-11-15, not the target in architecture §16 (which assumes services already in
+k3s behind kube-vip).
+
+## Hosts
+
+| Down | Keeps working | Breaks | You hear about it from |
+|---|---|---|---|
+| **dgx-1** | Alerts to the phone (Dell ntfy over Tailscale); Gatus checks; observe stack on dgx-2; Temporal, MLflow (job API on the LAN); Hermes on the Jetson (but no model); the robot's safety governor; k3s API on dgx-2 (dgx-2 + Jetson keep quorum) | Every `*.nghodki.ai` web route and `nghodki.ai` DNS (front door and dnsmasq); LiteLLM, Open WebUI, DGXMM, Coolify; NATS (picoclaw MQTT, governor NATS e-stop and reset, Hermes's picoclaw MCP); Fleet broker and API (the Edge Connector keeps deciding locally); Pocket ID sign-in (reached through dgx-1); Ansible, the age key, kubectl (all on dgx-1) | Gatus: web group, NATS, Fleet, dgx-1 ssh, API dgx-1, etcd dgx-1; then `K3sEtcdMemberDown` |
+| **dgx-2** | Front door and DNS; models on dgx-1; NATS; Gatus and ntfy (Dell); k3s API on dgx-1 (dgx-1 + Jetson) | Metrics, logs, traces, dashboards, vmalert alerts; Pocket ID (so no sign-in anywhere); Temporal; MLflow; Phoenix; backups | Gatus: Grafana, Phoenix, Temporal, MLflow, dgx-2 ssh, API dgx-2, etcd dgx-2; after 15 min the missing Watchdog heartbeat |
+| **Both Sparks** (the 2026-11-15 case) | Gatus and ntfy on the Dell; the phone gets every Spark check failing; the robot keeps its local safety loop (the LiDAR is on the Pi and the Zenoh router on the Jetson); the governor loses NATS, so only the ROS e-stop works | Everything web, models, observability, k3s API (only the Jetson's etcd vote is left: no quorum) | Gatus, many checks at once |
+| **Jetson** | Cluster (the two Sparks keep quorum over the cable); models; web | Hermes (both profiles), Home Assistant, the Zenoh router (so the Pi's `/scan` stops reaching anything and the governor holds the robot stopped: `scan_stale`), LiveKit and the control center | Gatus: Home Assistant, ha.nghodki.ai, jetson ssh, Zenoh router, etcd jetson; `K3sEtcdMemberDown`; `SafetyGovernorLidarStale` |
+| **Jetson and a Spark** | Running containers and pods | The k3s API (no quorum): nothing new is scheduled until one is back | `K3sEtcdQuorumLost` (if vmalert's Spark is alive) |
+| **The Dell** | Everything except alert delivery and Homepage; k3s (pods on the Dell are evicted after 5 min) | Gatus, ntfy, `status.nghodki.ai`, `ntfy.nghodki.ai`, `ops.nghodki.ai`; Alertmanager's notifications fail | after 15 min, `AlertingHostDown` to the ntfy.sh backup topic ("homelab: alerting host unreachable") |
+| **The Dell and dgx-2** | Services on dgx-1 | Nothing reaches the phone | nothing (known gap) |
+| **The Pi** | Everything else | The robot (no governor, no driver, no picoclaw); the car's firmware stops on its own after 500 ms without `/velocity` | Gatus: pi ssh; `SafetyGovernorStatusStale`; `FleetHostSilent`; `EdgeDeviceOffline` |
+
+## Services and links
+
+| Down | Effect | Alert |
+|---|---|---|
+| Wi-Fi / router reboot | Every host's LAN link drops. The Sparks keep quorum over the cable; the Jetson leaves quorum until it reconnects; the Pi's `/scan` and heartbeats stop, so the governor stops the robot within 1–2 s; collectors buffer and retry for 30 min | Gatus floods when it comes back; `FleetHostSilent` if longer than 5 min |
+| Internet | Everything local keeps working. No downloads, no Renovate, no GitHub (no deploys), no ntfy.sh (no iOS instant push, no backup route) | — |
+| Tailscale control plane | Existing connections keep working; new ones may fail | — |
+| A Tailscale-only path (phone away from home) | The phone still reaches the Dell's ntfy and dgx-1's front door over Tailscale | — |
+| edge-caddy | All web routes | Gatus web group |
+| edge-dnsmasq | `nghodki.ai` names stop resolving on the tailnet and LAN; in k3s, Argo CD can't resolve `id.nghodki.ai` (login fails); containers with `extra_hosts` keep working | Gatus checks by IP keep passing (they don't use DNS), so this one is quiet (known gap) |
+| Pocket ID | No new sign-ins. Gatus keeps checking. Temporal UI restarts in a loop until it's back. Use [break-glass](../security/identity.mdx) | Homepage monitor (no Gatus check for `id.nghodki.ai`) |
+| LiteLLM / the model engine | Hermes can't answer; Open WebUI has no models; the skill scanner's LLM judge (off anyway) | Gatus `model.nghodki.ai (LiteLLM)` |
+| NATS | picoclaw loses its MQTT input; the governor's NATS e-stop and reset can't arrive (the ROS e-stop still works); Hermes's picoclaw MCP fails | Gatus NATS (TLS), NATS MQTT |
+| Fleet broker / gateway | The Pi's Edge Connector keeps deciding locally; undecided calls stay blocked (strict); heartbeats stop | Gatus Fleet MQTT / Fleet API; `EdgeDeviceOffline` |
+| A DefenseClaw gateway on the Jetson | That Hermes profile's tool calls are refused (fail closed) | DefenseClaw `ConnectorTelemetrySilent` (no direct check) |
+| Zenoh router | `/scan` and heartbeats stop; the governor stops the robot (`fault`, `scan_stale`) | Gatus Zenoh router; `SafetyGovernorLidarStale` |
+| Safety governor | Nothing sends to the car; the firmware's 500 ms deadman stops it | `SafetyGovernorStatusStale` (critical) |
+| Kyverno (both admission replicas) | New pods in enforced namespaces are **refused** (failurePolicy Fail); `kube-system`, `kyverno`, `argocd`, `edge` keep working, so Kyverno and Argo CD can restart. Break-glass B in [Kyverno](../platform/kyverno.mdx) | `KyvernoAdmissionDown` (critical) |
+| GHCR or Sigstore unreachable | New pods with `ghcr.io/nikghodki` images can't be verified and are refused; running pods keep running | `KyvernoRejectionsSpike` |
+| Argo CD | No syncs; the cluster keeps running as is | `ArgoCDMetricsDown` |
+| GitHub | Nothing new deploys; everything running keeps running | — |

@@ -1,0 +1,80 @@
+---
+title: "Cluster networking"
+description: "How k3s traffic flows: node IPs on the Spark cable, flannel VXLAN, /32 routes for the Wi-Fi nodes, service CIDR and fixed ClusterIPs."
+---
+
+k3s was built over Wi-Fi before Ethernet (decision 0005). The Spark-to-Spark path is the target layout already; only
+the Jetson and the Dell use Wi-Fi to reach the Sparks.
+
+## Node addresses
+
+| Node | `node-ip` | Interface (`flannel-iface`) | `node-external-ip` |
+|---|---|---|---|
+| dgx-1 | 10.100.136.1 | `enp1s0f0np0` (cable) | 192.168.86.44 |
+| dgx-2 | 10.100.136.2 | `enp1s0f0np0` (cable) | 192.168.86.36 |
+| jetson | 192.168.86.211 | `wlP1p1s0` (Wi-Fi) | — |
+| omarchy | 192.168.86.49 | `wlp1s0` (Wi-Fi) | — |
+
+Every node joins `https://10.100.136.2:6443` (`k3s_server_url`, `group_vars/k3s.yml`). The API cert's SANs:
+192.168.86.44, 192.168.86.36, 10.100.136.1, 10.100.136.2, 100.65.137.82, 100.124.175.23, `k8s.nghodki.ai`.
+
+## The /32 routes
+
+The Jetson and the Dell have no path to 10.100.136.0/24. Ansible (role `k3s`, `tasks/routes.yml`) adds two host routes
+on their NetworkManager Wi-Fi connection, so they survive reconnects:
+
+```
+10.100.136.1/32 via 192.168.86.44
+10.100.136.2/32 via 192.168.86.36
+```
+
+Each Spark answers for its own cable address on its LAN interface. That needs `rp_filter` not strict (1). All nodes
+use 2 (loose); the role checks this and fails if it is strict. Check:
+`nmcli -g ipv4.routes connection show nikghodki_wifi`.
+
+## Overlay and services
+
+| | |
+|---|---|
+| Pod CIDR | 10.42.0.0/16 |
+| Service CIDR | 10.43.0.0/16 |
+| CNI | flannel VXLAN (UDP 8472), MTU 1450 (every path is MTU 1500) |
+| DNS | CoreDNS at 10.43.0.10, plus the `nghodki.ai` zone ([DNS](dns.mdx)) |
+| Disabled | traefik, servicelb, metrics-server (80/443 belong to edge-caddy on dgx-1) |
+| Measured | 0.4 ms Spark to Spark, 4–15 ms pod to pod over Wi-Fi (2026-11-15) |
+
+Raising the cable to jumbo frames would need the flannel MTU set by hand.
+
+## Fixed ClusterIPs for the hosts
+
+Docker services on the nodes (edge-caddy on dgx-1, VictoriaMetrics on dgx-2) reach some Services directly by ClusterIP.
+kube-proxy on every node routes ClusterIPs for host and Docker traffic too, so nothing is published on the LAN. They use
+the static band 10.43.0.0–10.43.0.255, which the API server doesn't hand out dynamically (`cluster/README.md`):
+
+| IP:port | Service | Used by |
+|---|---|---|
+| 10.43.0.10:53 | kube-dns | pods |
+| 10.43.0.100:80, :8083 | `argocd/argocd-server-host` | edge-caddy (`argocd.nghodki.ai`), VictoriaMetrics |
+| 10.43.0.101:8082 | `argocd/argocd-controller-host` | VictoriaMetrics |
+| 10.43.0.102:8084 | `argocd/argocd-repo-server-host` | VictoriaMetrics |
+| 10.43.0.110:8000 | `kyverno/kyverno-admission-host` | VictoriaMetrics |
+| 10.43.0.111:8000 | `kyverno/kyverno-reports-host` | VictoriaMetrics |
+
+Scrapes from Docker arrive from a Docker bridge (172.16.0.0/12) or, from another node, as that node's flannel address
+(10.42.x.0). The NetworkPolicies in `cluster/platform/argocd/extras/host-scrape-netpol.yaml` allow those sources on
+the metrics ports only. To add one: pick the next free address, add a row to `cluster/README.md`, and allow the hosts in
+a NetworkPolicy if the pods have one.
+
+P3.3 (in progress) adds kube-vip and LoadBalancer Services; at check time `edge-dns-lan` had ClusterIP 10.43.0.53.
+
+## Docker and k3s side by side
+
+k3s runs its own containerd (`/run/k3s/containerd`). Docker and its iptables chains are untouched; kube-proxy and
+flannel add their own chains in front of `DOCKER-USER`. k3s binds no LAN-IP ports (API `*:6443`, kubelet `*:10250`,
+etcd on the node IP), so a late Wi-Fi after a reboot doesn't affect k3s.
+
+## Moving to wired (P0.11)
+
+Nothing changes on the cable. On the LAN side: new reservations, `k3s_node_external_ip`, `k3s_lan_iface` (`enP7s7`),
+`k3s_tls_san`, the `via` addresses in `k3s_link_routes`, `k8s.nghodki.ai`, Gatus checks. Roll one node at a time
+(agents, Jetson, dgx-1, dgx-2). A node IP change on the Jetson means remove-and-rejoin. Full steps: runbooks/k3s.md.
