@@ -40,6 +40,9 @@ cisco_aibom_dirs:
 cisco_aibom_containers: [litellm-proxy, open-webui]
 # The agentic stage's model API: the role's default, http://model.nghodki.ai/v1 (the front door), as on every host;
 # LiteLLM is in k3s since 2026-11-16 and no longer on dgx-1's loopback.
+# The host collector pushes to dgx-2 over the direct QSFP cable (10.100.136.2, 0.3 ms) instead of Wi-Fi (22 ms avg,
+# 149 ms max; infra review 2026-11 §6.2). otel-fleet publishes 4319 on all of dgx-2's interfaces.
+otel_host_collector_endpoint: "10.100.136.2:4319"
 # k3s (plan P3.2)
 k3s_node_ip: 10.100.136.1
 k3s_node_external_ip: 192.168.86.44
