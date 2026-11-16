@@ -17,6 +17,7 @@ since, none of them related. The latest mcp-scanner release is 4.8.7.
 | 6 | Hermes connector: one HERMES_HOME per account; second profile stops the gateway | cisco-ai-defense/defenseclaw | Draft (not reported; add the exact error line before posting) | [06](06-hermes-connector-single-hermes-home.md) |
 | 7 | `skill-scanner` not found under a systemd user unit → every skill quarantined; `skill restore` fails | cisco-ai-defense/defenseclaw | Draft (not reported; related #796 closed, #1428 open) | [07](07-skill-scanner-path-fail-closed-quarantine.md) |
 | 8 | mcp-scanner 4.8.7 pins `litellm==1.93.2` (GHSA-7hp6-4w63-5g45, GHSA-g5ff-637f-6q2m) | cisco-ai-defense/mcp-scanner | Relaxed on `main` (#289), unreleased; floor PRs #290, #295, #315 open. Comment, don't file | [08](08-mcp-scanner-litellm-pin.md) |
+| 9 | cisco-aibom 1.10.1: `MLLifecycleDetector` re-searches the whole file per line of Python (quadratic; ~75 min for Hermes) | cisco-ai-defense/aibom | Draft (not reported; still on `main`) | [09](09-cisco-aibom-ml-lifecycle-quadratic.md) |
 
 When one is posted, put the upstream link in its file and in this table. When a release fixes one, update its runbook
 and the "Known limits" sections (`runbooks/edge-connector.md`, `policies/README.md`, `.github/osv-scanner.toml`).
