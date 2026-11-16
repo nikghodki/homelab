@@ -83,10 +83,10 @@ services:
       TEMPORAL_AUTH_SCOPES: openid,profile,email
     volumes:
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-    # Reach id.nghodki.ai at the front door and trust the homelab web CA from the host's bundle (role homelab_ca).
-    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+    # Reach id.nghodki.ai at the front door's LAN VIP and trust the homelab web CA from the host's bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.11"]
     ports:
-      - "192.168.86.36:8233:8080"   # LAN only: dgx-1's Caddy serves it as temporal.nghodki.ai
+      - "192.168.86.36:8233:8080"   # LAN only: the front door (k3s Caddy) serves it as temporal.nghodki.ai
     depends_on:
       - temporal
 
