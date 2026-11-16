@@ -13,6 +13,11 @@
         file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
         name: console_secrets
       no_log: true
+    - name: Load the docs build's Gatus token from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/docs.enc.yaml"
+        name: docs_secrets
+      no_log: true
     # Arch enables only docker.socket, which wouldn't start the stack's containers after a boot.
     - name: Docker starts at boot
       ansible.builtin.systemd_service:
@@ -25,6 +30,7 @@
     ntfy_alerts_token: "{{ observe_secrets.ntfy_alerts_token }}"
     ntfy_phone_password_hash: "{{ observe_secrets.ntfy_phone_password_hash }}"
     gatus_heartbeat_token: "{{ observe_secrets.gatus_heartbeat_token }}"
+    gatus_docs_build_token: "{{ docs_secrets.docs_build_gatus_token }}"
     oidc_gatus_secret: "{{ console_secrets.oidc_gatus_secret }}"
     oauth2_proxy_status_cookie_secret: "{{ console_secrets.oauth2_proxy_status_cookie_secret }}"
   roles:

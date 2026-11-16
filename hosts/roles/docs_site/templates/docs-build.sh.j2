@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Managed by homelab Ansible (roles/docs_site). runbooks/docs-site.md.
+# Build docs-site/ from {{ docs_site_branch }} and swap it into {{ docs_site_srv_dir }}/current. Only builds when the
+# branch moved and docs-site/ changed; a failed build leaves the last good site in place. Every run logs one
+# `docs-build` line to the journal (shipped to Loki) when something happened, and reports the result to Gatus.
+# Force a rebuild: rm {{ docs_site_state_dir }}/state && systemctl start docs-build
+set -euo pipefail
+umask 022
+
+REPO_URL={{ docs_site_repo_url | quote }}
+BRANCH={{ docs_site_branch | quote }}
+CONF={{ docs_site_conf_dir | quote }}
+STATE_DIR={{ docs_site_state_dir | quote }}
+SRV={{ docs_site_srv_dir | quote }}
+IMAGE={{ docs_site_build_image | quote }}
+KEEP={{ docs_site_keep_releases | int }}
+TIMEOUT={{ docs_site_build_timeout | int }}
+GATUS_URL={{ docs_site_gatus_url | quote }}
+STATE="$STATE_DIR/state"
+
+export HOME="$STATE_DIR" GIT_TERMINAL_PROMPT=0
+export GIT_SSH_COMMAND="ssh -F /dev/null -i $CONF/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+-o UserKnownHostsFile=$CONF/known_hosts -o StrictHostKeyChecking=yes -o HostKeyAlgorithms=ssh-ed25519 -o ConnectTimeout=20"
+
+log() { logger -t docs-build -p "user.$1" -- "$2"; }
+
+report() {  # report <true|false> [error]: Gatus external endpoint; never fails the run
+  curl -fsS -m 10 -o /dev/null -G -X POST -H "@$CONF/gatus-header" \
+    --data-urlencode "success=$1" ${2:+--data-urlencode "error=$2"} "$GATUS_URL" || true
+}
+
+save_state() {  # save_state <commit> <ok|failed>
+  printf 'seen=%s\nresult=%s\n' "$1" "$2" > "$STATE.tmp" && mv -f "$STATE.tmp" "$STATE"
+}
+
+fail() {
+  log err "FAILED: $1 (still serving $(readlink "$SRV/current" 2>/dev/null || echo nothing))"
+  save_state "${sha:-unknown}" failed
+  report false "$1"
+  exit 1
+}
+
+exec 9>"$STATE_DIR/lock"
+flock -n 9 || exit 0
+
+seen=$(sed -n 's/^seen=//p' "$STATE" 2>/dev/null || true)
+result=$(sed -n 's/^result=//p' "$STATE" 2>/dev/null || true)
+
+sha=$(git ls-remote "$REPO_URL" "refs/heads/$BRANCH" | cut -f1) || true
+if [ -z "$sha" ]; then
+  # GitHub unreachable: not a build failure; keep the last result and let Gatus' heartbeat notice a long outage.
+  log warning "cannot reach $REPO_URL; nothing built"
+  exit 0
+fi
+
+if [ "$sha" = "$seen" ] && [ -L "$SRV/current" ]; then
+  # main hasn't changed: nothing to build. Repeat the last result for Gatus (a failed build stays red until fixed).
+  if [ "$result" = ok ]; then report true; exit 0; fi
+  report false "build of $BRANCH ${sha:0:12} failed (see journal: docs-build)"
+  exit 1
+fi
+
+src="$STATE_DIR/src"
+rm -rf "$src" "$SRV"/releases/.new-*
+git clone -q --depth 1 --filter=blob:none --sparse --branch "$BRANCH" "$REPO_URL" "$src" 2>&1 \
+  || fail "git clone of $BRANCH failed"
+git -C "$src" sparse-checkout set docs-site || fail "sparse checkout failed"
+sha=$(git -C "$src" rev-parse HEAD)
+tree=$(git -C "$src" rev-parse "HEAD:docs-site")
+
+if [ "$(readlink "$SRV/current" 2>/dev/null)" = "releases/$tree" ]; then
+  save_state "$sha" ok
+  log info "main ${sha:0:12}: docs-site unchanged (tree ${tree:0:12}); nothing to build"
+  report true
+  exit 0
+fi
+
+uid=$(id -u {{ docs_site_user }}); gid=$(id -g {{ docs_site_user }})
+new="$SRV/releases/.new-$tree"
+mkdir -p "$new" && chown "$uid:$gid" "$new"
+start=$(date +%s)
+# Read-only source, no capabilities, its own user; the only writable places are /out, the caches and a tmpfs.
+if ! timeout "$TIMEOUT" docker run --rm --pull missing --user "$uid:$gid" --read-only --tmpfs /tmp:rw,exec,size=1g \
+    --cap-drop ALL --security-opt no-new-privileges:true --memory 1g --pids-limit 512 \
+    -e HOME=/tmp -e PIP_CACHE_DIR=/cache/pip -e HOMELAB_DOCS_CACHE=/cache/mermaid -e NO_MKDOCS_2_WARNING=1 \
+    -e PYTHONDONTWRITEBYTECODE=1 -e PIP_DISABLE_PIP_VERSION_CHECK=1 -e PIP_ROOT_USER_ACTION=ignore \
+    -v "$src/docs-site:/src/docs-site:ro" -v "$STATE_DIR/cache:/cache" -v "$new:/out" -w /src "$IMAGE" \
+    sh -ec 'python -m venv /tmp/venv
+            /tmp/venv/bin/pip install -q --require-hashes --only-binary=:all: -r docs-site/requirements-docs.txt
+            /tmp/venv/bin/mkdocs build --strict -f docs-site/mkdocs.yml -d /out'; then
+  rm -rf "$new"
+  fail "mkdocs build --strict of $BRANCH ${sha:0:12} failed"
+fi
+[ -s "$new/index.html" ] && [ -s "$new/assets/javascripts/mermaid.min.js" ] \
+  || { rm -rf "$new"; fail "build of ${sha:0:12} produced no site"; }
+
+printf 'commit %s\ndocs tree %s\nbuilt %s\n' "$sha" "$tree" "$(date -u +%FT%TZ)" > "$new/build-info.txt"
+chown -R root:root "$new"
+rel="$SRV/releases/$tree"
+rm -rf "$rel"
+mv -T "$new" "$rel"
+# Atomic swap: a new symlink renamed over the old one
+ln -sfn "releases/$tree" "$SRV/.current.new"
+mv -T "$SRV/.current.new" "$SRV/current"
+
+# Keep the newest $KEEP releases for rollback (never the one being served)
+cur=$(readlink -f "$SRV/current")
+find "$SRV/releases" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP + 1)) \
+  | cut -d' ' -f2- | while read -r d; do [ "$(readlink -f "$d")" = "$cur" ] || rm -rf "$d"; done
+
+save_state "$sha" ok
+log info "OK: built main ${sha:0:12} (docs tree ${tree:0:12}) in $(($(date +%s) - start)) s; now serving releases/$tree"
+report true

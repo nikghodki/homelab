@@ -1,0 +1,80 @@
+---
+title: "Day one"
+description: "A new operator's first hour: access, tools, where things live, the rules, and the first checks to run."
+---
+
+## 1. Get in
+
+From the admin laptop (nothing is written or run there; it only holds tunnels):
+
+```bash
+ssh -p 2244 nikghodki-dgx@localhost        # dgx-1: where all work happens
+ssh -p 2245 nikjetson@localhost            # Jetson
+ssh -p 2248 nikghodki-raspberry-1@localhost  # Pi
+```
+
+From dgx-1: `ssh nikghodki-dgx-2@192.168.86.36` (dgx-2), `ssh nikghodki@192.168.86.49` (the Dell). In scripts, use
+`ssh -n` inside heredocs.
+
+## 2. Set up your shell on dgx-1
+
+```bash
+export PATH=$HOME/.local/bin:$PATH          # gh (logged in as nikghodki), sops, helm, argocd, cosign
+export KUBECONFIG=$HOME/.kube/config
+source ~/.venvs/ansible/bin/activate        # ansible, ansible-lint, bcrypt
+gh auth status                              # must say nikghodki
+git -C ~/homelab config user.email          # must be 92228606+nikghodki@users.noreply.github.com
+```
+
+Never use the laptop's `gh` or `git`: they are a work account.
+
+## 3. Where things live
+
+| What | Where |
+|---|---|
+| The repo | dgx-1 `~/homelab` (`main`); your own work in `~/homelab-wt/<name>` (git worktree) |
+| Ansible | `~/homelab/hosts`, venv `~/.venvs/ansible`, inventory `hosts/inventory.yml`, runs on dgx-1 against LAN IPs |
+| The age key | dgx-1 `~/.config/sops/age/keys.txt` |
+| kubectl | dgx-1 `~/.kube/config` |
+| Deployed stacks | `/opt/homelab/<stack>` on each host |
+| Front door and DNS | dgx-1 `~/edge-gateway` (outside the repo) |
+| LiteLLM, Open WebUI, DGXMM, Coolify | dgx-1, hand-run (outside the repo; owned by the DGXMM session) |
+| Hermes | Jetson, users `nikjetson` and `hermes-nikhil` |
+| Robot | Pi user units |
+| Runbooks | `~/homelab/runbooks/` |
+| Decisions | `docs/design.md` §6 and `decisions/` |
+
+## 4. Rules
+
+1. Every change is a PR; merge only when `gh pr checks <n> --watch` exits 0, then `gh pr merge --squash --delete-branch`.
+2. Commits only as `nikghodki <92228606+nikghodki@users.noreply.github.com>`, no trailers.
+3. No code or files on the laptop. Write on dgx-1 (heredocs over SSH are fine).
+4. Playbooks: `--check --diff` first, then for real, then a second run that shows no changes.
+5. Rebase on `origin/main` before deploying a stack someone else also changes.
+6. No secrets in Git, in docs, or in chat. Name the SOPS file and key instead.
+7. Don't touch DGXMM, LiteLLM, model engines or GPUs from fleet work.
+
+Details: [PR and merge rules](../development/rules.md).
+
+## 5. First checks
+
+```bash
+kubectl get nodes                                   # 4 Ready
+kubectl get applications -n argocd                  # all Synced/Healthy
+curl -s -o /dev/null -w '%{http_code}\n' http://192.168.86.49:8081/health   # Gatus via status-proxy: 200
+curl -s http://192.168.86.49:8085/v1/health        # ntfy
+curl -s http://127.0.0.1:4000/health/liveliness    # LiteLLM
+docker ps                                          # dgx-1 containers
+```
+
+Then open `https://status.nghodki.ai` (Gatus) and `https://grafana.nghodki.ai` (Fleet Home) from a device with the web
+CA installed, and subscribe to ntfy on your phone ([Alert delivery](../observability/alert-delivery.md)).
+
+## 6. Recurring work
+
+| When | What |
+|---|---|
+| Daily (automatic) | AIBOM, Gatus, alerts. The 08:00 digest on WhatsApp is planned, not built |
+| Weekly | Lynis (Sunday). Review and merge Renovate PRs (Monday morning batch). Review DefenseClaw blocks |
+| Monthly | Upgrade window: snapshot → Omarchy → Jetson → dgx-2 → dgx-1 → Pi (docked); access review; safety-governor test |
+| Quarterly | Rotate secrets, capacity review, age key restore drill |

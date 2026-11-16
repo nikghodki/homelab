@@ -1,0 +1,144 @@
+---
+title: "Argo CD"
+description: "GitOps for the cluster: app-of-apps layout, every Application, adding an app, sync timing, KSOPS and the age key, the deploy key, sign-in and break-glass."
+---
+
+Argo CD pulls `cluster/` (and `policies/kyverno`) from `git@github.com:nikghodki/homelab.git`, branch `main`, with a
+read-only deploy key. Nothing pushes into the cluster (D15). Decision 0006; runbooks/argocd.md.
+
+| | |
+|---|---|
+| Version | Argo CD v3.6.1, Helm chart `argo-cd` 10.18.0, KSOPS v4.5.1 (digest-pinned init container) |
+| Values | `cluster/platform/argocd/values.yaml` (used by the bootstrap and by the `argocd` Application, so both render the same) |
+| Runs | namespace `argocd`, Sparks only (`nghodki.ai/role=gpu`), one replica each: application controller, repo-server, server, redis. No Dex, notifications, ApplicationSet (0 replicas) or commit server |
+| UI | `https://argocd.nghodki.ai` → edge-caddy → fixed ClusterIP 10.43.0.100:80 (server in insecure mode) |
+| Sign-in | Pocket ID client `argocd` (PKCE S256); `admins` → `role:admin`, no default role; built-in `admin` **off** |
+| CLI | on dgx-1: `argocd --core --kube-context argocd app list` (uses the admin kubeconfig; no Argo CD login) |
+| Polling | `timeout.reconciliation: 120s` plus up to 60 s jitter |
+| Metrics | controller 10.43.0.101:8082, server 10.43.0.100:8083, repo-server 10.43.0.102:8084 → VictoriaMetrics; dashboard Cluster → Argo CD |
+| Alerts | `ArgoCDAppOutOfSync`, `ArgoCDAppNotHealthy`, `ArgoCDMetricsDown` |
+
+The `argocd` kube context on dgx-1 is the admin context with namespace `argocd`.
+
+## Layout
+
+```
+cluster/
+├── bootstrap/apps/      root app of apps: one Application per component + AppProjects
+│   ├── root.yaml        manages this folder (itself too); applied once by hand
+│   ├── projects.yaml    AppProjects `platform` and `apps`
+│   ├── argocd.yaml      Argo CD manages itself
+│   ├── kyverno.yaml, kyverno-policies.yaml, cnpg-operator.yaml, cluster-dns.yaml
+│   └── smoke.yaml       SOPS canary
+├── platform/<component>/  Helm values + extras/ (kustomize: Services, NetworkPolicies, SOPS secrets)
+└── apps/<name>/         workloads (empty until P3.7); _smoke is the canary
+```
+
+## Applications (on `main`)
+
+| App | Project | Source | Destination | Notes |
+|---|---|---|---|---|
+| `root` | default | `cluster/bootstrap/apps` | argocd | manages itself |
+| `argocd` | default | chart argo-cd 10.18.0 + `cluster/platform/argocd/extras` | argocd | ServerSideApply; extras: host Services, scrape NetworkPolicies, KSOPS Secret `argocd-oidc` |
+| `kyverno` | platform | chart kyverno 3.10.0 + `cluster/platform/kyverno/extras` | kyverno | 2 admission replicas |
+| `kyverno-policies` | platform | `policies/kyverno` | kyverno | sync-wave 1; retries until the CRDs exist; Enforce |
+| `cnpg-operator` | platform | chart cloudnative-pg 0.29.1 | cnpg-system | |
+| `cluster-dns` | platform | `cluster/platform/cluster-dns` | kube-system | CoreDNS zone for `nghodki.ai` |
+| `smoke` | apps | `cluster/apps/_smoke` | smoke | SOPS canary; the only app with the resources finalizer |
+
+All have automated sync with prune and selfHeal, and retries (5×, 30 s backoff, up to 5 min). Deleting the `argocd`,
+`kyverno` or `cnpg-operator` Application leaves the components and CRDs in place (no finalizer), so no Postgres cluster
+disappears with it.
+
+Projects: `platform` (cluster-wide, repos: this repo, argo-helm, kyverno, cloudnative-pg charts; any namespace, all
+cluster resources); `apps` (this repo only; namespaced resources plus Namespace; not `argocd`, `kube-system`, `kyverno`,
+`cnpg-system`; no ResourceQuota or LimitRange).
+
+At check time three more apps were live, `edge`, `kube-vip` and `kube-state-metrics`, tracking branch
+`p3.3-edge-in-cluster` (P3.3 testing, not on `main`).
+
+## Add an app
+
+1. `cluster/apps/<name>/`: plain manifests or a `kustomization.yaml`; a Namespace named after the app; requests,
+   limits and a `nodeSelector` (`nghodki.ai/role: gpu` or `agent-node`) on every pod; images pinned by digest;
+   Secrets as SOPS `*.enc.yaml` plus a KSOPS generator (copy `_smoke/`).
+2. `cluster/bootstrap/apps/<name>.yaml`: an Application, `project: apps`, `targetRevision: main`, automated sync
+   (copy `smoke.yaml`).
+3. PR. CI runs kubeconform and the Kyverno CLI; also run `kyverno apply policies/kyverno --resource cluster/apps/<name>`
+   yourself, because Kyverno **enforces** in the cluster ([Kyverno](kyverno.md)). After the merge `root` creates the app
+   within about 3 minutes.
+
+A cluster-scoped platform component (a Helm chart) goes in `cluster/platform/<name>/` with project `platform`.
+Remove an app by deleting both; `root` prunes the Application.
+
+**Measured:** 89 s from a push (during bootstrap) and 178 s from the merge of PR #58 to the change being applied.
+
+**Roll back:** revert the commit on `main`. Don't fix things by hand: selfHeal puts Git's version back within seconds.
+
+## Status and debugging
+
+```bash
+export KUBECONFIG=~/.kube/config
+kubectl get applications -n argocd
+argocd --core --kube-context argocd app get <app>
+argocd --core --kube-context argocd app diff <app>
+kubectl -n argocd get app <app> -o jsonpath='{.status.conditions}'
+```
+
+| Symptom | Cause / fix |
+|---|---|
+| `ComparisonError ... Error getting data key: 0 successful groups required` | KSOPS can't read the age key: `sops-age` missing or not readable by uid 999 (`fsGroup: 999`, mode 0440) |
+| `ComparisonError ... app path does not exist` | `targetRevision` points at a branch without that folder |
+| OutOfSync that flips back | something mutates a field Argo CD sets: add `ignoreDifferences` |
+| Login loops, "failed to query provider" | Pocket ID down, or `id.nghodki.ai` doesn't resolve in pods (`kubectl -n kube-system get cm coredns-custom`, edge-dnsmasq) |
+| `ArgoCDMetricsDown` but pods run | the host path to 10.43.0.101: kube-proxy on dgx-2, or the `host-scrape` NetworkPolicy |
+
+## KSOPS and the age key in the cluster
+
+The repo-server gets `ksops` from an init container and `kustomize.buildOptions: --enable-alpha-plugins --enable-exec`.
+The fleet age key is the Secret `argocd/sops-age` (key `keys.txt`), mounted read-only at `/sops-age/keys.txt`
+(`SOPS_AGE_KEY_FILE`). It decrypts every SOPS file in the repo; see [SOPS and age](../security/secrets.md) for the exposure
+and rotation.
+
+Two things in the cluster don't come from Git and aren't pruned: `argocd/sops-age` and `argocd/repo-homelab` (the
+repository Secret with the deploy key).
+
+## Bootstrap (empty cluster; done once on 2026-11-15)
+
+On dgx-1, from a checkout of `main`, with `helm` and `sops` in `~/.local/bin`:
+
+1. `kubectl create namespace argocd`
+2. `kubectl -n argocd create secret generic sops-age --from-file=keys.txt=$HOME/.config/sops/age/keys.txt`
+3. Create `repo-homelab` from `secrets/argocd.enc.yaml` through a pipe (the Python snippet in runbooks/argocd.md; never
+   echo the key).
+4. `helm install argocd argo/argo-cd --version 10.18.0 -n argocd -f cluster/platform/argocd/values.yaml --wait`
+5. `kubectl apply -f cluster/bootstrap/apps/root.yaml`; wait until all apps are Synced/Healthy.
+6. `kubectl -n argocd delete secret -l owner=helm,name=argocd` (Argo CD owns the release now; nobody may `helm upgrade` it).
+
+## Deploy key
+
+ed25519, read-only, title `argocd-homelab`; private half `argocd_deploy_key` in `secrets/argocd.enc.yaml`. Rotation
+(runbooks/argocd.md): generate in a temp dir, `gh repo deploy-key add ... --title argocd-homelab` (never
+`--allow-write`), `sops set` both halves, shred the temp files, re-create `repo-homelab`, check
+`argocd --core --kube-context argocd repo list` says Successful, delete the old key, commit the SOPS file.
+
+## Break-glass
+
+Pocket ID down: use `argocd --core` on dgx-1. Only if the **UI** is needed: remove `automated` from the `root` and
+`argocd` Applications (so selfHeal doesn't undo it), set a one-off bcrypt `admin.password` in `argocd-secret`, set
+`admin.enabled: "true"` in `argocd-cm`; undo by removing the password and `kubectl apply -f cluster/bootstrap/apps/root.yaml`
+(admin goes back off within seconds). Exact commands: runbooks/argocd.md. Tested 2026-11-15.
+
+## Upgrade
+
+Bump `targetRevision` (the chart version) in `cluster/bootstrap/apps/argocd.yaml` after reading the upgrade notes;
+check the values with `helm template` first. Same for `kyverno.yaml` and `cnpg-operator.yaml`.
+
+## Resources (measured 2026-11-15)
+
+| Pod | Request / limit | Used (anon) |
+|---|---|---|
+| application-controller | 384Mi / 768Mi (`GOMEMLIMIT=600MiB`; OOM-killed once at 512Mi) | 377 MiB |
+| repo-server | 128Mi / 512Mi | 69 MiB (368 MiB with page cache) |
+| server | 64Mi / 256Mi | 33 MiB |
+| redis | 16Mi / 96Mi | 12 MiB |

@@ -1,0 +1,133 @@
+---
+title: "k3s"
+description: "The cluster: versions, nodes, etcd members, labels and taints, reservations, access, health, snapshots, adding and removing nodes, and decision 0005."
+---
+
+k3s (D1) was built on 2026-11-15 over Wi-Fi (decision 0005), before the Sparks get Ethernet. Ansible role `k3s`,
+`hosts/playbooks/k3s.yml`, inventory groups `k3s_servers`, `k3s_agents`, `k3s_init` (dgx-2). Runbook: runbooks/k3s.md.
+
+## Versions
+
+| Piece | Version |
+|---|---|
+| k3s | v1.37.2+k3s1 (binary and `install.sh` pinned by sha256 in `roles/k3s/defaults/main.yml`) |
+| Kubernetes | v1.37.2 |
+| etcd (embedded) | 3.7.1 |
+| containerd (k3s's own) | 2.3.7-k3s1 |
+
+## Nodes (live)
+
+| Node | Roles | Node IP | External IP | Labels | Taint |
+|---|---|---|---|---|---|
+| dgx-2 | control-plane, etcd (`cluster-init`) | 10.100.136.2 (cable) | 192.168.86.36 | `nghodki.ai/role=gpu`, `nghodki.ai/hw=gb10` | — |
+| dgx-1 | control-plane, etcd | 10.100.136.1 (cable) | 192.168.86.44 | `role=gpu`, `hw=gb10` | — |
+| jetson | etcd only (no API server, controller manager, scheduler) + kubelet | 192.168.86.211 (Wi-Fi) | — | `role=edge-robot`, `hw=orin` | `nghodki.ai/jetson=true:NoSchedule` |
+| omarchy | agent | 192.168.86.49 (Wi-Fi) | — | `role=agent-node`, `hw=x86` | — |
+
+Node names are inventory names (`node-name`), not hostnames. Hardware is in `nghodki.ai/hw` because k3s sets
+`node.kubernetes.io/instance-type` to `k3s`. Labels and taints in the config apply only when a node registers; on a live
+node, also run `kubectl label` / `kubectl taint`.
+
+## Quorum
+
+Three etcd members: dgx-1, dgx-2, the Jetson. Quorum is 2 of 3.
+
+- Losing any one member is fine.
+- Losing a Spark **and** the Jetson stops the API. Running pods and all Docker services keep running; nothing new is
+  scheduled.
+- A GPU/unified-memory OOM can take a Spark down at any time (it did on 2026-11-15). Then the Jetson's vote is what
+  keeps the API writable (tested: k3s stopped on dgx-2 for 2 minutes, dgx-1's API kept accepting writes).
+- Never run with 2 members for long, and keep an odd number.
+
+## Config (`/etc/rancher/k3s/config.yaml`, from `roles/k3s/templates/config.yaml.j2`)
+
+| Setting | Sparks | Jetson | Omarchy |
+|---|---|---|---|
+| `server` / `cluster-init` | dgx-2 `cluster-init: true`; dgx-1 joins `https://10.100.136.2:6443` | joins | joins |
+| `flannel-iface` | `enp1s0f0np0` | `wlP1p1s0` | `wlp1s0` |
+| `disable` | traefik, servicelb, metrics-server | same | — |
+| `secrets-encryption` | true | true | — |
+| `tls-san` | LAN, cable and Tailscale IPs of both Sparks, `k8s.nghodki.ai` | — | — |
+| kubelet `system-reserved` | cpu=2, memory=8Gi, ephemeral 20Gi | cpu=1500m, memory=4Gi | cpu=1, memory=2Gi |
+| kubelet `kube-reserved` | cpu=1, memory=2Gi, ephemeral 5Gi | cpu=500m, memory=768Mi | cpu=250m, memory=512Mi |
+| other kubelet args | — | eviction at 300 MiB available, `max-pods=40` | — |
+
+The Sparks' reservations are a scheduling budget only: DGXMM engines run in Docker and the kubelet doesn't count them.
+The join token is in `/etc/rancher/k3s/token` (0600), from `secrets/k3s.enc.yaml` → `k3s_token`. Other files:
+`k3s.service` / `k3s-agent.service`, `/usr/local/bin/k3s-killall.sh`, `k3s-uninstall.sh` / `k3s-agent-uninstall.sh`.
+
+## Access
+
+- dgx-1: `kubectl` as `nikghodki-dgx` uses `~/.kube/config` (0600, admin, server `https://192.168.86.44:6443`, context
+  `homelab`). `/etc/profile.d/homelab-kubeconfig.sh` sets `KUBECONFIG`. In non-login shells (scripts, SSH commands),
+  `export KUBECONFIG=$HOME/.kube/config` yourself: k3s's bundled `kubectl` otherwise defaults to the root-only
+  `/etc/rancher/k3s/k3s.yaml` and fails with a permission error.
+- `k8s.nghodki.ai` resolves to both Sparks and is in the cert, but Go clients can't use it (the AAAA NXDOMAIN quirk,
+  [DNS](../network/dns.md)).
+- Anonymous API access is off: `curl -k https://192.168.86.44:6443/readyz` answers 401 when the API server is up.
+
+## Health
+
+```bash
+export KUBECONFIG=~/.kube/config
+kubectl get nodes -o wide
+kubectl get --raw /readyz; kubectl get --raw /healthz/etcd
+kubectl get nodes -o custom-columns='N:.metadata.name,VOTER:.status.conditions[?(@.type=="EtcdIsVoter")].status'
+C=/var/lib/rancher/k3s/server/tls/etcd       # etcdctl from the etcd release, checksum-verified
+sudo etcdctl --endpoints https://10.100.136.1:2379,https://10.100.136.2:2379,https://192.168.86.211:2379 \
+  --cacert $C/server-ca.crt --cert $C/client.crt --key $C/client.key endpoint status -w table
+```
+
+Monitoring: Gatus group `k3s`; vmalert `K3sEtcdMemberDown`, `K3sEtcdQuorumLost`, `K3sApiDown`; also watch
+`FleetMemoryLow` and `journalctl -k | grep -i oom` on the Jetson, and `journalctl -u k3s` for etcd "lost leader".
+
+## Change and upgrade
+
+```bash
+source ~/.venvs/ansible/bin/activate && cd ~/homelab/hosts
+ansible-playbook playbooks/k3s.yml --check --diff
+ansible-playbook playbooks/k3s.yml      # dgx-2 first, then dgx-1 and the Jetson one at a time (serial: 1), then Omarchy
+```
+
+A config, token or binary change restarts k3s on that node. Upgrade: set `k3s_version`, `k3s_sha256` (from
+`sha256sum-arm64.txt` / `-amd64.txt`) and `k3s_install_script_sha256`; one minor version at a time; snapshot first.
+
+## Add a node
+
+1. Inventory: `k3s_servers` or `k3s_agents`. `host_vars`: `k3s_role`, `k3s_node_ip`, `k3s_lan_iface`,
+   `k3s_flannel_iface`, labels/taints, kubelet args; `k3s_link_routes` if not on the cable; `k3s_ufw: true` if ufw is on.
+2. `ansible-playbook playbooks/k3s.yml --limit <node> --check --diff`, then without `--check`.
+3. Servers: check the etcd member list shows it as a voter.
+
+## Remove or roll back a node
+
+1. `kubectl drain <node> --ignore-daemonsets --delete-emptydir-data`.
+2. `kubectl delete node <node>`. For an etcd member, check `etcdctl member list` and `member remove <id>` if it's still
+   there, **before** uninstalling.
+3. On the node: `sudo /usr/local/bin/k3s-uninstall.sh` (servers, incl. the Jetson) or `k3s-agent-uninstall.sh`
+   (Omarchy). Docker is untouched. The /32 routes stay (harmless).
+4. Remove it from the inventory groups.
+
+If dgx-2 itself is rebuilt, set `k3s_cluster_init: false` on it and point `k3s_server_url` at dgx-1, or it starts a
+second cluster.
+
+## Snapshots
+
+k3s takes etcd snapshots on every server (the Jetson too) at 00:00 and 12:00 and keeps 5, in
+`/var/lib/rancher/k3s/server/db/snapshots/`. Manual: `sudo k3s etcd-snapshot save --name <name>`. Off-host copies are
+off (decision 0002); SeaweedFS is P3.8. Restore: stop k3s on every server; on one,
+`sudo k3s server --cluster-reset --cluster-reset-restore-path=<snapshot>`; start it; wipe
+`/var/lib/rancher/k3s/server/db` on the others and start them.
+
+## Not installed (on purpose)
+
+kube-vip and in-cluster DNS/Caddy (P3.3, in progress); Tetragon (P3.6); the NVIDIA device plugin (the cluster doesn't touch the GPUs; k3s registers an `nvidia`
+runtime but nothing requests GPUs); workloads (P3.7); off-host snapshots (P3.8); metrics-server, an Ingress
+controller, ServiceLB.
+
+## Decision 0005 in one paragraph
+
+Build now over Wi-Fi rather than wait for cables: the Spark-to-Spark path already has its own link and doesn't change
+later. Risks accepted: etcd over Wi-Fi for the Jetson (k3s's lenient timers, heartbeat 500 ms and election 5 s,
+absorb ordinary jitter, but a drop takes it out of quorum); a router reboot cuts the Jetson off from both Sparks; the
+Jetson's memory. Rejected: waiting for P0.11, and a two-member etcd (can't lose either Spark).

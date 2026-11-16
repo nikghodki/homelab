@@ -48,6 +48,28 @@ jobs:
           ansible-galaxy collection install -r requirements.yml
           ansible-lint playbooks/site.yml roles
 
+  docs:
+    # The private docs site (docs-site/, runbooks/docs-site.md) as the Dell builds it, without publishing anything:
+    # broken links, anchors and nav entries fail the PR.
+    name: Docs site (mkdocs build --strict)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      NO_MKDOCS_2_WARNING: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install MkDocs (pinned with hashes)
+        run: |
+          python -m venv /tmp/docs
+          /tmp/docs/bin/pip install --require-hashes --only-binary=:all: -r docs-site/requirements-docs.txt
+      - name: Build the site (fails on any warning, broken link or anchor)
+        run: /tmp/docs/bin/mkdocs build --strict -f docs-site/mkdocs.yml -d /tmp/docs-site
+
   secrets:
     name: Secret scanning
     runs-on: ubuntu-24.04

@@ -1,0 +1,23 @@
+---
+# Private docs site build on the Dell (runbooks/docs-site.md): a timer fetches main with a read-only deploy key, builds
+# docs-site/ with MkDocs in a pinned Python container and swaps the result into docs_site_srv_dir/current, which the
+# ops stack's `docs` Caddy serves behind oauth2-proxy-docs. Secrets (deploy key, Gatus token) come from
+# secrets/docs.enc.yaml through the playbook.
+docs_site_repo_url: git@github.com:nikghodki/homelab.git
+docs_site_branch: main
+docs_site_conf_dir: /etc/homelab/docs      # deploy key, known_hosts, Gatus token header (root only)
+docs_site_state_dir: /var/lib/docs-build   # last seen commit and result, pip and Mermaid caches
+docs_site_srv_dir: /srv/docs               # releases/<docs tree hash>/ and the `current` symlink
+docs_site_user: docsbuild                  # the build container runs as this system user
+docs_site_keep_releases: 5                 # for rollback (runbooks/docs-site.md)
+docs_site_build_timeout: 900
+# Same image as robots/sim/mujoco/Dockerfile (multi-arch index digest)
+docs_site_build_image: python:3.12.16-slim-trixie@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+docs_site_schedule: "*:0/15"
+# Gatus external endpoint (stacks/alerting, group docs, name "docs build"): every run reports the last build result.
+docs_site_gatus_url: http://127.0.0.1:8082/api/v1/endpoints/docs_docs-build/external
+# github.com's SSH host key, checked against https://api.github.com/meta (ssh_keys) on 2026-11-15
+docs_site_github_host_key: >-
+  github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+docs_site_deploy_key: ""     # required: private key of deploy key docs-dell (read-only)
+docs_site_gatus_token: ""    # required: Gatus external endpoint token

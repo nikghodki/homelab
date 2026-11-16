@@ -1,0 +1,103 @@
+---
+- name: Secrets are set
+  ansible.builtin.assert:
+    that:
+      - docs_site_deploy_key | length > 0
+      - docs_site_gatus_token | length > 0
+    quiet: true
+  no_log: true
+
+- name: Build user
+  ansible.builtin.user:
+    name: "{{ docs_site_user }}"
+    system: true
+    shell: /usr/bin/nologin
+    home: "{{ docs_site_state_dir }}"
+    create_home: false
+  register: docs_site_account
+
+- name: Config folder (root only)
+  ansible.builtin.file:
+    path: "{{ docs_site_conf_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Deploy key (read-only, docs-dell)
+  ansible.builtin.copy:
+    dest: "{{ docs_site_conf_dir }}/deploy_key"
+    content: "{{ docs_site_deploy_key | trim }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Gatus push header (read by curl -H @file, so the token never shows in ps)
+  ansible.builtin.copy:
+    dest: "{{ docs_site_conf_dir }}/gatus-header"
+    content: "Authorization: Bearer {{ docs_site_gatus_token | trim }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Host key of github.com
+  ansible.builtin.copy:
+    dest: "{{ docs_site_conf_dir }}/known_hosts"
+    content: "{{ docs_site_github_host_key }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: State folder
+  ansible.builtin.file:
+    path: "{{ docs_site_state_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Build caches (pip wheels, Mermaid), written by the build container
+  ansible.builtin.file:
+    path: "{{ docs_site_state_dir }}/cache"
+    state: directory
+    owner: "{{ docs_site_user }}"
+    group: "{{ docs_site_user }}"
+    mode: "0755"
+
+- name: Served folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ docs_site_srv_dir }}"
+    - "{{ docs_site_srv_dir }}/releases"
+
+- name: Build script
+  ansible.builtin.template:
+    src: docs-build.sh.j2
+    dest: /usr/local/libexec/docs-build
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Build service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [docs-build.service, docs-build.timer]
+  register: docs_site_units
+
+- name: Timer is enabled (every 15 min and at boot)
+  ansible.builtin.systemd_service:
+    name: docs-build.timer
+    enabled: true
+    state: started
+    daemon_reload: "{{ docs_site_units.changed }}"

@@ -11,5 +11,6 @@ layout:
   Observe: {style: row, columns: 4}
   Models: {style: row, columns: 3}
   Home: {style: row, columns: 1}
+  Docs: {style: row, columns: 1}
   Security & Identity: {style: row, columns: 2}
   Fleet: {style: row, columns: 1}

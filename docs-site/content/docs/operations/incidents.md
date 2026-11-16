@@ -1,0 +1,105 @@
+---
+title: Incident playbooks
+description: What to do when a Spark runs out of GPU memory, the front door is down, Pocket ID is down, Wi-Fi drops, a tunnel drops, the Dell is down, quorum is lost, or the robot misbehaves.
+---
+
+The incident runbooks planned in `runbooks/README.md` (P3.9) don't exist yet. These playbooks cover the incidents seen
+so far and the obvious ones. First rule for all of them: **look before you restart**, and write down what you did.
+
+## GPU / unified-memory OOM on a Spark
+
+Symptoms: a Spark stops answering (ssh, Gatus `dgx-N ssh`, its web routes); after reboot, the previous boot's kernel log
+has `NVRM: ... Out of memory [NV_ERR_NO_MEMORY]` and then system OOM-killer lines. Full timeline of 2026-11-15:
+[GPU OOM incident](incident-gpu-oom.md).
+
+1. If it still answers: find the big GPU user: `nvidia-smi --query-compute-apps=pid,used_memory --format=csv`, and
+   `free -g`. Stop the job that caused it (coordinate with the DGXMM session for model engines).
+2. If it doesn't answer: power-cycle it (there is no remote management; unverified whether the DGX has a BMC).
+3. After the boot: `journalctl -k -b -1 | grep -iE 'NVRM.*out of memory|oom'` to confirm; `docker ps` (services back?),
+   `kubectl get nodes`, Gatus.
+4. Check containers that publish on the LAN IP came up (late Wi-Fi): `docker ps -a | grep -v Up`.
+5. The k3s API stays up if the other Spark and the Jetson are fine. If both Sparks went down, the API returns once
+   one Spark is back.
+6. Prevention: memory caps on our jobs (AIBOM 6 GiB, sims 16 GiB, JAX 15%), DGXMM reserves (P2.7, pending), `earlyoom`
+   and `gpu-oom-guard` (live but not in the repo).
+
+## The front door is down (dgx-1's edge-caddy or edge-dnsmasq)
+
+Symptoms: every `*.nghodki.ai` page fails; Gatus web group red; the phone still gets ntfy over Tailscale.
+
+1. `docker ps -a --filter name=edge-` on dgx-1. `docker logs --tail 50 edge-caddy`.
+2. A bad Caddyfile: `docker exec edge-caddy caddy validate --config /etc/caddy/Caddyfile`; restore the last
+   `Caddyfile.bak-*`; `docker restart edge-caddy`.
+3. DNS: `dig @192.168.86.44 grafana.nghodki.ai` and `@100.65.137.82`. dnsmasq uses `bind-dynamic`; if Tailscale came up
+   late it should still bind, otherwise `docker restart edge-dnsmasq`.
+4. Meanwhile, reach services directly by LAN IP and port ([Ports](../network/ports.md)), e.g. Grafana at
+   `http://192.168.86.36:3000`.
+
+## Pocket ID is down
+
+Symptoms: sign-in pages fail; Temporal UI restarts in a loop; Argo CD login loops.
+
+1. `ssh nikghodki-dgx-2@192.168.86.36 'sudo docker ps --filter name=pocket-id; sudo docker logs --tail 50 console-pocket-id-1'`.
+2. Remember it's reached through dgx-1's front door: check `curl -sk https://192.168.86.44/healthz -H 'Host: id.nghodki.ai'`.
+3. Use break-glass while it's down ([Pocket ID: break-glass](../security/identity.md)).
+4. `ansible-playbook playbooks/console.yml` redeploys it (data is in the volume; not backed up).
+
+## Wi-Fi drop or router reboot
+
+Symptoms: Gatus floods (every LAN check), the Jetson's etcd member goes away, the robot stops.
+
+1. Wait for the mesh to come back; the Sparks keep k3s quorum over the cable.
+2. Then: `kubectl get nodes` (Jetson and Omarchy Ready again), `docker ps -a` on every host for containers that failed
+   to bind a LAN IP (`up -d` in their stack folder), `nmcli -g ipv4.routes connection show nikghodki_wifi` on the Jetson
+   and the Dell (the /32 routes).
+3. Robot: `safety-estop status` on the Pi; it resumes by itself when `/scan` and heartbeats return (watchdogs don't latch;
+   an e-stop does).
+
+## An SSH tunnel from the admin laptop drops
+
+The laptop's tunnels (ports 2244, 2245, 2248) are not managed by the repo (unverified how they're built). If one drops,
+re-open it from the laptop; the fleet itself is unaffected. Everything that matters can be done from dgx-1 over the
+LAN once one tunnel to dgx-1 works.
+
+## The Dell is down
+
+You get "homelab: alerting host unreachable" on the ntfy.sh backup topic after 15 minutes. Other alerts are not
+delivered until it's back.
+
+1. Physically check it (power, lid: it must not sleep; `always_on` masks sleep targets).
+2. When back: `sudo docker ps` (alerting and ops stacks), `sudo tailscale serve status`, a test alert.
+
+## Quorum lost (a Spark and the Jetson down)
+
+Running pods and Docker services keep running; the k3s API is read-only or down. Bring back whichever is quicker
+(usually the Jetson: Wi-Fi). Don't remove etcd members while this is happening. If a member is permanently gone, follow
+"Remove or roll back a node" in [k3s](../platform/k3s.md) once quorum is back; restore from snapshot only as a last resort.
+
+## The robot misbehaves
+
+1. **E-stop:** `safety-estop` (Pi or dgx-1), or `ros2-kilted topic pub --once /safety/estop std_msgs/msg/Bool "{data: true}"`,
+   or the car's power switch. Also stop the agent: `sudo systemctl stop picoclaw` on the Pi.
+2. Check `safety-estop status` and `journalctl -t safety-governor`.
+3. Only a human resets: `safety-reset`.
+
+## A security alert
+
+1. Isolate: apply `tag:quarantine` to the device in the Tailscale console (reachable only by admins, reaches nothing);
+   on the LAN, stop the suspect service.
+2. Freeze the agent: stop its units (Hermes: `systemctl --user stop hermes-gateway` as its user). `ops agent-freeze` is
+   planned, not built.
+3. Look: DefenseClaw dashboards (Blocked Events, Findings), `~/.defenseclaw/audit.db`, Loki.
+4. Rotate whatever may have leaked ([Secrets rotation](secrets-rotation.md)).
+
+## Kyverno blocks everything
+
+Symptoms: `failed calling webhook ... kyverno-svc`, Argo CD apps can't create pods, `KyvernoAdmissionDown` (critical).
+`kube-system`, `kyverno` and `argocd` are never blocked, so first look: `kubectl -n kyverno get pods`,
+`kubectl -n kyverno describe deploy kyverno-admission-controller` (both Sparks down? OOM?). If it must admit unchecked
+now: break-glass B in [Kyverno](../platform/kyverno.md) (stop selfHeal, scale admission to 0 first, delete leftover
+webhooks); undo by turning `root`'s automated sync back on.
+
+## A bad deploy
+
+- Cluster: `git revert` on `main`; Argo CD applies it in about 3 minutes.
+- Host stack: revert in Git, then run the playbook from `main`. For the front door: restore the `.bak` file.

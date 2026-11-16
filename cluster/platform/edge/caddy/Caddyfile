@@ -26,6 +26,15 @@
 		reverse_proxy 192.168.86.49:4180
 	}
 
+	# Private docs site (Dell ops stack, runbooks/docs-site.md) behind oauth2-proxy-docs + Pocket ID (client docs).
+	# Session cookies are Secure, so http is redirected.
+	@docs host docs.nghodki.ai
+	handle @docs {
+		@plain protocol http
+		redir @plain https://{host}{uri} 308
+		reverse_proxy 192.168.86.49:4181
+	}
+
 	@ca host ca.nghodki.ai
 	handle @ca {
 		root * /etc/caddy/ca
