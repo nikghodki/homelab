@@ -58,7 +58,7 @@
   ],
   "pip-compile": {
     "managerFilePatterns": [
-      "/^\\.github/requirements-(ci|aibom)\\.txt$/"
+      "/^\\.github/requirements-(ci|aibom|radar)\\.txt$/"
     ]
   },
   "pip_requirements": {
