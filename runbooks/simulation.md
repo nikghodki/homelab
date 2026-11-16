@@ -6,7 +6,7 @@ are services of `hosts/stacks/sim/compose.yaml` in the `jobs` profile: they neve
 
 | Service | Image | What |
 |---|---|---|
-| `isaaclab` | `nvcr.io/nvidia/isaac-lab:3.0.0-kitless@sha256:d47169952b55effb46dba8f79761d381532b521561ecba38a3019adc7648884b` (NGC, multi-arch) | Isaac Lab 3.0.0, Newton physics, headless, no Isaac Sim ([README](../robots/sim/isaaclab/README.md)) |
+| `isaaclab` | `homelab/isaaclab:3.0.0-kitless-mlflow3.18.0`, built locally from `robots/sim/isaaclab`: NVIDIA's `nvcr.io/nvidia/isaac-lab:3.0.0-kitless@sha256:d47169952b55effb46dba8f79761d381532b521561ecba38a3019adc7648884b` (NGC, multi-arch) plus only the MLflow client | Isaac Lab 3.0.0, Newton physics, headless, no Isaac Sim ([README](../robots/sim/isaaclab/README.md)) |
 | `mujoco` | `homelab/mujoco-playground:0.2.0-jax0.9.2-mlflow3.18.0`, built locally from `robots/sim/mujoco` ([README](../robots/sim/mujoco/README.md)) | MuJoCo 3.6 + MJX + Playground 0.2.0, JAX 0.9.2 on CUDA 13, Brax PPO |
 
 Images live only in dgx-2's local Docker; nothing is pushed. Local image ID of the build measured below:
@@ -16,6 +16,14 @@ The current tag adds the MLflow client (`mlflow-skinny` 3.18.0, its own layer on
 (base `python:3.12.16-slim-trixie@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b`; the full
 `pip freeze` is in the image at `/opt/pip-freeze.txt`). Pip resolves unpinned transitive dependencies at build time,
 so a rebuild can produce a different ID; compare `/opt/pip-freeze.txt` if results change.
+
+`homelab/isaaclab:3.0.0-kitless-mlflow3.18.0` = `sha256:1615575841a0d3eec7fc9f3c15df5093c65351efed1abf66f75143e485eecef2`
+(2026-11-15): one layer on NVIDIA's image adding `mlflow-skinny` 3.18.0 and its 21 dependencies (pydantic 2.14.3,
+fastapi 0.163.1, opentelemetry 1.45.2, databricks-sdk 0.156.0, ...). Every package already in NVIDIA's venv is held
+at its version by a constraints file made from its `pip freeze`, and the build fails if any of them changed (NVIDIA's
+image already fails `pip check`, so that can't be the guard); the result is in `/opt/isaaclab-venv/pip-freeze.txt`.
+The training wrapper `robots/sim/isaaclab/train_mlflow.py` is mounted read-only, not copied, so it changes without a
+rebuild.
 
 ## Run
 
@@ -27,7 +35,7 @@ rsync -aR --delete ./hosts/stacks/sim ./robots/sim nikghodki-dgx-2@192.168.86.36
 ssh nikghodki-dgx-2@192.168.86.36
 cd ~/sim-repo
 df -h /                                    # keep at least 15% free
-docker compose -f hosts/stacks/sim/compose.yaml --profile jobs pull isaaclab    # 5.3 GB download, 16.3 GB on disk
+docker compose -f hosts/stacks/sim/compose.yaml --profile jobs build isaaclab   # pulls NVIDIA's image (5.3 GB download, 16.3 GB on disk), adds ~0.1 GB
 docker compose -f hosts/stacks/sim/compose.yaml --profile jobs build mujoco     # ~6 min, 12.4 GB on disk
 ```
 
@@ -41,8 +49,11 @@ robots/sim/measure.sh mujoco                                   # Go1JoystickFlat
 robots/sim/measure.sh mujoco --impl jax --timesteps 10000000   # same task, pure-JAX MJX
 ```
 
-MuJoCo jobs log to MLflow (params, eval reward, steps/s, the policy) when `/etc/homelab/mlflow-client.env` exists on
-dgx-2, which `playbooks/ml.yml` writes; see [mlflow.md](mlflow.md). `-e MLFLOW_TRACKING_URI=` turns it off for one run.
+Both jobs log to MLflow when `/etc/homelab/mlflow-client.env` exists on dgx-2, which `playbooks/ml.yml` writes: MuJoCo
+to experiment `sim-mujoco` (params, eval reward, steps/s, the policy), Isaac Lab RSL-RL to `sim-isaaclab` (params,
+every iteration's reward, episode length, losses and steps/s, the final checkpoint). `measure.sh` then adds its GPU and
+memory numbers to the same run (`measure/*`). Details in [mlflow.md](mlflow.md). `-e MLFLOW_TRACKING_URI=` on
+`docker compose ... run` turns it off for one run (Isaac Lab then writes TensorBoard files only, as before).
 
 Logs and 2-second samples go to `/tmp/sim-<service>-<epoch>.{log,samples.csv}`. Isaac Lab checkpoints are in the
 `sim_isaaclab-logs` volume. Without `measure.sh`:
@@ -89,14 +100,15 @@ P2.7 keeps 15–23 GiB for dgx-2's services (observe, console, gpu, Temporal); t
 
 ## Disk
 
-16.3 GB (Isaac Lab kit-less) + 12.4 GB (MuJoCo image) + the BuildKit cache from building the MuJoCo image
+16.4 GB (Isaac Lab kit-less + MLflow client) + 12.5 GB (MuJoCo image) + the BuildKit cache from building the MuJoCo image
 (`docker builder du`; `docker builder prune` frees it, the next build then downloads ~4 GB of wheels again).
 After these tests the root disk was 15% used.
 
 ## Next
 
-- P6.5: MLflow is up ([mlflow.md](mlflow.md)) and `train_ppo.py` logs to it. Still to do: Isaac Lab runs (RSL-RL has an
-  MLflow logger), `measure.sh`'s GPU/memory samples, and a policy video (`MUJOCO_GL=egl` is set in the MuJoCo image).
+- P6.5: MLflow is up ([mlflow.md](mlflow.md)); MuJoCo and Isaac Lab RSL-RL runs and `measure.sh`'s footprint log to it.
+  Still to do: a policy video (`MUJOCO_GL=egl` is set in the MuJoCo image; Isaac Lab needs `--video`, which wants a
+  renderer the kit-less image doesn't have), and skrl/rl_games runs (the wrapper only hooks RSL-RL).
 - P6.6: sim jobs in the GPU queue with these footprints (Isaac Lab ~3 GiB + 0.4–1.2 GiB GPU; Playground Go1
   ~3 GiB + 2.5 GiB GPU at 8192 envs); DGXMM budget; Temporal train → eval → export → register → PR.
 - P6.3: pull `isaac-sim:6.2.0` and test camera/LiDAR rendering; P6.12: Trivy-scan both images and block egress
