@@ -48,6 +48,9 @@ spec:
             - {name: XDG_DATA_HOME, value: /data}
             - {name: XDG_CONFIG_HOME, value: /config}
             - {name: GOMEMLIMIT, value: 150MiB}
+            # Sent to the backends of the signed-in routes, which refuse requests without it (decision 0011).
+            - name: EDGE_ORIGIN_TOKEN
+              valueFrom: {secretKeyRef: {name: edge-auth, key: origin-token}}
           ports:
             - {name: http, containerPort: 80}
             - {name: https, containerPort: 443}

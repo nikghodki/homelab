@@ -1,0 +1,113 @@
+# edge-auth: one oauth2-proxy (Pocket ID client edge-auth) for every browser app without its own login, called by
+# edge-caddy's forward auth (decision 0011, runbooks/sign-in.md). Stateless (sessions are encrypted cookies), so the two
+# replicas, one per Spark like Caddy, need nothing shared but the Secret.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: edge-auth
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-auth
+  labels: {app.kubernetes.io/name: edge-auth, app.kubernetes.io/part-of: edge}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: edge-auth}
+  strategy:
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: edge-auth, app.kubernetes.io/part-of: edge}
+    spec:
+      serviceAccountName: edge-auth
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: {app.kubernetes.io/name: edge-auth}
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
+          args: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: edge-auth, key: client-secret}}
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom: {secretKeyRef: {name: edge-auth, key: cookie-secret}}
+            - {name: GOMEMLIMIT, value: 48MiB}
+          ports:
+            - {name: http, containerPort: 4180}
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          livenessProbe:
+            httpGet: {path: /ping, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /ping, port: http}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: config, mountPath: /etc/oauth2-proxy/oauth2-proxy.cfg, subPath: oauth2-proxy.cfg, readOnly: true}
+            - {name: ca, mountPath: /etc/oauth2-proxy/ca, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: edge-auth}
+        - name: ca
+          configMap:
+            name: edge-ca-page
+            items: [{key: nghodki-web-ca.crt, path: nghodki-web-ca.crt}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: edge-auth
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: edge-auth}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-auth
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: edge-auth}
+  ports:
+    - {name: http, port: 4180, targetPort: http, protocol: TCP}
+---
+# Only the Caddy pods reach the proxy (they are its trusted_proxy_ips); kubelet probes come from the node and are
+# allowed by k3s's network-policy controller.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: edge-auth
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: edge-auth}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: edge-caddy}
+      ports:
+        - {port: 4180, protocol: TCP}

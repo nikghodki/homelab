@@ -8,6 +8,7 @@ resources:
   - namespace.yaml
   - coredns.yaml
   - caddy.yaml
+  - edge-auth.yaml
 generators:
   - secret-generator.yaml
 configMapGenerator:
@@ -20,6 +21,9 @@ configMapGenerator:
   - name: edge-caddy
     files:
       - caddy/Caddyfile
+  - name: edge-auth
+    files:
+      - edge-auth/oauth2-proxy.cfg
   - name: edge-ca-page
     files:
       - caddy/ca/index.html
