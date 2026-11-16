@@ -13,7 +13,7 @@ in the repo (keys, rotation, guardrail, Phoenix).
 | Host | dgx-1; `hosts/stacks/litellm` deployed by `playbooks/litellm.yml` to `/opt/homelab/litellm` (since 2026-11-15; was hand-run from `~/litellm-setup`) |
 | Port | 0.0.0.0:4000 |
 | URLs | `http(s)://model.nghodki.ai/v1` (front door → 10.100.136.1:4000); `https://litellm-admin.nghodki.ai` (the admin UI) |
-| Sign-in | LiteLLM virtual keys; admin UI login. Pocket ID later (P1.13) |
+| Sign-in | API: LiteLLM virtual keys. Admin UI: front door sign-in, then Pocket ID SSO (client `litellm`, `admins` → `proxy_admin`); break-glass `/fallback/login` |
 | Health | `curl -s http://127.0.0.1:4000/health/readiness` on dgx-1; Gatus `model.nghodki.ai (LiteLLM)` |
 | Secrets | `secrets/litellm.enc.yaml`: master key, salt key (both rotated 2026-11-15), Postgres and UI passwords, the DefenseClaw gateway token, the Phoenix API key, and the values of the picoclaw, judge and AIBOM keys |
 | Backups | restic on dgx-1: `pg_dump` before each run, and `/opt/homelab/litellm` |

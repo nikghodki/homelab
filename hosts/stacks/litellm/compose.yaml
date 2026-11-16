@@ -35,6 +35,9 @@ services:
       - "4000:4000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # Admin UI sign-in through Pocket ID: reach id.nghodki.ai at the front door's LAN VIP and trust the homelab web
+      # CA from the host's bundle (role homelab_ca)
+      - "id.nghodki.ai:192.168.86.11"
     env_file: ./litellm-proxy/litellm.env   # keys and passwords (rendered from secrets/litellm.enc.yaml, root 0600)
     environment:
       REDIS_HOST: litellm-redis
@@ -48,10 +51,27 @@ services:
       # Traces to Phoenix on dgx-2 over the LAN (P2.6); PHOENIX_API_KEY is in litellm.env
       PHOENIX_COLLECTOR_HTTP_ENDPOINT: http://192.168.86.36:6006/v1/traces
       PHOENIX_PROJECT_NAME: litellm
+      # Admin UI sign-in (P1.13): generic OIDC SSO with Pocket ID, client `litellm` (identity/pocket-id.yaml). Free while
+      # LiteLLM_UserTable has fewer than 5 users. The groups claim maps admins -> proxy_admin; Pocket ID only lets the
+      # admins group sign in to this client. UI_USERNAME/UI_PASSWORD stay as the break-glass login (/fallback/login).
+      PROXY_BASE_URL: https://litellm-admin.nghodki.ai
+      GENERIC_CLIENT_ID: litellm
+      GENERIC_AUTHORIZATION_ENDPOINT: https://id.nghodki.ai/authorize
+      GENERIC_TOKEN_ENDPOINT: https://id.nghodki.ai/api/oidc/token
+      GENERIC_USERINFO_ENDPOINT: https://id.nghodki.ai/api/oidc/userinfo
+      GENERIC_SCOPE: openid email profile groups
+      GENERIC_CLIENT_USE_PKCE: "true"
+      GENERIC_USER_ID_ATTRIBUTE: preferred_username
+      GENERIC_USER_EMAIL_ATTRIBUTE: email
+      GENERIC_ROLE_MAPPINGS_GROUP_CLAIM: groups
+      GENERIC_ROLE_MAPPINGS_ROLES: "{'proxy_admin': ['admins']}"
+      GENERIC_ROLE_MAPPINGS_DEFAULT_ROLE: internal_user_viewer
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
     volumes:
       - ./litellm-proxy/config.yaml:/app/config.yaml:ro
       - ./litellm-proxy/qwen_system_merge.py:/app/qwen_system_merge.py:ro
       - ./litellm-proxy/defenseclaw_guardrail.py:/app/defenseclaw_guardrail.py:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
     depends_on:
       - litellm-redis

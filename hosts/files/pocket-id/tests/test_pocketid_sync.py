@@ -69,6 +69,7 @@ def test_first_run_creates_everything(stored):
     assert api.user_groups["u-nikghodki"] == ["g-admins"]
     assert set(api.clients) == {c["id"] for c in REAL_SPEC["clients"]}
     assert all(v == ["g-admins"] for v in api.client_groups.values())
+    assert all(c["isGroupRestricted"] is True for c in api.clients.values())
     assert set(stored) == {f"oidc_{c['id']}_secret" for c in REAL_SPEC["clients"]}
 
 
@@ -143,3 +144,16 @@ def test_a_client_cannot_be_both_listed_and_removed(stored):
 
 def test_removed_clients_are_not_listed():
     assert not set(REAL_SPEC.get("removedClients", [])) & {c["id"] for c in REAL_SPEC["clients"]}
+
+
+def test_existing_unrestricted_client_gets_restricted(stored):
+    # Pocket ID 2.x ignores allowedUserGroups unless isGroupRestricted is set (clients made before this flag)
+    api = FakeAPI()
+    sync_mod.sync(api, REAL_SPEC, log=lambda *_: None)
+    for c in api.clients.values():
+        c["isGroupRestricted"] = False
+    api.writes.clear()
+    sync_mod.sync(api, REAL_SPEC, log=lambda *_: None)
+    assert all(c["isGroupRestricted"] is True for c in api.clients.values())
+    assert {p for m, p in api.writes if m == "PUT" and not p.endswith("/allowed-user-groups")} == \
+        {f"/oidc/clients/{c['id']}" for c in REAL_SPEC["clients"]}

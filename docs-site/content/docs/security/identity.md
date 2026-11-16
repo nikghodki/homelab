@@ -29,8 +29,10 @@ Groups: `admins`, `family`. Users: `nikghodki` (admin, in `admins`). Nobody is i
 | `edge-auth` | `https://auth.nghodki.ai/oauth2/callback` | yes (S256) | admins | `edge/edge-auth` (oauth2-proxy in k3s) for Homepage, docs, Gatus' status page, MLflow; each route also checks its group |
 | `temporal` | `https://temporal.nghodki.ai/auth/sso/callback` | **no** (Temporal UI 2.58 doesn't send it) | admins | Temporal UI's own OIDC |
 | `argocd` | `https://argocd.nghodki.ai/auth/callback` | yes (S256) | admins | Argo CD OIDC; RBAC `g, admins, role:admin`, no default role |
+| `litellm` | `https://litellm-admin.nghodki.ai/sso/callback` | yes (S256) | admins | LiteLLM generic OIDC SSO; `admins` → `proxy_admin` (tied to the existing admin user by email), anyone else `internal_user_viewer` |
 
-Client secrets are `oidc_<client>_secret` in `secrets/console.enc.yaml`. The Argo CD one is also copied to
+Every client with an allowed group is group-restricted (`isGroupRestricted`; Pocket ID 2.x doesn't enforce the
+allowed groups without it). Client secrets are `oidc_<client>_secret` in `secrets/console.enc.yaml`. The Argo CD one is also copied to
 `cluster/platform/argocd/extras/oidc.enc.yaml`.
 
 ## The sync script
@@ -89,7 +91,7 @@ Full recipe, rotation and troubleshooting: `runbooks/sign-in.md`.
 | App | Why |
 |---|---|
 | Home Assistant | Its phone app can't sign in through a forward-auth proxy. HA keeps its own login (trusted proxies set, P0.16) |
-| LiteLLM UI, DGXMM UI, Open WebUI | Wait for the DGXMM session. Open WebUI has family accounts to migrate |
+| Open WebUI | Has family accounts to migrate |
 | ntfy | Own logins or phone apps; a proxy would break the phone apps and API clients. (The voice agent, also listed here before, was retired in D26) |
 | Fleet API | Machine token auth, not people |
 
@@ -104,6 +106,7 @@ Full recipe, rotation and troubleshooting: `runbooks/sign-in.md`.
 | Argo CD | `argocd --core --kube-context argocd ...` on dgx-1 needs no login; for the UI, temporarily enable local admin (runbooks/argocd.md) |
 | Temporal UI | the CLI: `sudo docker compose exec admin-tools temporal ...` on dgx-2. The UI exits and restarts until Pocket ID is back |
 | MLflow | job API on 192.168.86.36:5000 with basic auth (`mlflow_api_password`) |
+| LiteLLM admin UI | `ssh -L 4000:127.0.0.1:4000 nikghodki-dgx@<dgx-1>`, open `http://localhost:4000/fallback/login`, user `nikghodki`, password `litellm_ui_password` in `secrets/litellm.enc.yaml` (the master key works too) |
 
 ## Gotchas
 

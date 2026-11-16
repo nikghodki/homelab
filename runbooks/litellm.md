@@ -19,6 +19,29 @@ backup copy).
 Deploy: `cd ~/homelab/hosts && ansible-playbook playbooks/litellm.yml --check --diff`, then without `--check`. A
 changed `config.yaml`, env file or plugin restarts `litellm-proxy` (about 25 s of 502s/connection errors).
 
+## Admin UI sign-in
+
+`https://litellm-admin.nghodki.ai`: the front door asks for the edge-auth session (group `admins`), then LiteLLM's
+own login is Pocket ID through LiteLLM's generic OIDC SSO (free while `LiteLLM_UserTable` has fewer than 5 users; it
+has 2):
+
+- Pocket ID client `litellm` (`identity/pocket-id.yaml`; callback `https://litellm-admin.nghodki.ai/sso/callback`,
+  PKCE S256, group-restricted to `admins`). Its secret is `oidc_litellm_secret` in `secrets/console.enc.yaml`
+  (written by `pocketid_sync.py`, loaded by `playbooks/litellm.yml`, rendered as `GENERIC_CLIENT_SECRET`).
+- `GENERIC_*` in the compose file: endpoints from `https://id.nghodki.ai/.well-known/openid-configuration`, scope
+  `openid email profile groups` (Pocket ID sends `groups` only when asked), `GENERIC_ROLE_MAPPINGS_ROLES`
+  `{'proxy_admin': ['admins']}` on the `groups` claim, default role `internal_user_viewer`. `PROXY_BASE_URL` is the
+  admin host, so the redirect URI matches the client.
+- The container reaches `id.nghodki.ai` at the front door's LAN VIP (`extra_hosts` 192.168.86.11) and trusts the web CA
+  from the host bundle (`SSL_CERT_FILE`, the host's `/etc/ssl/certs/ca-certificates.crt`, role `homelab_ca`).
+- The Pocket ID account lands on LiteLLM's existing admin user `default_user_id` (its email was set to the Pocket ID
+  email, so the SSO lookup finds it by email); no new LiteLLM user is created.
+- Break-glass (Pocket ID or the front door down): `ssh -L 4000:127.0.0.1:4000 nikghodki-dgx@<dgx-1>`, then
+  `http://localhost:4000/fallback/login` with `nikghodki` and `litellm_ui_password`.
+- Scripted check (2026-11-16): `/sso/key/generate` → 303 to `id.nghodki.ai/authorize?client_id=litellm…&code_challenge_method=S256`;
+  a sign-in with a one-time Pocket ID link (`pocketid_sync.py --login-link`, never printed) returned a UI session
+  with `user_role: proxy_admin`, `user_id: default_user_id`, `login_method: sso`, and `/key/list` answered 200.
+
 ## Keys
 
 Get the master key yourself (it is never printed in logs or docs):
