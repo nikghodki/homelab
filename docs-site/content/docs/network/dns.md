@@ -28,7 +28,7 @@ k3s**. edge-dnsmasq on dgx-1 was stopped on 2026-11-15 (kept a week for a rollba
 | `dgx-2` | `backup` (restic rest-server, TLS on 8000) | 192.168.86.36 | 100.124.175.23 + LAN IP |
 | `api` | `k8s` | the API VIP 192.168.86.10 | the answering Spark's Tailscale IP |
 | fixed address | `jetson` 192.168.86.211, `dgx` 192.168.86.44, `esp32` 192.168.86.50 (the robot car, unverified) | same | same |
-| fixed address | `pi`, `raspberrypi` 192.168.86.34 | **stale**: the Pi is now .39 ([discrepancy](../decisions/discrepancies.md)) | same |
+| fixed address | `pi`, `raspberrypi` 192.168.86.39 | the Pi (fixed in `names.txt` 2026-11-15, #90; edge-dnsmasq still answers .34 until it is retired) | same |
 
 `voice-agent.nghodki.ai` was removed on 2026-11-15 (D26, voice retired; #75, #76).
 

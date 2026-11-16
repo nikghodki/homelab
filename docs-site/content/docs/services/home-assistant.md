@@ -5,7 +5,7 @@ description: "Home Assistant on the Jetson: container, URL, reverse-proxy settin
 
 | | |
 |---|---|
-| Container | `homeassistant`, `ghcr.io/home-assistant/home-assistant:stable` (a floating tag, not pinned), host network, hand-run |
+| Container | `homeassistant`, `ghcr.io/home-assistant/home-assistant:2026.11.1` pinned by digest (Renovate PRs), host network; stack `hosts/stacks/home-assistant`, `playbooks/home.yml` (runbooks/jetson-services.md) |
 | Host / port | Jetson, 0.0.0.0:8123 |
 | URL | `https://ha.nghodki.ai`: no Caddy route of its own; the front door's default route sends it to `nginx-gateway`, whose `ha.nghodki.ai` server proxies to 192.168.86.211:8123 |
 | Config | `/home/nikjetson/homeassistant/config` |

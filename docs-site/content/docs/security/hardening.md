@@ -71,8 +71,8 @@ ansible-playbook playbooks/hardening.yml --limit <host> --tags all,security_upda
 | Dell | 68 → 72 | 0 |
 | Pi | 64 → 70 | 0 |
 
-The distro's own `lynis.timer` also exists on the Debian/Ubuntu hosts (from the package), next to `lynis-audit.timer`
-(unverified whether both should run).
+Since 2026-11-15 the Debian/Ubuntu hosts run upstream Lynis 3.1.7 (`/opt/lynis`, hash-locked); the distro package
+and its daily `lynis.timer` are gone, so only `lynis-audit.timer` runs (runbooks/hardening.md).
 
 ## Skipped on purpose
 

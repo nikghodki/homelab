@@ -45,6 +45,10 @@ Jetson's: `/var/lib/cisco-aibom/jetson-<date>.json` **on dgx-2**, journal lines 
 `host`; `scanned_on` keeps the scanning host), so the Jetson's code (from the Jetson) and image (from dgx-2) add up
 under `jetson`. Remote images must be pinned by digest (the role and the job both refuse a tag).
 
+First run, 2026-11-15: Home Assistant 2026.11.1 took 57 min on dgx-2 (docker-cp fallback, ~10,900 Python files),
+314 components, 1.3G cgroup peak. The Jetson's own code-dir scans peak at ~1.24 GB RSS, and each Hermes checkout
+hits the 3 h limit there; moving those to dgx-2 is the next step.
+
 Not scanned remotely: `ros-zenoh` (built on the Jetson from a digest-pinned base, no registry digest, no AI
 components). The Pi runs no containers.
 

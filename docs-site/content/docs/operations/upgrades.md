@@ -22,7 +22,7 @@ What Renovate covers: compose images (digest-pinned), GitHub Actions (SHA-pinned
 versions in `cluster/bootstrap/apps/` (unverified that Renovate detects these Application manifests), the hash-locked
 Python files.
 
-What it **doesn't** see: the front door (`caddy:2.11` tag), `nginx:alpine`, Home Assistant (`stable`), LiteLLM, Open
+What it **doesn't** see: the front door (`caddy:2.11` tag), `nginx:alpine`, LiteLLM, Open
 WebUI, DGXMM (all hand-run); the k3s version and checksums (`roles/k3s/defaults`); the OTel collector version
 (`otel_host_collector_version`); restic (`restic_install_version`); the ROS base image digest
 (`ros_zenoh_router_base_image`); the Isaac Lab and MuJoCo images; DefenseClaw per-user installs and the Edge Connector.

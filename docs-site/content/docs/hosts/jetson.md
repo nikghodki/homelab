@@ -25,7 +25,7 @@ when one Spark is down. Its memory is tight; treat every new process here as a b
 |---|---|---|
 | `hermes-gateway` | Hermes main profile (`~/.hermes/hermes-agent`), platform `api_server` | 0.0.0.0:8642 |
 | `defenseclaw-gateway` | DefenseClaw 1.0.9 for nikjetson | 127.0.0.1:18970 |
-| `livekit-server` | LiveKit (`--dev --key-file ~/.config/livekit/keys.yaml`), left running after voice was retired (D26) | 127.0.0.1:7880 |
+| `livekit-server` | LiveKit 1.13.5 (`/opt/livekit/1.13.5`, `--config ~/.config/livekit/livekit.yaml`, no `--dev`; role `livekit`, `playbooks/home.yml`), used by the control center after voice was retired (D26) | 127.0.0.1:7880 |
 | `control-center` | RoboClaw Control Center (uvicorn, py310 venv) | 0.0.0.0:8200 |
 | `vision-service` | RoboClaw vision service (face recognition, presence) | **disabled and inactive** since D26 (2026-11-15) |
 | `homelab-aibom.timer` | DefenseClaw AIBOM, 03:15 | — |
@@ -44,13 +44,13 @@ when one Spark is down. Its memory is tight; treat every new process here as a b
 
 | Unit / container | What | Listens |
 |---|---|---|
-| container `homeassistant` | `ghcr.io/home-assistant/home-assistant:stable` (tag, not pinned), host network | 0.0.0.0:8123 |
+| container `homeassistant` | `ghcr.io/home-assistant/home-assistant:2026.11.1` pinned by digest, host network; stack `hosts/stacks/home-assistant` (`playbooks/home.yml`) | 0.0.0.0:8123 |
 | `ros-zenoh-router.service` | container `ros-zenoh-router`, image `homelab/ros-zenoh:kilted-1`, host network | *:7447 |
 | `k3s.service` | etcd-only server + kubelet (`disable-apiserver` etc.) | 192.168.86.211:2379, *:10250, *:6443 (k3s supervisor, not a full API server) |
 | `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `docker` | standard | 9109 |
 | `nvidia-cdi-refresh` drop-in | CSV mode and retry (role `jetson_cdi`) | — |
 
-Timers: `cisco-aibom.timer` at 01:30 (3 h per target, each Hermes checkout is about 8,000 Python files), `lynis-audit`,
+Timers: `cisco-aibom.timer` at 01:30 (code dirs only, 3 h per target, each Hermes checkout is about 8,000 Python files; this host's images are scanned on dgx-2 by digest), `lynis-audit`,
 `homelab-backup`.
 
 ## Memory

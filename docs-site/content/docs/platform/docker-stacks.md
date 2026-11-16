@@ -14,14 +14,15 @@ SOPS). All images are pinned by digest; Renovate keeps them current.
 | `observe` | dgx-2 | `observe.yml` | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, otel-defenseclaw, otel-fleet, Grafana, Phoenix | `observe`, `console` | `observe` |
 | `alerting` | Dell | `alerting.yml` | Gatus 5.38.0, status-gate (Caddy 2.11.9), ntfy 2.38.0; plus `tailscale serve` | `observe`, `console` | stays on the Dell, outside the cluster |
 | `ops` | Dell | `ops.yml` | Homepage 2.8.0, Caddy (docs site + Homepage gate) | `console` | `console` |
-| `console` | dgx-2 | `console.yml` | Pocket ID 2.19.2 | `console` | `console` |
+| `console` | dgx-2 | `console.yml` | Pocket ID 2.19.3 | `console` | `console` |
 | `bus` | dgx-1 | `bus.yml` | NATS 2.15.3 | `bus`, `pki` | `bus` (3 replicas) |
 | `fleet` | dgx-1 | `fleet.yml` | Mosquitto 2.1.2, Caddy 2.11.9 (host network) | `fleet`, `pki` | `security` |
-| `gpu` | dgx-1, dgx-2 | `gpu.yml` | dcgm-exporter 4.4.2-4.7.1 | — | `observe` (DaemonSet) |
+| `gpu` | dgx-1, dgx-2 | `gpu.yml` | dcgm-exporter 4.8.4 | — | `observe` (DaemonSet) |
 | `jobs` | dgx-2 | `jobs.yml` | Temporal 1.32.2, PostgreSQL 17, admin-tools, UI 2.58.1 | `jobs`, `console` | `jobs` |
 | `ml` | dgx-2 | `ml.yml` | MLflow 3.18.0 (built locally), PostgreSQL 17, Caddy (job API + UI gate) | `ml`, `console` | `sim` |
 | `backup` | dgx-2 | `backups.yml` | restic rest-server 0.14.0 | `backup`, `pki` | stays on the host |
 | `litellm` | dgx-1 | `litellm.yml` | LiteLLM 1.109.1, PostgreSQL 16, Redis 7.4, DefenseClaw relay (socat) | `litellm` | `models` and `data` |
+| `home-assistant` | Jetson | `home.yml` | Home Assistant 2026.11.1 (host network; config dir on the host) | — | `home` |
 | `sim` | dgx-2 | none (run by hand) | isaaclab (local image on NVIDIA's + MLflow client), mujoco (local image) (profile `jobs`) | — | `sim` |
 
 Outside the repo (hand-run): edge-gateway (`edge-caddy`, `edge-dnsmasq`; replaced for clients by `edge` in k3s at the P3.3 cutover, stopped 2026-11-15), Open WebUI → `agents` or `models`, DGXMM and engines (stay outside). nginx-gateway was stopped on 2026-11-15 (its routes are in k3s).
