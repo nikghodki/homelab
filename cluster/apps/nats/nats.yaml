@@ -1,0 +1,172 @@
+# NATS: one server per node on dgx-1, dgx-2 and the Jetson (decision 0014, runbooks/nats.md). Clients reach it on the
+# NATS VIP 192.168.86.12 (:4222 NATS, :8883 MQTT, both TLS) and, from the cutover on, the Sparks' Tailscale IPs
+# (tailnet-service.yaml). Config: nats.conf (ConfigMap, hashed: a change rolls the pods one at a time).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nats
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nats
+  labels: {app.kubernetes.io/name: nats, app.kubernetes.io/part-of: bus}
+spec:
+  replicas: 3
+  serviceName: nats-headless
+  # All three at once: a JetStream cluster needs its peers to start (OrderedReady would wait for a ready nats-0).
+  podManagementPolicy: Parallel
+  revisionHistoryLimit: 3
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels: {app.kubernetes.io/name: nats}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: nats, app.kubernetes.io/part-of: bus}
+    spec:
+      serviceAccountName: nats
+      automountServiceAccountToken: false
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - {key: kubernetes.io/hostname, operator: In, values: [dgx-1, dgx-2, jetson]}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: {app.kubernetes.io/name: nats}
+              topologyKey: kubernetes.io/hostname
+      # The Jetson is tainted (only what is meant to run there); this is the third JetStream peer, kept small.
+      tolerations:
+        - {key: nghodki.ai/jetson, operator: Equal, value: "true", effect: NoSchedule}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      # Lame duck (30 s) hands the clients to the other two servers before the pod stops.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: nats
+          image: docker.io/library/nats:2.15.3-alpine@sha256:558394a23dd3c36f2d3a64b51865fd09908010e80a542cea5e75c2af543ed62a
+          command: [nats-server, --config, /etc/nats/config/nats.conf]
+          env:
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            # Routes by name, so the TLS check of the route certificate (*.nats-headless.nats.svc.cluster.local) holds
+            # for the routes the servers learn from each other too, not only the ones in nats.conf.
+            - name: ROUTE_ADVERTISE
+              value: $(POD_NAME).nats-headless.nats.svc.cluster.local:6222
+            - name: GOMEMLIMIT
+              value: 200MiB
+          ports:
+            - {name: client, containerPort: 4222, protocol: TCP}
+            - {name: cluster, containerPort: 6222, protocol: TCP}
+            - {name: monitor, containerPort: 8222, protocol: TCP}
+            - {name: mqtt, containerPort: 8883, protocol: TCP}
+          # Measured 2026-11-16 (3-server test cluster, MQTT on): ~13 MiB each. The Jetson has ~2.3 GiB for pods.
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          startupProbe:
+            httpGet:
+              path: "/healthz"
+              port: monitor
+            periodSeconds: 5
+            failureThreshold: 90
+          readinessProbe:
+            httpGet:
+              path: "/healthz?js-server-only=true"
+              port: monitor
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: "/healthz?js-enabled-only=true"
+              port: monitor
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: [/bin/sh, -c, "nats-server --signal ldm=/var/run/nats/nats.pid && sleep 50"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/nats/config, readOnly: true}
+            - {name: tls, mountPath: /etc/nats/tls, readOnly: true}
+            - {name: route, mountPath: /etc/nats/route, readOnly: true}
+            - {name: pid, mountPath: /var/run/nats}
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: config
+          projected:
+            sources:
+              - configMap: {name: nats-config}
+              - secret: {name: nats-auth}
+        - name: tls
+          secret: {secretName: nats-tls}
+        - name: route
+          projected:
+            sources:
+              - configMap: {name: nats-route-certs}
+              - secret: {name: nats-route}
+        - name: pid
+          emptyDir: {medium: Memory, sizeLimit: 1Mi}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: local-path
+        resources:
+          requests: {storage: 4Gi}
+---
+# Routes and the per-server names (nats-N.nats-headless...), ready or not: the servers must find each other to start.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-headless
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector: {app.kubernetes.io/name: nats}
+  ports:
+    - {name: client, port: 4222, targetPort: client, protocol: TCP}
+    - {name: cluster, port: 6222, targetPort: cluster, protocol: TCP}
+    - {name: monitor, port: 8222, targetPort: monitor, protocol: TCP}
+    - {name: mqtt, port: 8883, targetPort: mqtt, protocol: TCP}
+---
+# LAN: the NATS VIP (kube-vip ARP, lease plndr-svcs-lock, on the Spark that holds .11 too). Nothing answered on .12 on
+# 2026-11-16 (ping and arping from dgx-1 and the Pi). The monitoring port is not on the VIP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-lan
+  annotations:
+    kube-vip.io/loadbalancerIPs: 192.168.86.12
+spec:
+  type: LoadBalancer
+  allocateLoadBalancerNodePorts: false
+  externalTrafficPolicy: Cluster
+  selector: {app.kubernetes.io/name: nats}
+  ports:
+    - {name: client, port: 4222, targetPort: client, protocol: TCP}
+    - {name: mqtt, port: 8883, targetPort: mqtt, protocol: TCP}
+---
+# At most one server down at a time (drains, rollouts): JetStream R3 keeps quorum with two.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nats
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: nats}

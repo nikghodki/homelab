@@ -27,6 +27,7 @@ TTL = 30  # short: a tailnet answer names one Spark, and clients should re-ask s
 DGX1_LAN, DGX2_LAN = "192.168.86.44", "192.168.86.36"
 DGX1_TS, DGX2_TS = "100.65.137.82", "100.124.175.23"
 EDGE_VIP, API_VIP = "192.168.86.11", "192.168.86.10"
+BUS_VIP = "192.168.86.12"  # NATS (decision 0014); target `bus`, used by names.txt from the NATS cutover on
 SPARK_TS = {"dgx-1": DGX1_TS, "dgx-2": DGX2_TS}
 VIEWS = ["lan"] + [f"tailnet-{n}" for n in SPARK_TS]
 
@@ -37,6 +38,8 @@ def target_addrs(target, view):
     table = {
         "edge": [EDGE_VIP] if view == "lan" else [ts],
         "api": [API_VIP] if view == "lan" else [ts],
+        # NATS: LAN -> the NATS VIP; tailnet -> the answering Spark's Tailscale IP (kube-proxy, nats-tailnet) + the VIP
+        "bus": [BUS_VIP] if view == "lan" else [ts, BUS_VIP],
         "dgx-1": [DGX1_LAN] if view == "lan" else [DGX1_TS, DGX1_LAN],
         "dgx-2": [DGX2_LAN] if view == "lan" else [DGX2_TS, DGX2_LAN],
     }
@@ -47,6 +50,7 @@ def target_addrs(target, view):
 DNSMASQ = {
     "edge": [DGX1_LAN, DGX1_TS],
     "api": [DGX1_LAN, DGX2_LAN, DGX1_TS, DGX2_TS],
+    "bus": [BUS_VIP],
     "dgx-1": [DGX1_LAN, DGX1_TS],
     "dgx-2": [DGX2_LAN, DGX2_TS],
 }

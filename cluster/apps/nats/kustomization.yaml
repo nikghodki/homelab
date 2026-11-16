@@ -1,0 +1,21 @@
+# NATS in k3s: 3 servers (dgx-1, dgx-2, the Jetson), JetStream R3, MQTT, TLS (decision 0014, runbooks/nats.md).
+# PREPARED, NOT DEPLOYED: no Application points here until the user-present cutover (argocd-application.yaml is not
+# in cluster/bootstrap/apps). tailnet-service.yaml is added to resources only at the cutover's step that moves the
+# tailnet clients (its externalIPs take dgx-1's Tailscale IP :4222/:8883 from the Docker server at once).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: nats
+resources:
+  - namespace.yaml
+  - nats.yaml
+  - networkpolicies.yaml
+generators:
+  - secret-generator.yaml
+configMapGenerator:
+  - name: nats-config
+    files:
+      - nats.conf
+  - name: nats-route-certs
+    files:
+      - certs/route.crt
+      - certs/route-ca.crt

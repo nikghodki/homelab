@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: nats-auth
+    namespace: nats
+type: Opaque
+stringData:
+    passwords.conf: ENC[AES256_GCM,data:0/LhgZF7V3g317+BiV4eZ+AHAs343nBsi67fm7Xz+a8gZ6AKsjuvpO6/RCnDW2LebJKlnuMzr8eHrvWpLRwdeyjMcYpR3y9fiUvEw+HEcpMsP7DgKKaNDbpHAGdmfbL30DKehrYoat0NvaKcHO88C7sqWB6PlaWyLHD6s9mM308N1fP7VUrChIKiKoKXC96oTKUV45WzrwG3FBDbYJpBHCVbAxykhGhzzVGEO+bZl/tC75jArTChFSrU1Wa2Oz7h8cnwkFbCmLuv0hvzF0c1gvCIMORGL/cjcjhEaePww1jUZhsgnHhHSWufkzxll0aC/IkwU/hh7+3uIz1SE9dK8Wb+obMX9wfuQrVkUi15GCb+YqPkxs4X+5K1yGKQiseGOHXzeW9jfiePlT20QGZZKBEpoaqAk9HLKes0t+Nxc8nl5wUN8xpVjQ1UnowXmLSrEaJtk4hKhVq+a0ulB7JzecPsEJdxKxfeUdcjnoiYPf93XZ/+gQjZP+ndvTD/6pEWkuX4Ve05Y9nmQx9rgq9UxzuSDOxIHDsn2v/CflLKWV5w/ne36CrcbqQsEKgTBW4fKIZoiDVbSSRWCiQo8bpNraMd67KC8VTqCf1gnrFABJZZAEzvEIX2IpNgqXqprc+Gho6yg4FZNNVpGMkTNqSlEqpEBDJToT+67r63DnC9s/DakrFPhxY+VoJxhXCIoEtF0Qfu,iv:asbtjCARAEtWO2MGJaXDsjFFwT6+5h0eDB/Rb5Dup9w=,tag:FFoMc59Bj8OffHgcHHhi+w==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBOdDRFL1Npck9LQzNycmJ1
+            eXhqZ0JiSTFKOGdneVk2VzlZbDEwalBqQlI0Ck9GOElQU3UwTWtzMFlHN3VBZ1ph
+            TjhLWWV6ZFg2ZTkxck0zV2ZKa1dJTzQKLS0tIDQ0QkN3bHMxZzNvbUc4WHI3NEF1
+            SXlPUjRyaWxEVjQ0TnhESWVUUGhGcFUKviBDM2LwbSOjgG7Rqa8E0fHjZRgtYO1t
+            eLtIAIivnS5MuHkWh7qYXA5epFghMLhjBdyYm8gpzIr1TM51hR/JHg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T21:57:23Z"
+    mac: ENC[AES256_GCM,data:gj0gW/kk5u82n7cbIPoliWkVfjo1V3fsU+wh6aYybQI0U4bQqktAgbvpjeOoOckYkHVzS4FzWc/JVAOQ+2PdxKS3q2j694Pfm+s9iToXNpJqpxC3ZOW9yRoN/sdcptkMbMRxlNRRaSpOZpNwPWttyzlsYmskDeyjAVFc8pvOOO8=,iv:aJVNUQ/gOaIMOGR5UHfQ85LpahkrJwhm4OQTfX8Gsgs=,tag:YYy8SAbsMF1u2xs7uH8hnQ==,type:str]
+    version: 3.13.3

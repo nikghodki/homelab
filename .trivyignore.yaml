@@ -25,8 +25,8 @@ misconfigurations:
   # The tailnet front door is the Sparks' Tailscale IPs as externalIPs (decision 0007). The CVE-2020-8554 risk (anyone
   # who can create a Service can claim an IP) is limited by who can create Services: Argo CD from Git, and admins.
   - id: KSV-0108
-    paths: ["cluster/platform/edge/coredns.yaml", "cluster/platform/edge/caddy.yaml"]
-    statement: edge-dns-tailnet / edge-caddy-tailnet answer on the Sparks' Tailscale IPs by design
+    paths: ["cluster/platform/edge/coredns.yaml", "cluster/platform/edge/caddy.yaml", "cluster/apps/nats/tailnet-service.yaml"]
+    statement: edge-dns-tailnet / edge-caddy-tailnet / nats-tailnet answer on the Sparks' Tailscale IPs by design (decisions 0007, 0014)
 
 # Image vulnerabilities with no fixed upstream image yet (nightly-scan.yml scans every pinned image with this file).
 # Each one is scoped to the vulnerable package version (purls), has a reason, and expires 30 days out at most:

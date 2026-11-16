@@ -21,7 +21,8 @@ cluster/
 │   ├── kube-vip/          kube-vip DaemonSet (kube-system, hostNetwork): API VIP .10, edge VIP .11
 │   ├── edge/              namespace edge: CoreDNS (names.txt → zones) and Caddy (the *.nghodki.ai front door)
 │   └── kube-state-metrics/  readiness metrics for vmalert (kube-system)
-└── apps/                  workloads, one folder per app (README.md); `_smoke` is the SOPS canary
+└── apps/                  workloads, one folder per app (README.md); `_smoke` is the SOPS canary; `nats` is prepared,
+                           not deployed (no Application in bootstrap/apps until its cutover, decision 0014)
 ```
 
 Kyverno's policies are in [`policies/kyverno`](../policies/kyverno) (app `kyverno-policies`), Enforce since P3.5.
@@ -75,9 +76,10 @@ working while kube-dns is down.
 |---|---|---|
 | 192.168.86.10 | k3s API VIP (`k8s.nghodki.ai` on the LAN) | kube-vip, lease `kube-system/plndr-cp-lock` |
 | 192.168.86.11 | edge VIP: `edge-dns-lan` :53, `edge-caddy-lan` :80/:443 | kube-vip (`kube-vip.io/loadbalancerIPs`), lease `plndr-svcs-lock` |
+| 192.168.86.12 | NATS VIP: `nats/nats-lan` :4222/:8883 (**reserved, not live** until the NATS cutover, runbooks/nats.md) | kube-vip (`kube-vip.io/loadbalancerIPs`), lease `plndr-svcs-lock` |
 | 100.65.137.82, 100.124.175.23 | the Sparks' Tailscale IPs: `edge-dns-tailnet` :53, `edge-caddy-tailnet` :80/:443 | `externalIPs` (kube-proxy) |
 
-Both VIPs are below the Nest's DHCP pool (`.20`–`.250`). LoadBalancer Services here set
+The VIPs are below the Nest's DHCP pool (`.20`–`.250`). LoadBalancer Services here set
 `allocateLoadBalancerNodePorts: false` (no NodePorts on every node address).
 
 ## Host namespaces and capabilities (Kyverno allowlist)

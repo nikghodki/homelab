@@ -1,0 +1,7 @@
+# The message bus (decision 0014, runbooks/nats.md). Carries the robot's NATS e-stop.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nats
+  labels:
+    nghodki.ai/purpose: message-bus

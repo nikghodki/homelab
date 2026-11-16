@@ -5,6 +5,7 @@
 #   edge   the front door (Caddy): LAN -> the edge VIP 192.168.86.11, tailnet -> the answering Spark's Tailscale IP
 #   api    the k3s API:           LAN -> the API VIP 192.168.86.10,  tailnet -> the answering Spark's Tailscale IP
 #   dgx-1, dgx-2   that host directly (not through Caddy): LAN -> its LAN IP, tailnet -> its Tailscale IP + LAN IP
+#   bus    NATS (decision 0014): LAN -> the NATS VIP 192.168.86.12, tailnet -> the answering Spark's Tailscale IP + the VIP
 #   an IPv4 address   that address in both views (LAN-only devices)
 #
 # name             target

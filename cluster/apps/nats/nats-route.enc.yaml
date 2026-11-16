@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: nats-route
+    namespace: nats
+type: Opaque
+stringData:
+    route.key: ENC[AES256_GCM,data:USM3KaiBrBPvs31X1P1BwukCVQTvRuNLyILJacBhjajZQLGwdoAkI+6FPBr3oITRR9xmGGmcej1p4FlT+FDSc76g2lYLlqKyNeVIjmnzB+kHu8EghCCUFaPXef1wOlsn5apzioBEnz1c+tffpZnZO7A1ZB2FSkWme2vzQcLsbq2jJWHOy0mcJenxS8bPgou8286pBp6KA8Rjdaa36HwG7g5e07a9A5oSouRwO5XNHptVNviQ1AEBZ8Nc1pWxGCttYmf0ZBEJcDQSuZmEuUaVuHFNloYn9psytRWJf9O2mepeQ1E=,iv:3f2VJeQ5nvayMskRREEeeEPRbaogx2yvc0l9EhwLWQc=,tag:a0zNzXHtqU1JQFHBUH/C4w==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBDek9mai95WWFYcDlmb2Mv
+            ODFlK1ZaSU01U1lkVTNxeCtaU0hJaUd6MkFNClg1VHRLekZZdi9zWnd4N003d2Y4
+            TkhyMDgwa25GWmc5dVZ5cWhXM2U5dm8KLS0tIFg0WGhraWpsQWtxTWkzOXpNMHBD
+            K3c3RURabGw3dURIbHo0bXpiaUZSZ1UKZStfKxYvBwE/cX9qvjJYNc0jaYBjBUm2
+            AGRX6b/8nFSvjnClyESkpbUYTg0LSqWcaZI8h72kdrnJUbHyrausTQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T21:57:23Z"
+    mac: ENC[AES256_GCM,data:Y3kYPULJJjKdiYijgzZfBVIA28iYDzWxkqcZqDe9MoiM2wHDYRMKjW/d2O77p6tZ6FWSGxLcQR+2ca18/Bjro2euw2uPYG+5DjnlDgVMMLqgcBRbJaXKo8k8AVb7ppzlkpcyFxCa+h2JMVVCR1OEiCkOvxMZo0at1HRl/wFpnSs=,iv:U6wBT2Qb7KmenZPqTLSryx/7Xy/tfJfALFTvNsvXszA=,tag:+tYL3uHv8078Odd97omNZA==,type:str]
+    version: 3.13.3
