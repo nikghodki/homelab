@@ -39,6 +39,13 @@
   ],
   "packageRules": [
     {
+      "description": "dcgm-exporter 4.9 renames the metrics and changes units (DCGM 4.7 names); the vmalert rules and dashboards use the 4.8 names. Lift when they move",
+      "matchDepNames": [
+        "nvcr.io/nvidia/k8s/dcgm-exporter"
+      ],
+      "allowedVersions": "<4.9.0"
+    },
+    {
       "description": "Group CI scanner tools into one PR",
       "matchFileNames": [
         ".github/**"

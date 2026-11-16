@@ -5,7 +5,9 @@ name: gpu
 
 services:
   dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.9.0@sha256:2490e1dfb5baaee6765ef2841813af7d978bb459a566c22c326a8fc27c64eea9
+    # 4.8.x: 4.9.0 renames the metrics and changes units (DCGM 4.7 names); vmalert rules and dashboards use the old
+    # ones. Hold the major in Renovate until they move (runbooks/ci-scanners.md).
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.8.4@sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003
     restart: unless-stopped
     deploy:
       resources:
