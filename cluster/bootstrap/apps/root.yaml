@@ -8,7 +8,7 @@ spec:
   project: default
   source:
     repoURL: git@github.com:nikghodki/homelab.git
-    targetRevision: p3.4-platform
+    targetRevision: main
     path: cluster/bootstrap/apps
   destination:
     server: https://kubernetes.default.svc

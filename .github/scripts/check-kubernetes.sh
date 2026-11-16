@@ -11,9 +11,23 @@ docker run --rm -v "$PWD:/repo:ro" -w /repo "$KUBECONFORM_IMAGE" -strict -summar
 if ! find policies/kyverno -type f \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | grep -q .; then
   echo "no Kyverno policies under policies/kyverno/ yet"; exit 0
 fi
-kyverno() { docker run --rm -v "$PWD:/repo:ro" -w /repo "$KYVERNO_IMAGE" "$@"; }
-# The CLI skips documents it can't parse with only a log line, so a broken policy would pass silently.
-out=$(kyverno apply policies/kyverno --resource .github/scripts/fixtures/kyverno/bad-pod.yaml 2>&1 || true)
+fixture=$(mktemp -d); chmod 755 "$fixture"; trap 'rm -rf "$fixture"' EXIT
+kyverno() { docker run --rm -v "$PWD:/repo:ro" -v "$fixture:/fixture:ro" -w /repo "$KYVERNO_IMAGE" "$@"; }
+# The CLI skips documents it can't parse with only a log line, so a broken policy would pass silently. A pod that
+# breaks every policy must be reported by each of them. (Written here, not committed, so Trivy doesn't flag it.)
+cat > "$fixture/bad-pod.yaml" <<'POD'
+apiVersion: v1
+kind: Pod
+metadata: {name: bad-pod, namespace: default}
+spec:
+  hostNetwork: true
+  containers:
+    - name: app
+      image: evil.example.com/app:latest
+      securityContext: {privileged: true}
+POD
+chmod 644 "$fixture/bad-pod.yaml"
+out=$(kyverno apply policies/kyverno --resource /fixture/bad-pod.yaml 2>&1 || true)
 echo "$out"
 if grep -qi 'parsing error' <<<"$out"; then echo "::error::a Kyverno policy failed to parse"; exit 1; fi
 policies=$(grep -l '^kind: ValidatingPolicy' policies/kyverno/*.yaml | wc -l)

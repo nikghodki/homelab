@@ -95,8 +95,10 @@ Numbers marked "est." are estimates, not measurements.
 | `sim` | Isaac Lab / Isaac Sim and MuJoCo training and evaluation jobs, MLflow | dgx-2 (dgx-1 overnight) |
 | `observe` | VictoriaMetrics, Loki, Tempo, Grafana, Phoenix, Gatus, Alertmanager, ntfy, OTel gateway; **dcgm-exporter** (DaemonSet, `nghodki.ai/role=gpu` nodes only) | dgx-2; dcgm-exporter on both Sparks |
 | `console` | Fleet Console, Homepage (interim), **Pocket ID** (`id.nghodki.ai`), oauth2-proxy | dgx-2 |
-| `security` | Kyverno, Tetragon, policy bundles, nightly AIBOM job; **Fleet MQTT broker** (Mosquitto, D24, `fleet.nghodki.ai:8884`, TLS, per-device ACLs); **Fleet API TLS proxy** (Caddy `:8971`) | Fleet broker and proxy pinned to dgx-1 |
+| `security` | Tetragon, policy bundles, nightly AIBOM job; **Fleet MQTT broker** (Mosquitto, D24, `fleet.nghodki.ai:8884`, TLS, per-device ACLs); **Fleet API TLS proxy** (Caddy `:8971`) | Fleet broker and proxy pinned to dgx-1 |
 | `argocd` | Argo CD | Sparks |
+| `kyverno` | Kyverno (own namespace: Kyverno skips its own namespace at admission (resourceFilters), so it isn't shared with `security` workloads; decision 0006) | Sparks |
+| `cnpg-system` | CloudNativePG operator (the Postgres clusters live in `data`) | Sparks |
 
 - **Fleet API proxy.** The DefenseClaw Fleet gateway is part of the host-installed DefenseClaw on dgx-1 and listens
   on loopback. The proxy must reach it over loopback, so it runs as a `hostNetwork` pod pinned to dgx-1 and forwards

@@ -15,7 +15,7 @@ spec:
         releaseName: argocd
         valueFiles: [$values/cluster/platform/argocd/values.yaml]
     - repoURL: git@github.com:nikghodki/homelab.git
-      targetRevision: p3.4-platform
+      targetRevision: main
       ref: values
       path: cluster/platform/argocd/extras
   destination:

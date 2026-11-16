@@ -35,6 +35,7 @@ homelab web CA (`http://ca.nghodki.ai`) and add a passkey. Ask for a second pass
 | Phoenix | `PHOENIX_OAUTH2_POCKETID_*` (PKCE); `admins` → ADMIN. Needs `..._SCOPES: groups`, or Pocket ID sends no groups claim and Phoenix answers "authentication failed" | admins |
 | Homepage (`https://ops.nghodki.ai`) | oauth2-proxy in front (client `ops`, PKCE S256, `--allowed-group=admins`); Homepage itself has no login. Runs on the Dell (`hosts/stacks/ops`, `playbooks/ops.yml`), LAN port 4180 | admins |
 | MLflow (`https://mlflow.nghodki.ai`) | oauth2-proxy in front (client `mlflow`, same recipe, `hosts/stacks/ml`); jobs use a separate basic-auth API port ([mlflow.md](mlflow.md)) | admins |
+| Argo CD (`https://argocd.nghodki.ai`) | Its own OIDC (client `argocd`, PKCE S256, `rootCA` = web CA); `admins` → `role:admin`, no default role; local admin off ([argocd.md](argocd.md)). The client secret is also copied to `cluster/platform/argocd/extras/oidc.enc.yaml` for KSOPS | admins |
 
 Containers that talk to Pocket ID get `extra_hosts: id.nghodki.ai:192.168.86.44` and the host's CA bundle, which includes the
 web CA.

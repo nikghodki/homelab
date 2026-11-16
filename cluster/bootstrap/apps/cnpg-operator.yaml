@@ -15,7 +15,7 @@ spec:
         releaseName: cnpg
         valueFiles: [$values/cluster/platform/cnpg-operator/values.yaml]
     - repoURL: git@github.com:nikghodki/homelab.git
-      targetRevision: p3.4-platform
+      targetRevision: main
       ref: values
   destination:
     server: https://kubernetes.default.svc

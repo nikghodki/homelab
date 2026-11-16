@@ -10,7 +10,7 @@ spec:
   project: apps
   source:
     repoURL: git@github.com:nikghodki/homelab.git
-    targetRevision: p3.4-platform
+    targetRevision: main
     path: cluster/apps/_smoke
   destination:
     server: https://kubernetes.default.svc
