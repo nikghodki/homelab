@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The *.nghodki.ai zone from one list (cluster/platform/edge/names.txt, runbooks/edge.md).
 
-  edge-zone.py generate            write cluster/platform/edge/coredns/{lan,tailnet}.db and the caddy/ca copies
+  edge-zone.py generate            write cluster/platform/edge/coredns/*.db and the caddy/ca copies
   edge-zone.py check               fail if those files don't match names.txt / hosts/files/web-ca (CI)
   edge-zone.py dnsmasq             print the address= lines edge-dnsmasq on dgx-1 needs (until the cutover)
   edge-zone.py diff-dnsmasq FILE   compare a dnsmasq.conf with names.txt (same names, same addresses)
@@ -18,19 +18,31 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 EDGE = ROOT / "cluster/platform/edge"
 NAMES = EDGE / "names.txt"
 ZONE = "nghodki.ai"
-TTL = 60
+TTL = 30  # short: a tailnet answer names one Spark, and clients should re-ask soon after it fails
 
 # Addresses per target and view. The VIPs are kube-vip's (decision 0007); the Sparks' Tailscale IPs are stable
-# (policies/tailscale/policy.hujson `hosts`).
+# (policies/tailscale/policy.hujson `hosts`). The tailnet has one view per Spark: each CoreDNS replica answers with
+# the Tailscale IP of the node it runs on, so an answer always names a Spark that is up (a dead Tailscale peer
+# blackholes connections for over a minute before a client tries another address; decision 0007).
 DGX1_LAN, DGX2_LAN = "192.168.86.44", "192.168.86.36"
 DGX1_TS, DGX2_TS = "100.65.137.82", "100.124.175.23"
 EDGE_VIP, API_VIP = "192.168.86.11", "192.168.86.10"
-TARGETS = {
-    "edge": {"lan": [EDGE_VIP], "tailnet": [DGX1_TS, DGX2_TS]},
-    "api": {"lan": [API_VIP], "tailnet": [DGX1_TS, DGX2_TS]},
-    "dgx-1": {"lan": [DGX1_LAN], "tailnet": [DGX1_TS, DGX1_LAN]},
-    "dgx-2": {"lan": [DGX2_LAN], "tailnet": [DGX2_TS, DGX2_LAN]},
-}
+SPARK_TS = {"dgx-1": DGX1_TS, "dgx-2": DGX2_TS}
+VIEWS = ["lan"] + [f"tailnet-{n}" for n in SPARK_TS]
+
+
+def target_addrs(target, view):
+    """Addresses for a named target in a view, or None if the target is a literal IP."""
+    ts = SPARK_TS.get(view.removeprefix("tailnet-"))
+    table = {
+        "edge": [EDGE_VIP] if view == "lan" else [ts],
+        "api": [API_VIP] if view == "lan" else [ts],
+        "dgx-1": [DGX1_LAN] if view == "lan" else [DGX1_TS, DGX1_LAN],
+        "dgx-2": [DGX2_LAN] if view == "lan" else [DGX2_TS, DGX2_LAN],
+    }
+    return table.get(target)
+
+
 # What edge-dnsmasq answers today (one view for everyone: LAN and Tailscale address of dgx-1's front door).
 DNSMASQ = {
     "edge": [DGX1_LAN, DGX1_TS],
@@ -53,7 +65,7 @@ def load():
         name, target = parts
         if not NAME_RE.match(name) or name in names or name == "ns":
             sys.exit(f"{NAMES}:{n}: bad, reserved or duplicate name {name!r}")
-        if target not in TARGETS:
+        if target_addrs(target, "lan") is None:
             try:
                 ipaddress.IPv4Address(target)
             except ValueError:
@@ -63,11 +75,11 @@ def load():
 
 
 def addrs(target, view):
-    return TARGETS[target][view] if target in TARGETS else [target]
+    return target_addrs(target, view) or [target]
 
 
 def zone(names, view):
-    rr = [("ns", a) for a in TARGETS["edge"][view]]
+    rr = [("ns", a) for a in addrs("edge", view)]
     rr += [(name, a) for name, t in names.items() for a in addrs(t, view)]
     body = "".join(f"{n:<16} IN A     {a}\n" for n, a in rr)
     serial = zlib.crc32(body.encode()) % 2**31
@@ -86,7 +98,7 @@ def ca_pairs():
 
 def wanted():
     names = load()
-    files = {EDGE / f"coredns/{v}.db": zone(names, v) for v in ("lan", "tailnet")}
+    files = {EDGE / f"coredns/{v}.db": zone(names, v) for v in VIEWS}
     files.update({dst: src.read_text() for src, dst in ca_pairs()})
     return files
 
@@ -106,10 +118,11 @@ def main(argv):
         files = wanted()
         stale = [p for p, t in files.items() if not p.exists() or p.read_text() != t]
         extra = set((EDGE / "caddy/ca").iterdir()) - {d for _, d in ca_pairs()}
+        extra |= set((EDGE / "coredns").glob("*.db")) - set(files)
         for p in stale:
             print(f"::error::{p.relative_to(ROOT)} is stale: run .github/scripts/edge-zone.py generate")
         for p in sorted(extra):
-            print(f"::error::{p.relative_to(ROOT)} isn't in hosts/files/web-ca")
+            print(f"::error::{p.relative_to(ROOT)} isn't generated any more: delete it")
         if stale or extra:
             return 1
         print("edge zone and CA page match names.txt and hosts/files/web-ca")

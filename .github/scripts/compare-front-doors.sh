@@ -6,14 +6,15 @@
 #
 #   NEW_IP  new front door (default 192.168.86.11, the edge VIP; a Spark's Tailscale IP for the tailnet path)
 #   OLD_IP  old front door (default 192.168.86.44, dgx-1)
-#   view    which generated zone the DNS answers must match (default lan)
+#   view    which generated zone the DNS answers must match: lan (default) or tailnet (either Spark's tailnet zone:
+#           the replica that answers names its own Spark)
 #   DNS_IP  new DNS server (default NEW_IP)
 #   CA      web CA (default REPO/hosts/files/pki/web-ca.crt); REPO defaults to this checkout
 #
 # Prints a table (HTTP and HTTPS status code plus the redirect target without its query string, old vs new, per
 # *.nghodki.ai route) and the DNS results (A matches the zone, AAAA is NOERROR with no answer, an unknown name is
 # NXDOMAIN). Exit 1 on any difference. Runs with bash 3 (macOS) and needs curl, and dig or python3. On a host
-# without the repo, copy names.txt, lan.db, tailnet.db and web-ca.crt into one directory and pass it as -r.
+# without the repo, copy names.txt, the coredns/*.db zones and web-ca.crt into one directory and pass it as -r.
 set -u
 NEW=192.168.86.11 OLD=192.168.86.44 VIEW=lan DNS="" CA="" REPO=""
 while getopts "n:o:v:d:c:r:" f; do
@@ -22,12 +23,12 @@ while getopts "n:o:v:d:c:r:" f; do
 done
 [ -n "$REPO" ] || REPO=$(cd "$(dirname "$0")/../.." && pwd)
 [ -n "$DNS" ] || DNS=$NEW
-names=$REPO/cluster/platform/edge/names.txt zone=$REPO/cluster/platform/edge/coredns/$VIEW.db
-[ -f "$names" ] || names=$REPO/names.txt
-[ -f "$zone" ] || zone=$REPO/$VIEW.db
+zdir=$REPO/cluster/platform/edge/coredns names=$REPO/cluster/platform/edge/names.txt
+[ -f "$names" ] || { names=$REPO/names.txt; zdir=$REPO; }
 [ -n "$CA" ] || CA=$REPO/hosts/files/pki/web-ca.crt
 [ -f "$CA" ] || CA=$REPO/web-ca.crt
-for f in "$names" "$zone" "$CA"; do [ -f "$f" ] || { echo "missing $f" >&2; exit 2; }; done
+case $VIEW in lan) zones=$zdir/lan.db ;; tailnet) zones=$(ls "$zdir"/tailnet-*.db 2>/dev/null) ;; *) echo "bad view" >&2; exit 2 ;; esac
+for f in "$names" $zones "$CA"; do [ -f "$f" ] || { echo "missing $f" >&2; exit 2; }; done
 fail=0
 
 # probe SCHEME HOST IP -> "CODE [redirect target without query]" (OAuth state and PKCE values change every time)
@@ -98,10 +99,13 @@ echo; echo "## DNS @$DNS ($VIEW view)"
 printf '%-28s %-34s %-10s %s\n' name A AAAA ok
 for name in $(awk '!/^#/ && NF == 2 {print $1}' "$names"); do
   host=$name.nghodki.ai
-  want=$(awk -v n="$name" '$1 == n && $3 == "A" {print $4}' "$zone" | sort | tr '\n' ' ')
   got=$(q "$DNS" A "$host" | cut -s -d' ' -f3- | tr ' ' '\n' | grep . | sort | tr '\n' ' ')
   aaaa=$(q "$DNS" AAAA "$host" | awk '{print $1 "/" $2}')
-  ok=yes; { [ "$got" = "$want" ] && [ "$aaaa" = "NOERROR/0" ]; } || { ok=NO; fail=1; }
+  match=NO  # the answer must equal the A set of one of the view's zones
+  for z in $zones; do
+    [ "$got" = "$(awk -v n="$name" '$1 == n && $3 == "A" {print $4}' "$z" | sort | tr '\n' ' ')" ] && match=yes
+  done
+  ok=yes; { [ $match = yes ] && [ "$aaaa" = "NOERROR/0" ]; } || { ok=NO; fail=1; }
   printf '%-28s %-34s %-10s %s\n' "$host" "${got:-none}" "$aaaa" "$ok"
 done
 nx=$(q "$DNS" A no-such-name.nghodki.ai | cut -d' ' -f1)

@@ -1,9 +1,9 @@
 # Every *.nghodki.ai name: the one list (runbooks/edge.md). `.github/scripts/edge-zone.py generate` writes the
-# CoreDNS zones (coredns/lan.db, coredns/tailnet.db) and the edge-dnsmasq lines from it; CI fails if they're stale.
+# CoreDNS zones (coredns/lan.db, coredns/tailnet-dgx-{1,2}.db) and the edge-dnsmasq lines; CI fails if they're stale.
 #
 # Targets (addresses in the [targets] table of edge-zone.py):
-#   edge   the front door (Caddy): LAN -> the edge VIP 192.168.86.11, tailnet -> both Sparks' Tailscale IPs
-#   api    the k3s API:           LAN -> the API VIP 192.168.86.10,  tailnet -> both Sparks' Tailscale IPs
+#   edge   the front door (Caddy): LAN -> the edge VIP 192.168.86.11, tailnet -> the answering Spark's Tailscale IP
+#   api    the k3s API:           LAN -> the API VIP 192.168.86.10,  tailnet -> the answering Spark's Tailscale IP
 #   dgx-1, dgx-2   that host directly (not through Caddy): LAN -> its LAN IP, tailnet -> its Tailscale IP + LAN IP
 #   an IPv4 address   that address in both views (LAN-only devices)
 #

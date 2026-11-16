@@ -15,7 +15,8 @@ configMapGenerator:
     files:
       - coredns/Corefile
       - coredns/lan.db
-      - coredns/tailnet.db
+      - coredns/tailnet-dgx-1.db
+      - coredns/tailnet-dgx-2.db
   - name: edge-caddy
     files:
       - caddy/Caddyfile
