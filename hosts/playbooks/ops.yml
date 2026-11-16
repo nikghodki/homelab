@@ -1,4 +1,4 @@
-# Ops launcher on the Dell: Homepage behind oauth2-proxy at ops.nghodki.ai (plan P1.15, runbooks/sign-in.md), and the
+# Ops launcher on the Dell: Homepage at ops.nghodki.ai (plan P1.15, runbooks/sign-in.md), and the
 # private docs site at docs.nghodki.ai (role docs_site builds it, the stack serves it, the front door signs people in;
 # runbooks/docs-site.md).
 # Always --check --diff first. Docker at boot is set by playbooks/alerting.yml.
@@ -17,9 +17,7 @@
         name: docs_secrets
       no_log: true
   vars:
-    oidc_ops_secret: "{{ console_secrets.oidc_ops_secret }}"
-    oauth2_proxy_ops_cookie_secret: "{{ console_secrets.oauth2_proxy_ops_cookie_secret }}"
-    # The front door's token (decision 0011): the docs Caddy answers only requests that carry it
+    # The front door's token (decision 0011): the docs Caddy (docs and Homepage's gate) answers only requests with it
     edge_origin_token: "{{ console_secrets.edge_origin_token }}"
   roles:
     # First, so /srv/docs exists before the stack's `docs` container mounts it
@@ -32,5 +30,4 @@
         compose_stack_name: ops
         compose_stack_src: "{{ playbook_dir }}/../stacks/ops"
         compose_stack_private_templates:
-          oauth2-proxy: 65532        # distroless nonroot
           docs: 65534                # the docs Caddy (compose `user:`); its Caddyfile holds the edge origin token

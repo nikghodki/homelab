@@ -1,5 +1,6 @@
-# Launcher entries (plan P1.15). siteMonitor checks run from the homepage container through the front door
-# (dgx-1 Caddy) and need no credentials. Don't put API keys or passwords in this file.
+# Launcher entries (plan P1.15). siteMonitor checks run from the homepage container through the in-cluster front door
+# (its LAN VIP 192.168.86.11, compose extra_hosts) or straight to a backend, and need no credentials. Don't put API
+# keys or passwords in this file.
 - Observe:
     - Grafana:
         href: https://grafana.nghodki.ai
