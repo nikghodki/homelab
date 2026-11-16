@@ -21,7 +21,8 @@ Collections: community.general, ansible.posix, community.docker, community.sops 
 
 | Playbook | Hosts | Does |
 |---|---|---|
-| `site.yml` | all | `base`, `tailscale`, `fleet_metrics`, then imports `always-on.yml` |
+| `site.yml` | all | `base`, `hardening`, `tailscale`, `fleet_metrics`, then imports `always-on.yml` |
+| `hardening.yml` | all | role `hardening` (Lynis remediation; `--tags all,security_updates` opt-in) |
 | `always-on.yml` | `always_on` (Dell) | role `always_on` |
 | `pki.yml` | all | role `homelab_ca` (both CAs) |
 | `fleet-metrics.yml` | all | role `fleet_metrics` |

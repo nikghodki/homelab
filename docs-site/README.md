@@ -69,7 +69,7 @@ ID). Nextra works too: it reads `_meta` files instead of `meta.json`, so those w
 Every role, playbook, stack, runbook and decision in the repo, and the page that covers it. Checked by script on
 2026-11-15: every item below appears by name on its page.
 
-### Roles (`hosts/roles/`, 24)
+### Roles (`hosts/roles/`, 25)
 
 | Role | Page |
 |---|---|
@@ -83,6 +83,7 @@ Every role, playbook, stack, runbook and decision in the repo, and the page that
 | `defenseclaw_policy` | [security/defenseclaw](content/docs/security/defenseclaw.mdx) |
 | `edge_connector` | [security/edge-connector](content/docs/security/edge-connector.mdx) |
 | `fleet_metrics` | [observability/index](content/docs/observability/index.mdx), [hosts/index](content/docs/hosts/index.mdx) |
+| `hardening` | [security/hardening](content/docs/security/hardening.mdx) |
 | `homelab_ca` | [security/pki](content/docs/security/pki.mdx) |
 | `jetson_cdi` | [hosts/jetson](content/docs/hosts/jetson.mdx) |
 | `k3s` | [platform/k3s](content/docs/platform/k3s.mdx) |
@@ -98,7 +99,7 @@ Every role, playbook, stack, runbook and decision in the repo, and the page that
 | `tailscale` | [network/tailscale](content/docs/network/tailscale.mdx), [security/hardening](content/docs/security/hardening.mdx) |
 | `tailscale_serve` | [network/tailscale](content/docs/network/tailscale.mdx) |
 
-### Playbooks (`hosts/playbooks/`, 21)
+### Playbooks (`hosts/playbooks/`, 22)
 
 All are listed with their hosts and roles in [operations/deploy](content/docs/operations/deploy.mdx). Topic pages:
 
@@ -116,6 +117,7 @@ All are listed with their hosts and roles in [operations/deploy](content/docs/op
 | `fleet-metrics.yml` | [operations/deploy](content/docs/operations/deploy.mdx) |
 | `fleet.yml` | [services/fleet-broker](content/docs/services/fleet-broker.mdx) |
 | `gpu.yml` | [platform/docker-stacks](content/docs/platform/docker-stacks.mdx) |
+| `hardening.yml` | [security/hardening](content/docs/security/hardening.mdx) |
 | `jobs.yml` | [services/temporal](content/docs/services/temporal.mdx) |
 | `k3s.yml` | [platform/k3s](content/docs/platform/k3s.mdx) |
 | `lynis.yml` | [security/hardening](content/docs/security/hardening.mdx) |
@@ -146,7 +148,7 @@ Outside the repo: edge-gateway → [network/front-door](content/docs/network/fro
 [services/litellm](content/docs/services/litellm.mdx), Open WebUI, Coolify, Home Assistant, LiveKit/control center →
 their service pages.
 
-### Runbooks (`runbooks/`, 17 + README)
+### Runbooks (`runbooks/`, 18 + README)
 
 | Runbook | Page |
 |---|---|
@@ -156,6 +158,7 @@ their service pages.
 | `argocd.md` | [platform/argocd](content/docs/platform/argocd.mdx) |
 | `build-sign.md` | [platform/image-signing](content/docs/platform/image-signing.mdx) |
 | `edge-connector.md` | [security/edge-connector](content/docs/security/edge-connector.mdx) |
+| `hardening.md` | [security/hardening](content/docs/security/hardening.mdx) |
 | `hermes-profiles.md` | [agents/hermes](content/docs/agents/hermes.mdx) |
 | `k3s.md` | [platform/k3s](content/docs/platform/k3s.mdx) |
 | `kyverno.md` | [platform/kyverno](content/docs/platform/kyverno.mdx) |

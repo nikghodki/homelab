@@ -35,6 +35,10 @@ not `"Look up {{ jobs_namespace }} namespace"`.
 
 **ssh in a heredoc or loop eats the rest of my script.** Use `ssh -n` (no stdin).
 
+**SSH from dgx-1 to the Dell is refused after a burst of connections.** UFW's `limit` rule on 22/tcp (6 new
+connections per 30 s). The `hardening` role adds allow rules for dgx-1 above it; check `sudo ufw status numbered` and
+re-run `playbooks/hardening.yml --limit omarchy`. The kernel log shows `[UFW LIMIT BLOCK]`.
+
 ## k3s
 
 **`kubectl` says permission denied on `/etc/rancher/k3s/k3s.yaml`.** k3s's bundled `kubectl` defaults to the root-only

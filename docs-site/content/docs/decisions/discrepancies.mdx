@@ -32,7 +32,7 @@ here; each needs a decision or a PR in its own area.
 | 15 | `runbooks/alerting.md` | "dgx-1 and dgx-2 only reach [the Dell] on 22 over Tailscale" | dgx-1 may reach `tag:agent` on 22 and 443; dgx-2 has no Tailscale grant to the Dell |
 | 16 | `runbooks/README.md` | lists incident runbooks "to be written" and only some how-tos | it omits `age-key`, `aibom`, `build-sign`, `edge-connector`, `hermes-profiles`, `robot-ros`, `sign-in`, `temporal`, `web-https` |
 | 17 | `README.md`, `docs/README.md`, `decisions/README.md` | decisions "D1–D23" / "D1–D19" | D1–D25 |
-| 18 | `hosts/README.md` | "Roles today: base, tailscale, fleet_metrics"; mentions Tetragon; Jetson "etcd-only member" | 24 roles; no Tetragon; the Jetson is etcd + tainted worker |
+| 18 | `hosts/README.md` | "Roles today: base, tailscale, fleet_metrics"; mentions Tetragon; Jetson "etcd-only member" | 25 roles; no Tetragon; the Jetson is etcd + tainted worker |
 | 19 | `policies/README.md` | Tailscale ACL "`tailscale.hujson`" | `policies/tailscale/policy.hujson` |
 | 20 | `policies/defenseclaw/homelab.yaml` comment | LiteLLM gateway "(D18)" | D20 |
 | 21 | `hosts/files/fleet-metrics/README.md` | deploy with `scp` and a user unit | Ansible role `fleet_metrics`, system unit, user `fleetmetrics` |

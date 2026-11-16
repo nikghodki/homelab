@@ -52,7 +52,10 @@ with the values. Argo CD upgrades itself on merge.
 
 ## Host OS
 
-- Debian/Ubuntu hosts take security updates automatically (no reboot).
+- The Jetson and the Pi take security updates automatically (no reboot). The Sparks don't (NVIDIA turns unattended
+  upgrades off); apply them with `playbooks/hardening.yml --limit <spark> --tags all,security_updates`.
+- Jetson, open operator actions from Lynis: a reboot (KRNL-5830) and `sudo apt-get install linux-firmware` + reboot
+  (PKGS-7392), in the monthly window.
 - Full updates and reboots in the monthly window: back up and snapshot → Omarchy → Jetson → dgx-2 → dgx-1 → Pi (docked).
 - Before rebooting a Spark, make sure the Jetson is healthy (it's the third etcd vote).
 - Omarchy needed a full system update before Tailscale would install (P0.10).

@@ -51,7 +51,8 @@ over SSH inside a heredoc, use `ssh -n`, or ssh eats the rest of the heredoc as 
 
 | Component | Role | Port | All 5 hosts? |
 |---|---|---|---|
-| Base hardening (time zone, journal cap, sshd drop-in, security-only upgrades on Debian/Ubuntu) | `base` | — | yes |
+| Base hardening (time zone, journal cap, sshd drop-in, security-only upgrades on Debian/Ubuntu; off on the Sparks) | `base` | — | yes |
+| Lynis remediation (sysctl, modules, SSH logging, permissions, banner; UFW allow for dgx-1 on the Dell) | `hardening` | — | yes |
 | Tailscale | `tailscale` | — | yes |
 | fleet-metrics (system unit, user `fleetmetrics`) | `fleet_metrics` | 9109 (all interfaces) | yes |
 | OTel collector `otelcol-contrib` 0.165.0 | `otel_host_collector` | — (pushes to dgx-2:4319) | yes |
