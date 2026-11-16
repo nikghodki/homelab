@@ -5,8 +5,9 @@
 # This is a PATCH, not the whole Deployment: Argo CD server-side-applies only these fields (its own field manager);
 # k3s owns the rest. k3s's manifest sets neither replicas nor affinity, so a k3s restart keeps them. Never pruned or
 # deleted from here (the Deployment is k3s's). CI skips *.ssa-patch.yaml in kubeconform (not a whole object).
-# Spread: k3s's own topologySpreadConstraints (one per hostname); the node affinity keeps both on the Sparks (not the
-# Dell over Wi-Fi; the Jetson is tainted anyway).
+# Placement: the node affinity keeps both on the Sparks (not the Dell over Wi-Fi; the Jetson is tainted anyway), the
+# required anti-affinity one per Spark. k3s's own topology spread (maxSkew 1) isn't enough: the first rollout put both
+# new pods on dgx-1 while the old one was still on dgx-2.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,3 +25,8 @@ spec:
             nodeSelectorTerms:
               - matchExpressions:
                   - {key: nghodki.ai/role, operator: In, values: [gpu]}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels: {k8s-app: kube-dns}
