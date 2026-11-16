@@ -28,7 +28,8 @@ reports every failure, and any failed step fails the job.
   full suite on `main` (merge skew shows within a day) and saves the caches. `build-sign.yml` still runs on pushes.
 - **Caches**: the tool venvs, built by `.github/scripts/ci-venv.sh` from the hash-locked files with `--require-hashes`
   and keyed on the Python version and the lock files' hashes (a hit skips 20-25 s of installing per venv; a restored
-  venv that fails `pip check` is rebuilt); `setup-python` `cache: pip` for the downloads when a venv is rebuilt; the Trivy DB per day, and the Ansible collections per day and `hosts/requirements.yml` (so new releases within
+  venv that fails `pip check` is rebuilt). No `setup-python` `cache: pip`: it only saves downloads, not the 20-25 s of
+  installing, and restoring it cost 4-5 s per job even when the venv cache hit; the Trivy DB per day, and the Ansible collections per day (a PR uses the day of the last daily run) and `hosts/requirements.yml` (so new releases within
   its ranges still arrive within a day). A cache saved on a PR is visible to that PR
   only, which is why the daily run on `main` matters.
 - **Concurrency**: a new push to a PR cancels that PR's older run; the daily and manual runs are never cancelled.
