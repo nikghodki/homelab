@@ -1,0 +1,4 @@
+# DefenseClaw route: the global LiteLLM guardrail checks every prompt of the key ops-agent (pre_call). A prompt the
+# guardrail blocks (an injection in the evidence) ends the investigation with a finding instead of a retry.
+route: litellm-guardrail
+tier: read-only

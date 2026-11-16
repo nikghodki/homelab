@@ -1,0 +1,27 @@
+# A2A agent card for the ops agent (decision 0013). Scanned in CI by a2a-scanner (.github/scripts/scan-agents.py).
+# It doesn't serve A2A yet; the card documents what it is and what it may do.
+name: Ops agent
+description: >-
+  Ambient operations agent for the homelab fleet, in shadow mode. Watches alerts, checks, syncs, cluster events and
+  CI; investigates with read-only tools and the local model; writes root-cause analyses and notifies. It changes
+  nothing: no pull requests, no restarts, no syncs, no silences.
+url: https://ops-agent.nghodki.ai
+version: 0.1.0
+protocolVersion: 0.3.0
+provider:
+  organization: nikghodki homelab
+  url: https://nghodki.ai
+capabilities:
+  streaming: false
+  pushNotifications: false
+defaultInputModes: [text/plain]
+defaultOutputModes: [text/plain]
+skills:
+  - id: investigate
+    name: Investigate an incident
+    description: Reads metrics, logs, cluster and Argo CD state and allowlisted host status, and writes an RCA with evidence.
+    tags: [ops, read-only]
+  - id: digest
+    name: Morning digest
+    description: Summarises the last 24 hours of incidents at 08:00.
+    tags: [ops, read-only]

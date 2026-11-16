@@ -1,0 +1,5 @@
+# Decision 0013 Q13. The agent enforces the daily budget itself (the on-demand routes have no price in LiteLLM).
+tokens_per_day: 1000000
+investigations_in_flight: 2
+per_incident: {tokens: 150000, tool_calls: 25, minutes: 15}
+litellm_key_limits: {rpm: 30, tpm: 150000, max_parallel_requests: 2}

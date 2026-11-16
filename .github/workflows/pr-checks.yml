@@ -255,3 +255,9 @@ jobs:
         run: python -m pytest -q .github/scripts/tests
       - name: DefenseClaw dashboards and rules match the pinned release
         run: python .github/scripts/defenseclaw-bundle.py check
+      # Last: it installs the agent's own pinned dependencies (with hashes) into this job's Python.
+      - name: Ops agent (correlation, redaction, tools, notifications)
+        working-directory: agents/ops-agent
+        run: |
+          pip install --require-hashes --no-deps -r requirements.txt
+          PYTHONPATH=. python -m pytest -q tests

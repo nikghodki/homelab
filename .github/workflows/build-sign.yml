@@ -16,6 +16,10 @@ on:
       - hosts/stacks/ml/compose.yaml
       - hosts/roles/ros_zenoh_router/templates/Dockerfile.j2
       - hosts/roles/ros_zenoh_router/defaults/main.yml
+      - agents/ops-agent/Dockerfile
+      - agents/ops-agent/pyproject.toml
+      - agents/ops-agent/requirements.txt
+      - agents/ops-agent/ops_agent/**
   workflow_dispatch:
 
 permissions: {}
@@ -50,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [mlflow, ros-zenoh]
+        image: [mlflow, ros-zenoh, ops-agent]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

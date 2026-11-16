@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="grid">
+ <div class="card kv"><span class="mute">Open incidents</span><b>{{ open|length }}</b></div>
+ <div class="card kv"><span class="mute">Events (24 h)</span><b>{{ last_event.n }}</b><span class="mute">last {{ last_event.t.strftime('%H:%M') if last_event.t else 'never' }} UTC</span></div>
+ <div class="card kv"><span class="mute">Notifications (24 h)</span><b>{{ notes.sent }}</b><span class="mute">{{ notes.held }} held for the digest</span></div>
+ <div class="card kv"><span class="mute">Shadow mode</span><b>read-only</b><span class="mute">no PRs, no live actions</span></div>
+</div>
+<h2>Open</h2>
+{% for i in open %}
+<div class="card {{ 'crit' if i.severity == 'critical' else i.severity }}">
+ <a href="/incidents/{{ i.id }}"><b>INC-{{ i.id }}</b> {{ i.title }}</a>
+ <div class="mute">{{ i.severity }} · {{ i.klass }} · {{ i.status }} · opened {{ i.opened_at.strftime('%m-%d %H:%M') }} UTC
+ {% if i.family_impact %} · <b style="color:var(--red)">family-facing</b>{% endif %}
+ {% if i.during_change %} · during a change{% endif %}{% for t in i.tags %} · {{ t }}{% endfor %}</div>
+ {% if i.rca_summary %}<div>RCA ({{ i.confidence }}, {{ i.engine }}): {{ i.rca_summary }}</div>{% endif %}
+</div>
+{% else %}<p class="mute">Nothing open.</p>{% endfor %}
+<h2>Resolved (48 h)</h2>
+{% for i in resolved %}
+<div class="card"><a href="/incidents/{{ i.id }}">INC-{{ i.id }} {{ i.title }}</a>
+<div class="mute">{{ i.status }} {{ i.updated_at.strftime('%m-%d %H:%M') }} UTC{% if i.rca_summary %} · {{ i.confidence }}: {{ i.rca_summary }}{% endif %}</div></div>
+{% else %}<p class="mute">None.</p>{% endfor %}
+{% endblock %}

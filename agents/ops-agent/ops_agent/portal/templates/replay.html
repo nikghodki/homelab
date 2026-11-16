@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Replay{% endblock %}
+{% block body %}
+<h2>A0 replay: past incidents, gold RCAs, precision</h2>
+<p class="mute">Each gold incident is replayed with the clock set back to its time: metrics and logs stop at that time, the
+runbooks are the commit that was on main, live-only tools answer from recorded output. Precision = correct claims / claims made.</p>
+{% for run in runs %}
+<div class="card"><b>Run {{ run.id }} · {{ run.engine }}</b> <span class="mute">{{ run.model }} · {{ run.started_at.strftime('%Y-%m-%d %H:%M') }} UTC{% if run.note %} · {{ run.note }}{% endif %}</span>
+<table><tr><th>Gold</th><th>Root cause</th><th>Precision</th><th>Claims</th><th>Unsafe</th><th>Tokens</th><th>Tools</th><th>Time</th><th>Notes</th></tr>
+{% for r in results if r.run_id == run.id %}
+<tr><td>{% if r.incident_id %}<a href="/incidents/{{ r.incident_id }}">{{ r.gold_id }}</a>{% else %}{{ r.gold_id }}{% endif %}</td><td>{{ r.root_cause }}</td>
+<td>{{ "%.2f"|format(r.precision) if r.precision is not none else '-' }}</td><td>{{ r.claims_correct }}/{{ r.claims_total }}</td><td>{{ r.unsafe }}</td>
+<td>{{ r.tokens }}</td><td>{{ r.tool_calls }}</td><td>{{ "%.0f"|format(r.seconds or 0) }} s</td><td class="mute">{{ r.notes or '' }}</td></tr>
+{% endfor %}</table></div>
+{% else %}<p class="mute">No replay yet.</p>{% endfor %}
+{% endblock %}

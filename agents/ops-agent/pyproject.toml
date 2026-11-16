@@ -1,0 +1,23 @@
+[project]
+name = "ops-agent"
+version = "0.1.0"
+description = "Ambient ops agent for the home fleet (decision 0013): shadow mode, read-only"
+requires-python = ">=3.12"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+
+[project.scripts]
+ops-agent = "ops_agent.__main__:main"
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["ops_agent*"]
+
+[tool.setuptools.package-data]
+ops_agent = ["schema.sql", "playbooks/*.yaml", "portal/templates/*.html", "replay/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
