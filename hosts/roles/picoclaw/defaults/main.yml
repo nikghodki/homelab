@@ -10,6 +10,12 @@ picoclaw_env_file: /etc/picoclaw/picoclaw.env   # OPENAI_API_KEY (the LiteLLM ke
 picoclaw_mcp_dir: "{{ picoclaw_home }}/roboclaw/mcp-server"
 picoclaw_motion_socket: /run/robot-motion/motion.sock
 picoclaw_memory_max: 1G
+# DefenseClaw Lite hook (in-process, FFI). The shipped picoclaw_hook.py declared a shorter dclaw_tool_request_t than
+# the engine it loads, so dclaw_evaluate() read a stray content pointer (segfaults). The patch adds the missing fields;
+# the check compares the ctypes size with sizeof(dclaw_tool_request_t) of the deployed libdclaw_core.so (built from
+# ~/edge-connector on 2026-09-18: 248 bytes, content at 232). Change it together with the engine.
+picoclaw_hook: "{{ picoclaw_home }}/.defenseclaw/bin/picoclaw_hook.py"
+picoclaw_hook_request_size: 248
 
 # Where picoclaw ran before (2026-11-15): the login user's home and user unit. Copied from once (marker
 # file); the old copy and the old user unit stay, the unit disabled, for rollback.

@@ -129,6 +129,37 @@
       failed_when: picoclaw_direct_motion.rc != 1
       when: not ansible_check_mode
 
+- name: DefenseClaw hook request struct matches the engine (runbooks/edge-connector.md)
+  when: not ansible_check_mode or picoclaw_migrated.stat.exists
+  block:
+    - name: Hook declares the whole dclaw_tool_request_t (patch; the unpatched copy is the old login home's)
+      ansible.posix.patch:
+        src: picoclaw_hook.request-struct.patch
+        dest: "{{ picoclaw_hook }}"
+      notify: Restart picoclaw
+
+    - name: Hook's request struct has the engine's size
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            import ctypes, importlib.util, sys
+            s = importlib.util.spec_from_file_location("hook", sys.argv[1]); m = importlib.util.module_from_spec(s)
+            s.loader.exec_module(m); print(ctypes.sizeof(m.DclawToolRequest), m.DclawToolRequest.content.offset)
+          - "{{ picoclaw_hook }}"
+      register: picoclaw_hook_size
+      changed_when: false
+      failed_when: (picoclaw_hook_size.stdout.split() | first | int) != picoclaw_hook_request_size
+      when: not ansible_check_mode
+
+    - name: Hook permissions
+      ansible.builtin.file:
+        path: "{{ picoclaw_hook }}"
+        owner: root
+        group: "{{ picoclaw_user }}"
+        mode: "0750"
+
 - name: Config points at the new home (paths only; secrets untouched)
   when: not ansible_check_mode or picoclaw_migrated.stat.exists
   block:
@@ -160,7 +191,7 @@
           node: "{{ picoclaw_home }}/bin/node"
           mcp_server: "{{ picoclaw_mcp_dir }}/picoclaw-hardware-mcp.js"
           motion_socket: "{{ picoclaw_motion_socket }}"
-          hook: "{{ picoclaw_home }}/.defenseclaw/bin/picoclaw_hook.py"
+          hook: "{{ picoclaw_hook }}"
           hook_lib: "{{ picoclaw_home }}/.defenseclaw/lib/libdclaw_core.so"
           hook_log: "{{ picoclaw_home }}/.defenseclaw/logs/dclaw_hook.log"
       register: picoclaw_config_paths
