@@ -67,7 +67,7 @@ flowchart LR
 | Robot | ROS 2 Kilted over Zenoh, safety governor | Pi, Jetson |
 | Security | DefenseClaw 1.0.9 per user, Edge Connector + Fleet, scanners in CI, signed images, Kyverno (Enforce) | every host, CI, k3s |
 | Observe | OTel collectors → VictoriaMetrics, Loki, Tempo → Grafana; Phoenix; vmalert → Alertmanager → ntfy | collectors everywhere, stack on dgx-2, delivery on the Dell |
-| Identity | Pocket ID (passkeys, OIDC), oauth2-proxy | dgx-2 (behind dgx-1's front door) |
+| Identity | Pocket ID (passkeys, OIDC); oauth2-proxy `edge-auth` (one sign-in for apps without a login) | Pocket ID on dgx-2; edge-auth in k3s on both Sparks |
 | Platform | k3s (3 etcd members), Argo CD + KSOPS, Kyverno, CNPG operator; kube-vip and the `*.nghodki.ai` front door (Caddy + CoreDNS) | Sparks (+ Jetson etcd, Omarchy agent) |
 | Change | Git PRs, GitHub Actions CI, Ansible from dgx-1, Argo CD pulling `cluster/` | GitHub, dgx-1, k3s |
 

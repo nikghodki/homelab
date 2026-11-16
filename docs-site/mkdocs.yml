@@ -1,5 +1,5 @@
 # Operator docs for the homelab fleet, built with MkDocs Material (setup copied from DGXMM).
-# Private: served only by the Dell behind oauth2-proxy + Pocket ID at https://docs.nghodki.ai (runbooks/docs-site.md).
+# Private: served only by the Dell behind the front door's sign-in (edge-auth, Pocket ID) at https://docs.nghodki.ai (runbooks/docs-site.md).
 # Never GitHub Pages. Build from the repo root:
 #   pip install --require-hashes -r docs-site/requirements-docs.txt && mkdocs build --strict -f docs-site/mkdocs.yml
 site_name: Homelab fleet

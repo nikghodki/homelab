@@ -42,7 +42,7 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | 7233 | 192.168.86.36 | Temporal frontend gRPC (no mTLS) |
 | 8233 | 192.168.86.36 | Temporal Web UI |
 | 9233 | 192.168.86.36 | Temporal Prometheus metrics |
-| 4181 | 192.168.86.36 | MLflow oauth2-proxy |
+| 4181 | 192.168.86.36 | MLflow UI gate (the `api` Caddy; front door token, else 403) |
 | 5000 | 192.168.86.36 | MLflow job API (Caddy, basic auth) |
 | 8000 | all | restic rest-server (TLS) |
 | 9400 | 127.0.0.1 | dcgm-exporter |
@@ -72,11 +72,12 @@ the Postgres instances, MLflow 5000 inside the stack.
 
 | Port | Bind | Service |
 |---|---|---|
-| 8081 | 192.168.86.49 | status-proxy (oauth2-proxy) → Gatus |
+| 8081 | 192.168.86.49 | status-gate (Caddy) → Gatus: UI with the front door token only; `/health`, `/metrics`, heartbeat open |
 | 8082 | 127.0.0.1 | Gatus itself (break-glass via SSH tunnel) |
 | 8085 | 127.0.0.1, 192.168.86.49 | ntfy |
 | 443 (tailnet) | tailscaled | `tailscale serve` → 127.0.0.1:8085 |
-| 4180 | 192.168.86.49 | ops oauth2-proxy → Homepage |
+| 4180 | 192.168.86.49 | ops stack Caddy → Homepage (front door token, else 403) |
+| 4181 | 192.168.86.49 | ops stack Caddy → docs site (front door token, else 403; `/healthz` open) |
 | 10250 | all | kubelet |
 | 9109 | all | fleet-metrics |
 

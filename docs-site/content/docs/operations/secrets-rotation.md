@@ -16,7 +16,7 @@ commit the SOPS file in a PR, merge, deploy the playbooks that use it, check, an
 | Fleet API token | `fleet` → `dclaw_fleet_api_token` | `defenseclaw.yml` (dgx-1), `collectors.yml --limit dgx-1` | Gatus `Fleet API` 401; metrics flowing |
 | Fleet OTA / emergency / audit keys, device key | `fleet` → `dclaw_ota_hmac_key`, `dclaw_emergency_key`, `dclaw_audit_key_*`, `dclaw_device_key_*` | gateway and devices together; a device key changes by re-registering (`register` replaces it) | heartbeats, a policy push |
 | OIDC client secrets | `console` → `oidc_<client>_secret` (regenerate in Pocket ID, then the sync script writes SOPS) | the app's playbook; for Argo CD also `cluster/platform/argocd/extras/oidc.enc.yaml` | sign in |
-| oauth2-proxy cookie secrets | `console`/`ml` → `oauth2_proxy_*_cookie_secret` (32 random bytes, base64url) | the stack's playbook (everyone signs in again) | sign in |
+| Sign-in (edge-auth) | `cluster/platform/edge/edge-auth.enc.yaml` → `cookie-secret` (32 random bytes, base64url), `client-secret`; `edge_origin_token` (+ `origin-token`) | merge, restart `edge-auth` (cookie: everyone signs in again); token: restart `edge-caddy`, then `ops.yml`, `alerting.yml`, `ml.yml` (`runbooks/sign-in.md`) | sign in; `verify-edge-auth.sh` |
 | Pocket ID static API key | `console` → `pocketid_static_api_key` | `console.yml` | `pocketid_sync.py --dry-run` |
 | Pocket ID encryption key | `console` → `pocketid_encryption_key` | **don't rotate casually**: it encrypts Pocket ID's data (unverified whether Pocket ID supports re-keying) | — |
 | ntfy users/token | `observe` → `ntfy_*_password(_hash)`, `ntfy_alerts_token` (hash with `ntfy user hash`) | `alerting.yml`, `observe.yml` (Alertmanager), phone settings | test alert |

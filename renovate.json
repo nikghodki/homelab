@@ -28,6 +28,17 @@
     },
     {
       "customType": "regex",
+      "description": "Container images in Ansible role defaults (<role>_..._image: image:tag@sha256:digest), e.g. the docs build image",
+      "managerFilePatterns": [
+        "/^hosts/roles/[^/]+/defaults/main\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "_image: \"?(?<depName>[a-z0-9][a-z0-9./_-]*):(?<currentValue>[A-Za-z0-9][A-Za-z0-9._-]*)@(?<currentDigest>sha256:[a-f0-9]{64})\"?"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
       "description": "DefenseClaw release behind the observe stack's dashboards and rules",
       "managerFilePatterns": [
         "/^hosts/stacks/observe/defenseclaw-bundle\\.yaml$/"
@@ -65,7 +76,8 @@
   ],
   "pip-compile": {
     "managerFilePatterns": [
-      "/^\\.github/requirements-(ci|aibom|radar)\\.txt$/"
+      "/^\\.github/requirements-(ci|aibom|radar)\\.txt$/",
+      "/^docs-site/requirements-docs\\.txt$/"
     ]
   },
   "pip_requirements": {

@@ -21,8 +21,8 @@ phone when both Sparks crash. It was made "always on" for that (PR #55, role `al
 
 | Stack / unit | Containers | Published | Playbook |
 |---|---|---|---|
-| `alerting` | `alerting-gatus-1` (Gatus 5.38.0), `alerting-status-proxy-1` (oauth2-proxy 7.15.6), `alerting-ntfy-1` (ntfy 2.38.0) | 127.0.0.1:8082 (Gatus), 192.168.86.49:8081 (status-proxy), 127.0.0.1:8085 and 192.168.86.49:8085 (ntfy) | `alerting.yml` |
-| `ops` | `ops-homepage-1` (Homepage 2.8.0), `ops-oauth2-proxy-1` | 192.168.86.49:4180 | `ops.yml` |
+| `alerting` | `alerting-gatus-1` (Gatus 5.38.0), `alerting-status-gate-1` (Caddy 2.11.9), `alerting-ntfy-1` (ntfy 2.38.0) | 127.0.0.1:8082 (Gatus), 192.168.86.49:8081 (status-gate), 127.0.0.1:8085 and 192.168.86.49:8085 (ntfy) | `alerting.yml` |
+| `ops` | `ops-homepage-1` (Homepage 2.8.0), `ops-docs-1` (Caddy 2.11.9: docs site and Homepage's gate) | 192.168.86.49:4180 (Homepage), :4181 (docs) | `ops.yml` |
 | `tailscale serve` | `https://nikghodki-omarchy-1.tail1cb707.ts.net` → `http://127.0.0.1:8085` (ntfy, tailnet only) | 443 on the tailnet | role `tailscale_serve` |
 | `k3s-agent.service` | k3s agent, node IP 192.168.86.49 | 10250 | `k3s.yml` |
 | `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `sshd`, `docker` | standard | 9109 | — |

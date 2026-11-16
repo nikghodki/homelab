@@ -9,7 +9,7 @@ target is the `sim` namespace, with PostgreSQL on CNPG and artifacts on SeaweedF
 | MLflow 3.18.0 | `mlflow`, image `homelab/mlflow:3.18.0-psycopg2.9.13`, built on dgx-2 from `hosts/stacks/ml/mlflow` (official `ghcr.io/mlflow/mlflow:v3.18.0`, pinned, plus `psycopg2-binary` with hashes; runs as uid 1000). **No published port** |
 | PostgreSQL 17 | `postgresql`, its own instance (not the Temporal one), database `mlflow`, volume `ml_pg-data`; not published |
 | Artifacts | volume `ml_artifacts` at `/mlartifacts`, served by MLflow (`--serve-artifacts`): clients upload and download through the server (`mlflow-artifacts:/...`), never the volume |
-| Browser | **https://mlflow.nghodki.ai** → dgx-1 Caddy → oauth2-proxy on **192.168.86.36:4181** (LAN) → `mlflow:5000` |
+| Browser | **https://mlflow.nghodki.ai** → the front door (sign-in: `edge-auth`, admins, [sign-in.md](sign-in.md)) → the ml stack's Caddy on **192.168.86.36:4181** (LAN; needs the door's `X-Edge-Origin` token, else 403) → `mlflow:5000` |
 | Job API | **http://192.168.86.36:5000** (LAN), a Caddy (`api`) with HTTP basic auth → `mlflow:5000`; `/health` is open |
 | Uptime | Gatus group `ml`: `mlflow.nghodki.ai` through the front door (302 to Pocket ID) and `http://192.168.86.36:5000/health` |
 | Launcher | Homepage (`https://ops.nghodki.ai`, group ML): links to `mlflow.nghodki.ai`; its status dot checks the job API's open `/health`, since the browser URL answers 302 when signed out |
@@ -132,6 +132,6 @@ deploy) in the repo or a model registry PR as well.
 
 - Namespace `sim`: MLflow as a Deployment, PostgreSQL on CNPG, artifacts on SeaweedFS's S3 API
   (`--artifacts-destination s3://mlflow/`), still proxied by MLflow so clients need no S3 credentials.
-- Sign-in stays oauth2-proxy + Pocket ID; the job API becomes a ClusterIP Service for in-cluster jobs (NetworkPolicy
+- Sign-in stays the front door's (`import signed_in`, pointing at a Service); the job API becomes a ClusterIP Service for in-cluster jobs (NetworkPolicy
   from the `sim` namespace) instead of a LAN port.
 - Move the two volumes with `pg_dump`/`pg_restore` and a copy of `/mlartifacts` to the bucket (same relative paths).

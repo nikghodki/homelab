@@ -25,7 +25,7 @@ jobs, so jobs must leave the service reserve alone.
 | `observe` | victoriametrics, vmalert, alertmanager, loki, tempo, otel-defenseclaw, otel-fleet, grafana, phoenix | 0.0.0.0: 3000 (Grafana), 6006 (Phoenix), 4317–4318 (DefenseClaw OTLP), 4319–4320 (fleet OTLP) | `observe.yml` |
 | `console` | pocket-id | 192.168.86.36:1411 | `console.yml` |
 | `jobs` | temporal, postgresql, admin-tools, ui | 192.168.86.36: 7233 (gRPC), 8233 (UI), 9233 (metrics) | `jobs.yml` |
-| `ml` | mlflow, postgresql, oauth2-proxy, api (Caddy) | 192.168.86.36: 4181 (oauth2-proxy), 5000 (job API) | `ml.yml` |
+| `ml` | mlflow, postgresql, api (Caddy) | 192.168.86.36: 4181 (UI gate for the front door), 5000 (job API) | `ml.yml` |
 | `gpu` | dcgm-exporter | 127.0.0.1:9400 | `gpu.yml` |
 | `backup` | rest-server (restic) | 0.0.0.0:8000 (TLS) | `backups.yml` |
 | `sim` (on demand) | isaaclab, mujoco (profile `jobs`, never start by themselves) | none | run by hand |

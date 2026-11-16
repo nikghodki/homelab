@@ -1,19 +1,19 @@
 ---
 title: "MLflow"
-description: "Experiment tracking on dgx-2: MLflow with its own PostgreSQL, a browser path behind Pocket ID and a basic-auth job API."
+description: "Experiment tracking on dgx-2: MLflow with its own PostgreSQL, a browser path signed in at the front door and a basic-auth job API."
 ---
 
 | | |
 |---|---|
 | Purpose | Experiment tracking for sim jobs (P6.5); later the policy registry |
 | Host | dgx-2, stack `ml` (`hosts/stacks/ml`, `playbooks/ml.yml`, `/opt/homelab/ml`) |
-| Containers | `mlflow` (3.18.0, image `homelab/mlflow:3.18.0-psycopg2.9.13` built on dgx-2 from `hosts/stacks/ml/mlflow/Dockerfile`, uid 1000, 2 workers, `--serve-artifacts`, no published port), `postgresql` (17, database `mlflow`, volume `ml_pg-data`), `oauth2-proxy`, `api` (Caddy 2.11.9 as 65532, no capabilities) |
-| Browser | `https://mlflow.nghodki.ai` → front door → oauth2-proxy 192.168.86.36:4181 → `mlflow:5000`. Pocket ID client `mlflow`, admins |
+| Containers | `mlflow` (3.18.0, image `homelab/mlflow:3.18.0-psycopg2.9.13` built on dgx-2 from `hosts/stacks/ml/mlflow/Dockerfile`, uid 1000, 2 workers, `--serve-artifacts`, no published port), `postgresql` (17, database `mlflow`, volume `ml_pg-data`), `api` (Caddy 2.11.9 as 65532, no capabilities: the job API on :5000 and the browser gate on :4181) |
+| Browser | `https://mlflow.nghodki.ai` → front door (sign-in: `edge-auth`, admins; the same session as Homepage and the docs) → `api` Caddy 192.168.86.36:4181 (only with the door's `X-Edge-Origin` token, else 403) → `mlflow:5000` |
 | Job API | `http://192.168.86.36:5000` (LAN only), basic auth user `sim`; `/health` open |
 | Artifacts | volume `ml_artifacts` at `/mlartifacts`, uploaded and downloaded through the server |
 | Allowed hosts | `mlflow.nghodki.ai`, `192.168.86.36:5000`, `mlflow:5000`, `localhost:5000` (DNS-rebinding protection) |
 | Memory caps | mlflow 1 GiB, postgres 512 MiB, proxy and api 128 MiB; GenAI job runner off (`MLFLOW_SERVER_ENABLE_JOB_EXECUTION=false`) |
-| Secrets | `secrets/ml.enc.yaml` → `postgres_password`, `mlflow_api_password`, `mlflow_api_password_hash`, `oauth2_proxy_mlflow_cookie_secret`; `console` → `oidc_mlflow_secret` |
+| Secrets | `secrets/ml.enc.yaml` → `postgres_password`, `mlflow_api_password`, `mlflow_api_password_hash`; `console` → `edge_origin_token` |
 | Client file | `/etc/homelab/mlflow-client.env` on dgx-2 (root:docker, 0640), written by the playbook; sim jobs read it |
 | Health | Gatus `mlflow.nghodki.ai` (302) and `MLflow job API` (`/health` = OK); Homepage tile (group ML) checks the job API's `/health` |
 | Image signing | also built and signed in CI as `ghcr.io/nikghodki/mlflow` ([Image signing](../platform/image-signing.md)) |

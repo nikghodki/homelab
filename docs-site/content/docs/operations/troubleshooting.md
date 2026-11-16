@@ -96,8 +96,8 @@ treat a changed tool as possible poisoning until reviewed.
 
 ## Sign-in
 
-**Gatus crashed at start.** Its own `security.oidc` panics when Pocket ID is unreachable. Gatus has no OIDC; status-proxy
-(oauth2-proxy) does the sign-in.
+**Gatus crashed at start.** Its own `security.oidc` panics when Pocket ID is unreachable. Gatus has no OIDC; the front door
+(`edge-auth`) does the sign-in and `status-gate` lets only the door through to the UI.
 
 **Phoenix says "authentication failed" after Pocket ID.** Request the `groups` scope
 (`PHOENIX_OAUTH2_POCKETID_SCOPES: groups`).

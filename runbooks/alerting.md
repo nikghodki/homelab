@@ -18,7 +18,7 @@ exhaustion, 2026-11-15), and when Gatus and ntfy lived on dgx-2 nobody was told.
 | Piece | Where |
 |---|---|
 | Gatus 5.38.0, ntfy 2.38.0 | Dell, `hosts/stacks/alerting` (`playbooks/alerting.yml`), `/opt/homelab/alerting` |
-| Status-page sign-in | `status-proxy` (oauth2-proxy 7.15.6, Pocket ID client `gatus`) on `192.168.86.49:8081`; without a session only `/health`, `/metrics` and the heartbeat POST pass. Gatus itself listens on the Dell's loopback (`127.0.0.1:8082`) |
+| Status-page sign-in | at the front door (`edge-auth`, [sign-in.md](sign-in.md), decision 0011). On the Dell, `status-gate` (Caddy) on `192.168.86.49:8081` passes the UI only with the front door's `X-Edge-Origin` token; `/health`, `/metrics` and the heartbeat POST pass without it. Gatus itself listens on the Dell's loopback (`127.0.0.1:8082`); none of this is on the checking path |
 | Gatus config (authoritative) | `hosts/stacks/alerting/gatus/config.yaml.j2`; checks use LAN addresses or the front door, never container names |
 | ntfy config | `hosts/stacks/alerting/ntfy/server.yml.j2`; users, access and tokens are declared there from `secrets/observe.enc.yaml` |
 | Tailscale HTTPS | `tailscale serve` on the Dell (role `tailscale_serve`): `https://nikghodki-omarchy-1.tail1cb707.ts.net` → `127.0.0.1:8085` |
@@ -26,7 +26,7 @@ exhaustion, 2026-11-15), and when Gatus and ntfy lived on dgx-2 nobody was told.
 | Heartbeat | `hosts/stacks/observe/vmalert/rules/watchdog.yml` → Alertmanager route `gatus-heartbeat` → Gatus external endpoint `observe_alert-pipeline-heartbeat` |
 | Never sleep | `hosts/roles/always_on` (`playbooks/always-on.yml`, also in `site.yml`) |
 | Dead man for the Dell | `hosts/stacks/observe/vmalert/rules/alerting-host.yml` → Alertmanager receivers `ntfy-sh-backup-host` / `ntfy-sh-backup-delivery` → public `https://ntfy.sh/<topic>`; topic `ntfy_sh_backup_topic_token` in `secrets/observe.enc.yaml` |
-| Web routes | dgx-1 Caddy: `status.nghodki.ai` → `192.168.86.49:8081`, `ntfy.nghodki.ai` → `192.168.86.49:8085` ([web-https.md](web-https.md)) |
+| Web routes | the in-cluster Caddy: `status.nghodki.ai` → `192.168.86.49:8081` (signed in, `/health` open), `ntfy.nghodki.ai` → `192.168.86.49:8085` ([edge.md](edge.md)) |
 
 ## The phone
 
@@ -55,8 +55,8 @@ Second subscription, once: the backup topic on public ntfy.sh (when the Dell is 
 Gatus and ntfy can't report their own host being down, so the check runs on dgx-2 and the message goes around the Dell:
 
 - **Check:** vmalert `AlertingHostDown`: `max(up{job="gatus"}) < 1 or absent(up{job="gatus"})` for 15 min. dgx-2's
-  VictoriaMetrics scrapes the Dell's Gatus `/metrics` (`192.168.86.49:8081`, through status-proxy) every 30 s, so this
-  is "the Dell, its Docker, status-proxy or Gatus is down, or dgx-2 can't reach it". `AlertDeliveryFailing`
+  VictoriaMetrics scrapes the Dell's Gatus `/metrics` (`192.168.86.49:8081`, through status-gate) every 30 s, so this
+  is "the Dell, its Docker, status-gate or Gatus is down, or dgx-2 can't reach it". `AlertDeliveryFailing`
   (Alertmanager's webhook notifications kept failing for 15 min, e.g. the Dell's ntfy broken while Gatus answers) uses
   the same path; it is inhibited while `AlertingHostDown` fires.
 - **Delivery:** Alertmanager posts straight to public `https://ntfy.sh/<topic>` (dgx-2 → internet; no Dell, no
@@ -100,7 +100,7 @@ curl -s "https://ntfy.sh/$T/json?poll=1&since=5m" | jq -c '{title, message, prio
 ```bash
 # from dgx-1
 curl -s http://192.168.86.49:8085/v1/health                     # ntfy on the LAN
-curl -s -o /dev/null -w '%{http_code}\n' http://192.168.86.49:8081/health   # Gatus, through status-proxy
+curl -s -o /dev/null -w '%{http_code}\n' http://192.168.86.49:8081/health   # Gatus, through status-gate
 ssh -n nikghodki@192.168.86.49 'sudo tailscale serve status'    # https://nikghodki-omarchy-1... -> 127.0.0.1:8085
 ssh -n nikghodki@192.168.86.49 'sudo docker logs --since 10m alerting-gatus-1 | grep -E "success=false|TRIGGERED|RESOLVED|external"'
 # read the topic as the phone user without printing the password

@@ -1,6 +1,6 @@
 ---
 title: Docs site (docs.nghodki.ai)
-description: These pages, built from main every 15 minutes on the Dell and served behind oauth2-proxy and Pocket ID.
+description: These pages, built from main every 15 minutes on the Dell and signed in at the front door (edge-auth, Pocket ID).
 ---
 
 The site you are reading. Private: only the home front door serves it, behind Pocket ID (group `admins`), on the LAN
@@ -14,8 +14,8 @@ and Tailscale. Never GitHub Pages. Full procedure: `runbooks/docs-site.md`.
 | Build | role `docs_site` on the Dell (`playbooks/ops.yml`): `docs-build.timer` every 15 min and at boot; only when `main` moved and `docs-site/` changed; pinned Python image by digest, hash-locked requirements |
 | Fetch | read-only deploy key `docs-dell` (`secrets/docs.enc.yaml` → `docs_deploy_key`, root-only on the Dell), shallow sparse clone of `docs-site/` |
 | Files | `/srv/docs/current` → `releases/<docs tree hash>/`, swapped atomically; the last 5 releases kept for rollback |
-| Containers | ops stack: `docs` (Caddy 2.11.9, read-only, no ports) and `oauth2-proxy-docs` (7.15.6) on 192.168.86.49:4181 |
-| Sign-in | Pocket ID client `docs`, PKCE S256, `allowed_groups = ["admins"]`, cookie `_docs_oauth2_proxy`; `secrets/console.enc.yaml` → `oidc_docs_secret`, `oauth2_proxy_docs_cookie_secret` |
+| Containers | ops stack: `docs` (Caddy 2.11.9, read-only) on 192.168.86.49:4181, which answers only requests with the front door's `X-Edge-Origin` token (else 403; `/healthz` open); `:8080` on the stack network for Homepage. The same Caddy is Homepage's gate (:4180) |
+| Sign-in | the front door: `import signed_in 192.168.86.49:4181 admins` (client `edge-auth`; one session with Homepage, Gatus and MLflow); `edge_origin_token` in `secrets/console.enc.yaml` |
 | Health | Gatus `docs.nghodki.ai` (302 to Pocket ID) and `docs build` (external endpoint: build result, 1 h heartbeat); journal tag `docs-build` in Loki |
 
 Measured on 2026-11-15: PR #82 merged at 03:08:54Z and was live at 03:15:55Z (7 min: the wait for the next
@@ -24,5 +24,5 @@ quarter-hour timer run, then about 50 s to clone, install and build). Worst case
 A failed build leaves the last good site up. Nothing on the site loads from other hosts (system fonts, local search,
 Mermaid served from the site).
 
-Why a second oauth2-proxy instead of a second upstream on the `ops` one: an oauth2-proxy instance signs in with one
-OIDC client and one cookie domain, and the docs have their own client (`docs`), so they get their own small instance.
+Until 2026-11-15 the docs had their own oauth2-proxy and Pocket ID client (`docs`); now the front door's one sign-in
+covers them ([decision 0011](https://github.com/nikghodki/homelab/blob/main/decisions/0011-one-sign-in-proxy.md)).
