@@ -1,0 +1,28 @@
+# Argo CD and Kyverno in k3s (plans P3.4/P3.5, runbooks/argocd.md, runbooks/kyverno.md).
+groups:
+  - name: gitops
+    rules:
+      - alert: ArgoCDAppOutOfSync
+        expr: max by (name) (argocd_app_info{sync_status!="Synced"}) == 1
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Argo CD app {{ $labels.name }} hasn't matched Git for 15 min (runbooks/argocd.md)"
+      - alert: ArgoCDAppNotHealthy
+        expr: max by (name, health_status) (argocd_app_info{health_status!="Healthy"}) == 1
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Argo CD app {{ $labels.name }} is {{ $labels.health_status }} for 15 min (runbooks/argocd.md)"
+      - alert: ArgoCDMetricsDown
+        expr: up{job="argocd-application-controller-metrics"} == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Argo CD's application controller isn't answering: nothing syncs and the app alerts are blind (runbooks/argocd.md)"
+      - alert: KyvernoAdmissionDown
+        expr: up{job="kyverno-admission"} == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Kyverno's admission controller is down: pods are admitted unchecked (failurePolicy Ignore, runbooks/kyverno.md)"

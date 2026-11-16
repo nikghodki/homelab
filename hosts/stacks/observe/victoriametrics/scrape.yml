@@ -25,3 +25,15 @@ scrape_configs:
   # Temporal server in the jobs stack (plan P4.7); its metrics port is published on dgx-2's LAN address.
   - job_name: temporal
     static_configs: [{targets: ["192.168.86.36:9233"], labels: {service: temporal}}]
+  # k3s platform (plan P3.4/P3.5, runbooks/argocd.md, runbooks/kyverno.md): fixed ClusterIPs that dgx-2's kube-proxy
+  # routes for host traffic (cluster/README.md). Job names match the Argo CD dashboard.
+  - job_name: argocd-application-controller-metrics
+    static_configs: [{targets: ["10.43.0.101:8082"], labels: {service: argocd}}]
+  - job_name: argocd-server-metrics
+    static_configs: [{targets: ["10.43.0.100:8083"], labels: {service: argocd}}]
+  - job_name: argocd-repo-server-metrics
+    static_configs: [{targets: ["10.43.0.102:8084"], labels: {service: argocd}}]
+  - job_name: kyverno-admission
+    static_configs: [{targets: ["10.43.0.110:8000"], labels: {service: kyverno}}]
+  - job_name: kyverno-reports
+    static_configs: [{targets: ["10.43.0.111:8000"], labels: {service: kyverno}}]
