@@ -23,10 +23,11 @@ cisco_aibom_remote_images:
 cisco_aibom_remote_dirs:
   - {host: jetson, name: hermes-agent}
   - {host: jetson, name: hermes-agent-hermes-nikhil}
-# Home Assistant's core is ~10,900 Python files (over 30 min here): 3 h per target; the whole run (own container,
-# two Hermes copies, Home Assistant) gets 10 h
-cisco_aibom_timeout_s: 10800
-cisco_aibom_unit_timeout: 10h
+# A first scan of a Hermes copy is ~75 min deterministic here plus the agentic stage, which the cisco-aibom key's
+# 100k tokens/min bounds (~1 batch/min); Home Assistant's core ~10,900 Python files. 5 h per target, 14 h in all.
+# Nights without changes are fast: the job keeps cisco-aibom's cache (runbooks/aibom.md).
+cisco_aibom_timeout_s: 18000
+cisco_aibom_unit_timeout: 14h
 # k3s (plan P3.2): starts the cluster (dgx-2 is the less critical Spark)
 k3s_node_ip: 10.100.136.2
 k3s_node_external_ip: 192.168.86.36

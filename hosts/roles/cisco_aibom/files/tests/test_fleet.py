@@ -339,3 +339,19 @@ def test_refresh_copy_never_copies_git_internals_or_links(tmp_path, monkeypatch)
     assert "--filter=- /.git/**" in cmd and "--exclude=.env" in cmd and "--delete-excluded" in cmd
     assert cmd[-2:] == ["u@h::m/", f"{tmp_path / 'c'}/"]
     assert "StrictHostKeyChecking=yes" in cmd[cmd.index("-e") + 1]
+
+
+def test_cache_persists_in_state_and_old_entries_go(run, tmp_path):
+    go, state = run
+    old = state / "cache" / "scan" / "old.json"
+    old.parent.mkdir(parents=True)
+    old.write_text("{}")
+    fresh = state / "cache" / "agentic" / "fresh.json"
+    fresh.parent.mkdir(parents=True)
+    fresh.write_text("{}")
+    past = datetime.datetime.now().timestamp() - 40 * 86400
+    import os
+    os.utime(old, (past, past))
+    go()
+    assert fleet.CACHE_DIR == state / "cache"
+    assert fresh.exists() and not old.exists()

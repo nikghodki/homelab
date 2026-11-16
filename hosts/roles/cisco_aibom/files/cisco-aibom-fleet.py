@@ -30,6 +30,10 @@ import tempfile
 
 MAX_LINES = 50          # per-component journal lines per run and direction
 HIDDEN_TYPES = {"secret"}
+# cisco-aibom's own cache (<state>/cache: scan/ and agentic/), kept between runs so an unchanged target is not scanned
+# or sent to the LLM again (its key: the git commit, else the files' mtimes, which the remote copies keep); entries
+# older than keep_days are deleted. None (tests): a cache in the run's work dir.
+CACHE_DIR: pathlib.Path | None = None
 # `analyze` insists on an LLM. None is reachable on purpose: a closed port makes it fall back to its deterministic
 # scanners at once (agentic_status "degraded").
 NO_LLM = ["--llm-model", "none", "--llm-provider", "openai", "--llm-api-base", "http://127.0.0.1:9",
@@ -100,7 +104,7 @@ def scan(exe: str, source: str, is_image: bool, timeout: int, workdir: pathlib.P
     out = workdir / "report.json"
     out.unlink(missing_ok=True)
     cmd = [exe, "analyze", source, "-o", "json", "-O", str(out), "--no-progress", "--no-show-summary",
-           "--cache-dir", str(workdir / "cache"), *llm_args()]
+           "--cache-dir", str(CACHE_DIR or workdir / "cache"), *llm_args()]
     if is_image:
         cmd += ["--container-extraction-tier", "docker"]
     run = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, cwd=workdir)
@@ -248,6 +252,19 @@ def secret_like(copy: pathlib.Path, excludes: list) -> list[str]:
     return sorted(hits)
 
 
+def prune_cache(cache: pathlib.Path, keep_days: int) -> None:
+    """Delete cache files not written for keep_days (a reused entry keeps its old mtime: it is rebuilt once)."""
+    if not cache.is_dir():
+        return
+    cutoff = datetime.datetime.now().timestamp() - keep_days * 86400
+    for f in cache.rglob("*"):
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink()
+        except OSError:
+            pass
+
+
 def prune_copies(state: pathlib.Path, wanted: set) -> None:
     """Delete copies of remote code dirs that are no longer configured (<state>/mirror/<host>/<name>)."""
     base = state / "mirror"
@@ -371,8 +388,12 @@ def run_host(cfg: dict, host: str, targets: list, state: pathlib.Path, work: pat
 
 def main() -> int:
     cfg = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    global CACHE_DIR
     host, state = cfg["host"], pathlib.Path(cfg["state"])
     state.mkdir(parents=True, exist_ok=True)
+    if cfg.get("persistent_cache", True):
+        CACHE_DIR = state / "cache"
+        CACHE_DIR.mkdir(mode=0o700, exist_ok=True)
     targets = [(d["name"], d["path"], "dir", {}) for d in cfg.get("dirs", [])]
     targets += [(f"container:{c}", c, "container", {"key": c}) for c in cfg.get("containers", [])]
     # other hosts' code dirs ({host, name, source, excludes}), copied to <state>/mirror/<host>/<name> and scanned
@@ -398,6 +419,8 @@ def main() -> int:
             errors += run_host(cfg, rhost, rtargets, state, work, pulled, scanned_on=host)
     prune_remote_images(state, {r["image"] for r in cfg.get("remote_images", [])}, pulled)
     prune_copies(state, {(r["host"], r["name"]) for r in cfg.get("remote_dirs", [])})
+    if CACHE_DIR:
+        prune_cache(CACHE_DIR, int(cfg.get("keep_days", 30)))
     return 1 if errors else 0
 
 
