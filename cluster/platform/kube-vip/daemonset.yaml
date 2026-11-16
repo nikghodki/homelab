@@ -21,7 +21,8 @@ spec:
       labels: {app.kubernetes.io/name: kube-vip, app.kubernetes.io/part-of: edge}
     spec:
       serviceAccountName: kube-vip
-      hostNetwork: true
+      # The VIPs live on the host interface (decision 0007; Kyverno allowlists kube-system, Trivy: .trivyignore.yaml).
+      hostNetwork: true  # nosemgrep: yaml.kubernetes.security.hostnetwork-pod.hostnetwork-pod
       dnsPolicy: ClusterFirstWithHostNet
       priorityClassName: system-node-critical
       nodeSelector: {nghodki.ai/role: gpu}
