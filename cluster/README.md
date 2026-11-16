@@ -63,6 +63,7 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 | 10.43.0.141:8080, :9100 | `ops/ops-ingest-ip` (reserved) | Alertmanager (webhook), VictoriaMetrics |
 | 10.43.0.142:9100 | `ops/ops-worker-metrics` (reserved) | VictoriaMetrics |
 | 10.43.0.143:5432 | `ops/ops-db-host` | the ops agent's replay harness on dgx-1 (runbooks/ops-agent.md) |
+| 10.43.0.144:8000, 10.43.0.145:8080, 10.43.0.146:3000 | `ops/mcp-grafana`, `ops/mcp-kubernetes`, `ops/mcp-argocd` | the ops agent and its replay harness |
 
 Pick the next free address here and add a row. If the pods behind one have a NetworkPolicy, allow the hosts
 (`argocd/extras/host-scrape-netpol.yaml`). The in-cluster Caddy uses these addresses too (Argo CD, edge-auth), never Service names: the front door must keep
