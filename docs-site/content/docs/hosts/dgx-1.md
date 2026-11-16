@@ -42,7 +42,7 @@ dgxmanager), NATS and Fleet still go down with dgx-1 (see
 | `bus-nats-1` | `nats:2.15.3-alpine` | 0.0.0.0:4222, :8883; 127.0.0.1:8222 | `playbooks/bus.yml` |
 | `fleet-mosquitto-1` | `eclipse-mosquitto:2.1.2-alpine` | 0.0.0.0:8884 | `playbooks/fleet.yml` |
 | `fleet-caddy-1` | `caddy:2.11.9-alpine` | host network, :8971 | `playbooks/fleet.yml` |
-| `gpu-dcgm-exporter-1` | `nvcr.io/nvidia/k8s/dcgm-exporter:4.4.2-4.7.1` | 127.0.0.1:9400 | `playbooks/gpu.yml` |
+| `gpu-dcgm-exporter-1` | `nvcr.io/nvidia/k8s/dcgm-exporter:4.8.4` | 127.0.0.1:9400 | `playbooks/gpu.yml` |
 
 DGXMM starts model engines (vLLM, llama.cpp) as more containers when models load; none were loaded at check time.
 
@@ -56,11 +56,11 @@ DGXMM starts model engines (vLLM, llama.cpp) as more containers when models load
 | `tailscaled.service` | Tailscale |
 | `earlyoom.service`, `gpu-oom-guard.service` | Memory guards added after the 2026-11-15 OOM. The unit says "Managed by homelab Ansible (roles/memory_guard)", but no such role exists in the repo on any branch (unverified who installed it; likely the DGXMM session) |
 | `nvidia-persistenced`, `dgx-dashboard`, `dgx-dashboard-admin` | DGX OS |
-| NFS server (`nfs-mountd`, `nfsdcld`, ...), `iperf3` | Present and running; not documented in the repo (purpose unverified) |
+| NFS server (`nfs-server`, `rpcbind`, ...), `iperf3` | Stopped and disabled 2026-11-15 (role `retired_units`): no exports or clients; NFS came with the Jetson reflash tools, iperf3 with a one-off link test. Re-enable `nfs-server` for the next Jetson reflash |
 | user `defenseclaw-gateway.service` | DefenseClaw 1.0.9 gateway with the Fleet gateway, API on 127.0.0.1:18970 |
 
 Timers: `cisco-aibom.timer` (~04:20), `lynis-audit.timer` (Sunday ~03:30), `homelab-backup.timer` (02:30; see
-[Backups](../operations/backups.md)), and the distro's own `lynis.timer`.
+[Backups](../operations/backups.md)). Lynis is the upstream 3.1.7 in `/opt/lynis`; the distro package and its `lynis.timer` are gone.
 
 ### k3s pods
 

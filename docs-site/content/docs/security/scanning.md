@@ -15,7 +15,8 @@ installed from hash-locked files. Full job list: [CI](../development/ci.md).
 | SOPS | `.github/scripts/check-sops.sh` | plaintext in `secrets/`, plaintext `*.enc.yaml`, a Secret outside `*.enc.yaml` in `cluster/` |
 | Code | Semgrep 1.185.0 (`p/default`) | any finding |
 | Dependencies | OSV-Scanner 2.7.1 | a known vulnerability (exceptions in `.github/osv-scanner.toml`, each with an expiry) |
-| Vulns, misconfig, secrets in files | Trivy 0.76.2 (`fs`, HIGH/CRITICAL) | HIGH or CRITICAL |
+| Vulns, misconfig in files | Trivy 0.76.2 (`fs --scanners vuln,misconfig`, HIGH/CRITICAL; no secret scanner: gitleaks and TruffleHog cover secrets) | HIGH or CRITICAL |
+| Shell | shellcheck 0.11.0 on `*.sh` and shell `*.j2` templates (`.github/scripts/shellcheck.sh`) | a warning or error |
 | Kubernetes | kubeconform 0.8.0, Kyverno CLI 1.20.0 | invalid manifest; a policy that doesn't parse; the bad-pod fixture not failing every policy |
 | MCP tools | `mcp-tool-hashes.py check`, mcp-scanner 4.8.7 (YARA, offline) | a changed tool without a hash update; HIGH/CRITICAL not accepted |
 | Skills | skill-scanner 2.3.2 (`--policy strict --fail-on-severity high`) on any `SKILL.md` folder in `agents/`, `tools/` | HIGH or above (no skills in the repo yet) |
@@ -66,6 +67,7 @@ prompts, datasets, endpoints, AI dependencies, secrets). Decision 0003; runbooks
 | Unit | `cisco-aibom.timer` (~04:20 + up to 20 min; Jetson 01:30), `cisco-aibom.service` as root but read-only: `CapabilityBoundingSet=CAP_DAC_READ_SEARCH`, `ProtectSystem=strict`, `ProtectHome=read-only`, `Nice=19`, idle I/O, `OOMPolicy=continue` |
 | Memory cap | Sparks 6G (`group_vars/sparks.yml`), Jetson 3G, Pi 1500M, default 4G |
 | Memory guard | Sparks: skip an image target when MemAvailable is under 20 GiB (`aibom.skipped`). Code dirs always scanned |
+| Remote images | The Jetson runs code-dir scans only; dgx-2 scans its images by digest (`cisco_aibom_remote_images`) and reports them as `host: jetson`, `scanned_on: dgx-2` |
 | Reports | `/var/lib/cisco-aibom/<host>-<date>.json`, root only, 30 days |
 | Summary | journal, `SyslogIdentifier=cisco-aibom` → Loki → Grafana "AI inventory" |
 

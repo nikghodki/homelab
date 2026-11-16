@@ -32,7 +32,7 @@ the car today).
 | `robot-motion-bridge` | system, as the login user, group `robot-motion` | the governor's motion bridge; socket `/run/robot-motion/motion.sock` | — |
 | `ros-lidar` | user (linger) | MS200 driver → `/scan` and `/tf_static` over Zenoh (client mode) | — |
 | `safety-governor` | user | the safety governor, mock sink | metrics 127.0.0.1:9113 |
-| `dclaw-tunnel` | user | Old SSH tunnel `-L 18970` to the Jetson's DefenseClaw gateway. Still enabled; the plan said to retire it (P1.12). See [discrepancies](../decisions/discrepancies.md) | — |
+| `dclaw-tunnel` | user | Old SSH tunnel `-L 18970` to the Jetson's DefenseClaw gateway. Stopped and disabled 2026-11-15 (P1.12, role `retired_units`); it had never connected | — |
 
 Timers: `cisco-aibom` (~04:20), `lynis-audit`, `homelab-backup`. No Docker.
 
@@ -56,4 +56,4 @@ Changes to the robot (limits, governor code) are applied only while the robot is
 
 - Wi-Fi only. Bursty `/scan` arrival (0–0.5 s gaps), steady 10 Hz average.
 - picoclaw runs as its own user without sudo, and the login home is 0750; the login user still has passwordless sudo.
-- `pi.nghodki.ai` in dnsmasq still points at the old address 192.168.86.34 (see [discrepancies](../decisions/discrepancies.md)).
+- `pi.nghodki.ai` and `raspberrypi.nghodki.ai` answer 192.168.86.39 from the in-cluster CoreDNS (`names.txt`, #90); the old edge-dnsmasq still says .34 until it is retired.

@@ -11,8 +11,8 @@ These pieces are hand-run and only partly documented in the repo. What is left (
 
 | Piece | Where | Details |
 |---|---|---|
-| LiveKit server | Jetson, user unit `livekit-server` (nikjetson), enabled and active | `~/.local/bin/livekit-server --dev --key-file ~/.config/livekit/keys.yaml`; listens on 127.0.0.1:7880 and ::1:7880 only, so nothing off the Jetson reaches it |
-| LiveKit key | `~/.config/livekit/keys.yaml` (0600) | moved out of the command line (P0.8, finding F4); **rotated 2026-11-15** after it had been printed (PR #34). New key in `secrets/voice.enc.yaml` → `livekit_api_key`, `livekit_api_secret`. Old key rejected (checked) |
+| LiveKit server | Jetson, user unit `livekit-server` (nikjetson), role `livekit` (`playbooks/home.yml`) | `/opt/livekit/1.13.5/livekit-server --config ~/.config/livekit/livekit.yaml` (no `--dev`, binary hash-locked); listens on 127.0.0.1:7880 and ::1:7880 only, so nothing off the Jetson reaches it |
+| LiveKit key | in `~/.config/livekit/livekit.yaml` (0600, rendered from SOPS) | moved out of the command line (P0.8, finding F4); **rotated 2026-11-15** after it had been printed (PR #34). New key in `secrets/voice.enc.yaml` → `livekit_api_key`, `livekit_api_secret`. Old key rejected (checked) |
 | RoboClaw Control Center | Jetson, user unit `control-center`, enabled and active | uvicorn `app.main:app` on 0.0.0.0:8200 (py310 venv); uses the LiveKit key; calls the car's `POST /stop` |
 | `controlcenter.nghodki.ai` | front door → 192.168.86.211:8200 | no sign-in in Caddy (app auth unverified) |
 | `vision-service` | Jetson, user unit (nikjetson) | **disabled and inactive** (D26) |
@@ -23,6 +23,6 @@ These pieces are hand-run and only partly documented in the repo. What is left (
 The retired route had been broken: it sent `/rtc*` and `/twirp/*` to dgx-1:7880, while LiveKit runs on the Jetson's
 loopback (502 on 2026-11-15).
 
-Rotate the LiveKit key: generate a new pair, put it in `secrets/voice.enc.yaml`, write `keys.yaml` (0600) on the
-Jetson, update the control center's settings, restart `livekit-server` and `control-center` as nikjetson, and check
-that the old key is refused.
+Rotate the LiveKit key: generate a new pair, put it in `secrets/voice.enc.yaml`, run `playbooks/home.yml` (it
+rewrites `livekit.yaml` and restarts `livekit-server`), update the control center's settings, restart
+`control-center` as nikjetson, and check that the old key is refused (ListRooms check in runbooks/jetson-services.md).

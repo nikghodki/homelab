@@ -7,6 +7,7 @@
 | Method | Repo read at `origin/main` 4a9383d. Memory measured read-only on 2026-11-15 ~18:20 PT: `docker stats --no-stream`, `k3s crictl stats` (working set; there is no metrics-server, so `kubectl top` doesn't work), `ps` RSS. Upstream data from the GitHub API (stars, license, latest release) and the vendors' docs, fetched the same day |
 | Constraints | Free (OSS, or a free tier without lock-in), self-hosted, arm64 (2 × GB10, Jetson Orin, Pi 4) plus one 8 GB amd64 laptop; 5 hosts, 1 user plus family; low memory and low operational overhead beat scale |
 | Status | Review only. Nothing was changed on any host. Recommendations that need your decision are marked **[decision]** |
+| Applied | 2026-11-15: recommendations 4, 6 and part of 7 (§6 below) |
 
 **Bottom line.** The stack is mostly the right one for a small arm64 fleet, and almost everything is genuinely free.
 The waste is in **duplicates and idle services**, not in bad choices: Coolify hosts zero apps, Temporal runs zero
@@ -569,3 +570,22 @@ MuJoCo, LiveKit, Hermes, picoclaw, ROS 2 + Zenoh, Home Assistant, restic, CNPG, 
 5. Accept the source-available licences (Phoenix ELv2, Open WebUI branding clause, Semgrep rules) with the named
    fallbacks, or switch now (not recommended).
 6. Edge cutover timing (#1); backups on (decision 0002) for #17.
+
+---
+
+## 6. Applied (2026-11-15)
+
+| # | What was done | PR | Deployed |
+|---|---|---|---|
+| 4 | Cisco AIBOM: no image scans on the Jetson (`cisco_aibom_image_scans: false`); dgx-2 scans the Jetson's Home Assistant image by digest (`cisco_aibom_remote_images`), reported as `host: jetson`, `scanned_on: dgx-2`; dashboard groups by that host | #85 | yes: first remote scan 57 min, 314 components, 1.3G cgroup peak on dgx-2 |
+| 6 | Trivy without its secret scanner (PR `fs` and nightly images); standalone shellcheck; digest-pin check for every workflow image; expiring, purl-scoped `.trivyignore.yaml` and a nightly failure on expired ignores; dcgm-exporter 4.8.4 (not 4.9.0, which renames the metrics the alerts use). Nightly green again | #83, #86 | dcgm-exporter on both Sparks |
+| 7 | Home Assistant pinned (2026.11.1 by digest, same image) and in `hosts/stacks/home-assistant`; LiveKit without `--dev` (config file, key from SOPS, hash-locked 1.13.5); Pocket ID 2.19.3; Lynis 3.1.7 upstream (the distro's duplicate `lynis.timer` is gone); unused NFS and iperf3 on dgx-1 and the Pi's `dclaw-tunnel` stopped and disabled; `pi`/`raspberrypi.nghodki.ai` → .39 in `names.txt` | #85, #89, #90 | yes, all |
+
+Correction to §1.8 and §2.7: the Jetson never had image targets. The 1.1 GiB was its **code-dir** scans
+(Hermes checkouts): the run that started 14:10 peaked at 1.24 GB RSS (1.2G cgroup + 391M swap, MemAvailable never
+below ~2.6 GiB), and both Hermes targets hit the 3 h limit. Moving image scans to dgx-2 sets up the pattern but
+doesn't lower that peak. Next step (not done): scan the Hermes checkouts on dgx-2 too, from a read-only copy.
+
+Not done here: CoreDNS 1.15 (front door, P3.3), LiveKit 1.13.11 (pinned to the running 1.13.5), Open WebUI and
+LiteLLM (their own sessions), the edge-gateway tags (`caddy:2.11`, `nginx:alpine`, dnsmasq; retired by the cutover).
+

@@ -14,7 +14,7 @@ the repo settings (which is why build-sign uses plain buildx/cosign binaries, PR
 |---|---|---|
 | `lint` | actionlint 1.7.12; yamllint 1.38.0 with `.yamllint.yaml` (line length 160 as a warning, no document-start, octal values forbidden); ansible-lint 26.11.0 on `playbooks/site.yml` and `roles` | any error |
 | `secrets` | gitleaks 8.30.1 on the full history (redacted); TruffleHog 3.99.9 `--only-verified`; `check-sops.sh` | any finding |
-| `code` | Semgrep 1.185.0 `p/default`; OSV-Scanner 2.7.1 (exit 128 = no manifests is OK); Trivy 0.76.2 `fs` vuln, misconfig, secret at HIGH/CRITICAL | any finding |
+| `code` | Semgrep 1.185.0 `p/default`; OSV-Scanner 2.7.1 (exit 128 = no manifests is OK); Trivy 0.76.2 `fs` vuln and misconfig (no secret scanner) at HIGH/CRITICAL; `.trivyignore.yaml` format and 30-day limit | any finding |
 | `kubernetes` | `check-kubernetes.sh`: kubeconform 0.8.0 `-strict` on `cluster/` (values files and `*.enc.yaml` skipped); Kyverno CLI 1.20.0 with a bad-pod fixture that must fail every policy; then `cluster/` against the policies | invalid manifests, unparsed or non-failing policies |
 | `ai-scanners` | `mcp-tool-hashes.py check tools`; `scan-mcp-tools.py tools` (mcp-scanner 4.8.7); `scan-skills.sh` (skill-scanner 2.3.2); `scan-agents.py --self-test` then `scan-agents.py` (a2a-scanner 1.0.1); Agentic Radar 0.14.2 in its own venv (report artifact) | hash drift, HIGH/CRITICAL findings |
 | `aibom` | Cisco AIBOM 1.10.1 in its own venv on the repo, deterministic (LLM at a closed port); summary in the job summary; artifact `aibom` (30 days) | tool errors |

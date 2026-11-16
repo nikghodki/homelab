@@ -26,7 +26,7 @@ jobs, so jobs must leave the service reserve alone.
 | `console` | pocket-id | 192.168.86.36:1411 | `console.yml` |
 | `jobs` | temporal, postgresql, admin-tools, ui | 192.168.86.36: 7233 (gRPC), 8233 (UI), 9233 (metrics) | `jobs.yml` |
 | `ml` | mlflow, postgresql, api (Caddy) | 192.168.86.36: 4181 (UI gate for the front door), 5000 (job API) | `ml.yml` |
-| `gpu` | dcgm-exporter | 127.0.0.1:9400 | `gpu.yml` |
+| `gpu` | dcgm-exporter 4.8.4 | 127.0.0.1:9400 | `gpu.yml` |
 | `backup` | rest-server (restic) | 0.0.0.0:8000 (TLS) | `backups.yml` |
 | `sim` (on demand) | isaaclab, mujoco (profile `jobs`, never start by themselves) | none | run by hand |
 
