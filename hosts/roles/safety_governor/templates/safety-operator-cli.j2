@@ -1,0 +1,13 @@
+#!/bin/sh
+# Managed by homelab Ansible (role safety_governor). {{ safety_governor_cli_name }} as the NATS user operator, the only
+# account (besides admin) allowed to publish robot.pi.safety.reset: runbooks/robot-safety.md.
+# The password is in a root-only file and reaches the CLI on stdin, never on a command line.
+#   safety-reset                clear the latched e-stop (payload RESET); exits 0 once the governor reports it clear
+#   safety-estop [status]       latch it / print the governor's status (where installed with operator credentials)
+creds=$(sudo -n cat {{ safety_governor_operator_credentials }}) || {
+  echo "{{ safety_governor_cli_name }}: can't read {{ safety_governor_operator_credentials }} (needs sudo)" >&2
+  exit 1
+}
+export PYTHONPATH="{{ safety_governor_cli_pythonpath }}"
+printf '%s\n' "$creds" | {{ safety_governor_cli_python }} -m safety_governor.estop_cli {{ safety_governor_cli_action }} \
+  --config "{{ safety_governor_cli_config }}" --credentials - "$@"

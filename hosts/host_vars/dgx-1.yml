@@ -25,9 +25,8 @@ restic_backup_sqlite:
   - {name: open-webui, path: /var/lib/docker/volumes/open-webui_open-webui-data/_data/webui.db}
 restic_backup_pre_commands:
   - docker exec litellm-postgres pg_dump -U litellm -d litellm --no-owner | gzip > /var/backups/homelab/litellm-db.sql.gz
-# Cisco AIBOM (runbooks/aibom.md). DGXMM and LiteLLM are only read. Open WebUI's image takes ~25 min and ~13 GB.
+# Cisco AIBOM (runbooks/aibom.md). DGXMM and LiteLLM are only read. Memory cap and guard: group_vars/sparks.yml.
 cisco_aibom_enabled: true
-cisco_aibom_memory_max: 16G
 cisco_aibom_dirs:
   - {name: dgx-model-manager, path: /home/nikghodki-dgx/workspace/dgx-model-manager}
   - {name: litellm-setup, path: /home/nikghodki-dgx/litellm-setup}

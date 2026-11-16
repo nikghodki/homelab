@@ -7,6 +7,8 @@ that the host collector ships to Loki:
   {"event": "aibom", ...}          one summary per run: component counts per type and per target, added/removed
   {"event": "aibom.new", ...}      one per component that was not in the previous run (capped)
   {"event": "aibom.removed", ...}  one per component that is gone (capped)
+  {"event": "aibom.skipped", "reason": "skipped: low memory", ...}  an image target not scanned because MemAvailable
+                                   was below its threshold (image_min_mem_gib / image_min_mem_gib_by_container)
 Secret findings are counted, never named. No LLM is configured, so the BOM is deterministic-only (runbooks/aibom.md).
 Managed by homelab Ansible (roles/cisco_aibom). Usage: cisco-aibom-fleet <targets.json>
 """
@@ -29,6 +31,15 @@ NO_LLM = ["--llm-model", "none", "--llm-provider", "openai", "--llm-api-base", "
 
 def log(event: str, **fields) -> None:
     print(json.dumps({"event": event, **fields}, sort_keys=True), flush=True)
+
+
+def mem_available_gib() -> float:
+    """MemAvailable from /proc/meminfo, in GiB (on a DGX Spark this is the unified CPU+GPU memory left)."""
+    with open("/proc/meminfo", encoding="ascii") as fh:
+        for line in fh:
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) / 1024 / 1024
+    raise RuntimeError("no MemAvailable in /proc/meminfo")
 
 
 def image_of(container: str) -> str:
@@ -112,6 +123,22 @@ def load_components(doc: dict) -> set:
             for c in components(name, t["report"])}
 
 
+def baseline(paths: list, names: set) -> set:
+    """Per target, the components of the latest previous run in which it was scanned, so a target that was
+    skipped or failed on some night is compared with its last real scan, not counted as all added."""
+    out, todo = set(), set(names)
+    for p in reversed(paths):
+        if not todo:
+            break
+        targets = json.loads(p.read_text()).get("targets") or {}
+        for name in sorted(todo):
+            t = targets.get(name)
+            if t and t.get("report"):
+                out |= components(name, t["report"])
+                todo.discard(name)
+    return out
+
+
 def changes(event: str, host: str, items: set) -> None:
     for target, ctype, name, path in sorted(items)[:MAX_LINES]:
         if ctype in HIDDEN_TYPES:
@@ -127,13 +154,25 @@ def main() -> int:
     targets += [(f"container:{c}", c, True) for c in cfg.get("containers", [])]
     doc = {"host": host, "started": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
            "targets": {}}
-    errors = []
+    errors, skipped = [], []
+    min_gib = float(cfg.get("image_min_mem_gib", 0))
+    min_gib_by = cfg.get("image_min_mem_gib_by_container") or {}
     with tempfile.TemporaryDirectory(prefix="cisco-aibom-") as tmp:
         work = pathlib.Path(tmp)
         for name, source, is_image in targets:
             entry = {"kind": "image" if is_image else "dir"}
             try:
                 if is_image:
+                    need = float(min_gib_by.get(source, min_gib))
+                    avail = mem_available_gib() if need > 0 else None
+                    if avail is not None and avail < need:
+                        entry.update(container=source, status="skipped", reason="low memory",
+                                     mem_available_gib=round(avail, 1), need_gib=need)
+                        skipped.append(name)
+                        log("aibom.skipped", host=host, target=name, reason="skipped: low memory",
+                            mem_available_gib=round(avail, 1), need_gib=need)
+                        doc["targets"][name] = entry
+                        continue
                     entry["container"], source = source, image_of(source)
                 elif not os.path.isdir(source):
                     raise RuntimeError(f"{source} does not exist")
@@ -164,12 +203,14 @@ def main() -> int:
     now = load_components(doc)
     by_type, by_target = counts(now)
     summary = {"host": host, "total": len(now), "counts": by_type, "targets": by_target,
-               "errors": errors, "agentic": "off"}
+               "errors": errors, "skipped": skipped, "agentic": "off"}
     if previous:
-        before_doc = json.loads(previous[-1].read_text())
-        failed_now = {n for n, t in doc["targets"].items() if t.get("status") != "ok"}
-        # a target that failed tonight is not "removed"; compare only targets that were scanned both times
-        before = {c for c in load_components(before_doc) if c[0] not in failed_now}
+        last_doc = json.loads(previous[-1].read_text())
+        not_scanned = {n for n, t in doc["targets"].items() if t.get("status") != "ok"}
+        # a target that failed or was skipped tonight is not "removed": compare only targets scanned tonight (and
+        # targets gone from the config), each against its last real scan
+        names = (set(last_doc.get("targets") or {}) | set(doc["targets"])) - not_scanned
+        before = baseline(previous, names)
         added, removed = now - before, before - now
         summary.update(first_run=False, added=len(added), removed=len(removed), compared_to=previous[-1].name)
         log("aibom", **summary)

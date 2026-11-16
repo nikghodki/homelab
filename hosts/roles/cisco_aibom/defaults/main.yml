@@ -5,7 +5,11 @@ cisco_aibom_dirs: []         # [{name: hermes-agent, path: /home/...}] scanned i
 cisco_aibom_containers: []   # running container names; the image each one runs is scanned
 cisco_aibom_time: "*-*-* 04:20:00"
 cisco_aibom_keep_days: 30
-cisco_aibom_memory_max: 4G
+cisco_aibom_memory_max: 4G   # systemd MemoryMax of the unit (the Sparks: 6G, group_vars/sparks.yml)
+# Pre-flight guard: an image target is skipped ("aibom.skipped", reason "skipped: low memory") when MemAvailable is
+# below this many GiB when its turn comes. 0 = off. Per container overrides in the map.
+cisco_aibom_image_min_mem_gib: 0
+cisco_aibom_image_min_mem_gib_by_container: {}
 cisco_aibom_timeout_s: 3600  # per target
 cisco_aibom_unit_timeout: 6h  # whole run
 cisco_aibom_prefix: /opt/cisco-aibom

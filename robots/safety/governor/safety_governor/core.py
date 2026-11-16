@@ -15,6 +15,8 @@ applies decides):
 
 The e-stop is latched: only `reset()` clears it, and after a reset only commands received
 *after* the reset count, so a stale command can't move the robot the moment the latch opens.
+Only sources in `reset_sources` may reset (default: "nats", where the server lets only the
+operator user publish the reset subject); any other source is refused and logged as an event.
 """
 
 from __future__ import annotations
@@ -166,9 +168,13 @@ def _clamp(value: float, limit: float) -> float:
     return max(-limit, min(limit, value))
 
 
+DEFAULT_RESET_SOURCES = frozenset({"nats"})
+
+
 class Governor:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, reset_sources=DEFAULT_RESET_SOURCES) -> None:
         self.cfg = config
+        self.reset_sources = frozenset(reset_sources)
         self.estop_latched = False
         self.estop_source: str | None = None
         self.estop_since: float | None = None
@@ -199,7 +205,12 @@ class Governor:
         return True
 
     def reset(self, now: float, source: str) -> bool:
-        """Clear the e-stop. Returns True if it was latched. Commands from before the reset are dropped."""
+        """Clear the e-stop. Returns True if it was latched and `source` may reset. Commands from before the
+        reset are dropped. A reset from a source not in `reset_sources` is refused (event "reset_refused")."""
+        if source not in self.reset_sources:
+            self._event(now, "reset_refused", REASON_ESTOP, f"reset from {source} refused (allowed: "
+                        f"{', '.join(sorted(self.reset_sources)) or 'none'})")
+            return False
         if not self.estop_latched:
             return False
         self.estop_latched = False

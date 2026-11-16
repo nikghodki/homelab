@@ -31,16 +31,27 @@ accounts {
     users: [
       {user: admin, password: "{{ nats_admin_password_hash }}"}
       # picoclaw (Pi) over MQTT. MQTT topic /picoclaw/... is the NATS subject /.picoclaw...
+      # Agents may latch the e-stop but never clear it: the reset subjects are the operator's only
+      # (runbooks/robot-safety.md). Deny wins over allow, for MQTT publishes too.
       {user: picoclaw, password: "{{ nats_picoclaw_password_hash }}",
        permissions: {
-         publish: {allow: ["/.picoclaw.>", "robot.pi.>", "$MQTT.>"]},
+         publish: {allow: ["/.picoclaw.>", "robot.pi.>", "$MQTT.>"],
+                   deny: ["robot.pi.safety.reset", "robot.pi.safety.test.reset"]},
          subscribe: {allow: ["/.picoclaw.>", "robot.pi.cmd.>", "robot.pi.safety.>", "$MQTT.>", "_INBOX.>"]}
        }}
       # Hermes (Jetson): may command the robot and use its own subjects
       {user: hermes, password: "{{ nats_hermes_password_hash }}",
        permissions: {
-         publish: {allow: ["/.picoclaw.>", "robot.>", "agents.hermes.>", "home.>", "$MQTT.>", "_INBOX.>"]},
+         publish: {allow: ["/.picoclaw.>", "robot.>", "agents.hermes.>", "home.>", "$MQTT.>", "_INBOX.>"],
+                   deny: ["robot.pi.safety.reset", "robot.pi.safety.test.reset"]},
          subscribe: {allow: ["/.picoclaw.>", "robot.>", "agents.hermes.>", "home.>", "$MQTT.>", "_INBOX.>"]}
+       }}
+      # The human: safety-reset / safety-estop on dgx-1 and the Pi. Only this user (and admin) can clear the e-stop.
+      {user: operator, password: "{{ nats_operator_password_hash }}",
+       permissions: {
+         publish: {allow: ["robot.pi.safety.reset", "robot.pi.safety.estop",
+                           "robot.pi.safety.test.reset", "robot.pi.safety.test.estop"]},
+         subscribe: {allow: ["robot.pi.safety.>"]}
        }}
     ]
   }

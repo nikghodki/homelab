@@ -9,6 +9,10 @@ exhaustion, 2026-11-15), and when Gatus and ntfy lived on dgx-2 nobody was told.
                     │                                             ▲
                     └─ Watchdog heartbeat every 5 min ──▶ Gatus (Dell :8081) ──┘  (Gatus alerts on its own checks too,
                                                           alerts if the heartbeat stops for 15 min)
+
+ The Dell itself (dead man, off the Dell):
+ VictoriaMetrics scrapes the Dell's Gatus ──▶ vmalert AlertingHostDown (15 min) ──▶ Alertmanager ──HTTPS──▶ ntfy.sh
+ (job "gatus", every 30 s)                                                      (random topic, fixed text) ──▶ phone
 ```
 
 | Piece | Where |
@@ -21,6 +25,7 @@ exhaustion, 2026-11-15), and when Gatus and ntfy lived on dgx-2 nobody was told.
 | Alertmanager | dgx-2, `hosts/stacks/observe/alertmanager/alertmanager.yml.j2`; posts to `http://192.168.86.49:8085/fleet-alerts` |
 | Heartbeat | `hosts/stacks/observe/vmalert/rules/watchdog.yml` → Alertmanager route `gatus-heartbeat` → Gatus external endpoint `observe_alert-pipeline-heartbeat` |
 | Never sleep | `hosts/roles/always_on` (`playbooks/always-on.yml`, also in `site.yml`) |
+| Dead man for the Dell | `hosts/stacks/observe/vmalert/rules/alerting-host.yml` → Alertmanager receivers `ntfy-sh-backup-host` / `ntfy-sh-backup-delivery` → public `https://ntfy.sh/<topic>`; topic `ntfy_sh_backup_topic_token` in `secrets/observe.enc.yaml` |
 | Web routes | dgx-1 Caddy: `status.nghodki.ai` → `192.168.86.49:8081`, `ntfy.nghodki.ai` → `192.168.86.49:8085` ([web-https.md](web-https.md)) |
 
 ## The phone
@@ -36,6 +41,48 @@ In the ntfy app (iPhone, on the tailnet as nikghodki):
 `https://ntfy.nghodki.ai` still works (same server, through dgx-1), but only while dgx-1 is up, and the iOS app gets no
 instant push for it. Don't subscribe twice.
 
+Second subscription, once: the backup topic on public ntfy.sh (when the Dell is down, this is the only path).
+
+1. Read the topic on dgx-1, in the repo: `sops -d --extract '["ntfy_sh_backup_topic_token"]' secrets/observe.enc.yaml`
+   (don't paste it anywhere public; anyone who knows it can read and post to it).
+2. ntfy app → **+** → Topic: the value from step 1 → turn on **Use another server** → `https://ntfy.sh` → **Subscribe**.
+   No user or password. Notifications on (it's sent with priority urgent).
+3. Messages there are only `homelab: alerting host unreachable` or `homelab: alert delivery failing`, title `homelab`.
+   They mean: look at the Dell (and the Dell's ntfy topic won't have anything).
+
+## Dead man for the Dell
+
+Gatus and ntfy can't report their own host being down, so the check runs on dgx-2 and the message goes around the Dell:
+
+- **Check:** vmalert `AlertingHostDown`: `max(up{job="gatus"}) < 1 or absent(up{job="gatus"})` for 15 min. dgx-2's
+  VictoriaMetrics scrapes the Dell's Gatus `/metrics` (`192.168.86.49:8081`, through status-proxy) every 30 s, so this
+  is "the Dell, its Docker, status-proxy or Gatus is down, or dgx-2 can't reach it". `AlertDeliveryFailing`
+  (Alertmanager's webhook notifications kept failing for 15 min, e.g. the Dell's ntfy broken while Gatus answers) uses
+  the same path; it is inhibited while `AlertingHostDown` fires.
+- **Delivery:** Alertmanager posts straight to public `https://ntfy.sh/<topic>` (dgx-2 → internet; no Dell, no
+  Tailscale, no dgx-1). Why ntfy.sh: it needs no account or extra service, the phone already runs the ntfy app, and
+  ntfy.sh is what the Dell's ntfy uses for iOS push anyway. The topic is 128 random bits (only in SOPS and the
+  rendered `alertmanager.yml` on dgx-2; Alertmanager shows webhook URLs as `<secret>`).
+- **Content-free:** the URL uses ntfy's template mode (`tpl=1`) with a fixed `t=homelab` and `m=...`, so ntfy.sh
+  stores and shows only that text, never the alert JSON. The alerts' labels and annotations carry no hostnames or
+  addresses (`max()` drops `instance`), because the webhook body still goes to ntfy.sh. `send_resolved: false`;
+  repeats every 4 h while it lasts.
+- **Not covered:** dgx-2 down at the same time as the Dell (then nothing is left to notice), or the house's internet
+  down (dgx-2 can't reach ntfy.sh; the phone couldn't reach the Dell either).
+
+Test (2026-11-15): an `amtool` alert with the dead-man labels went to `ntfy-sh-backup-host` and the fixed message was on
+the topic within seconds:
+
+```bash
+# on dgx-2
+docker exec observe-alertmanager-1 amtool --alertmanager.url=http://127.0.0.1:9093 config routes test alertname=AlertingHostDown
+docker exec observe-alertmanager-1 amtool --alertmanager.url=http://127.0.0.1:9093 alert add AlertingHostDown severity=critical \
+  --annotation='summary="alerting host unreachable"' --end=$(date -u -d '+3 min' +%Y-%m-%dT%H:%M:%SZ)
+# on dgx-1, without printing the topic
+T=$(sops -d --extract '["ntfy_sh_backup_topic_token"]' secrets/observe.enc.yaml)
+curl -s "https://ntfy.sh/$T/json?poll=1&since=5m" | jq -c '{title, message, priority}'; unset T
+```
+
 ## What still depends on what
 
 | If this is down | Alerts |
@@ -43,7 +90,8 @@ instant push for it. Don't subscribe twice.
 | dgx-2 (VictoriaMetrics, vmalert, Alertmanager, Grafana) | Metric alerts stop. Gatus on the Dell alerts on dgx-2's checks (ssh, Grafana, Phoenix, Temporal, MLflow, k3s API) and, after 15 min, on the missing heartbeat |
 | dgx-1 (front door, DNS, NATS, LiteLLM) | Phone still gets alerts over Tailscale. `status.nghodki.ai`, `ntfy.nghodki.ai` and `ops.nghodki.ai` don't open (and Pocket ID, behind the front door, can't sign anyone in); Gatus keeps checking because it has no OIDC of its own. UI: `ssh -L 8082:127.0.0.1:8082 nikghodki@192.168.86.49` |
 | Both Sparks | Gatus on the Dell alerts on every Spark check; ntfy delivers to the phone |
-| The Dell | No Gatus, no ntfy: nothing reaches the phone. Alertmanager's notifications fail (visible in its log and `alertmanager_notifications_failed_total`). Nothing outside the house watches the Dell yet |
+| The Dell | No Gatus, no ntfy. After 15 min dgx-2 sends `AlertingHostDown` to the backup topic on ntfy.sh (content-free). Other alerts fail to deliver until it's back (Alertmanager's log, `alertmanager_notifications_failed_total`) |
+| The Dell and dgx-2 | Nothing reaches the phone |
 | Home Wi-Fi / internet | LAN checks still run. The phone gets alerts only if it is on the home Wi-Fi or the Dell can reach Tailscale; iOS instant push needs ntfy.sh |
 | Tailscale control plane | Existing connections keep working; new ones may not |
 

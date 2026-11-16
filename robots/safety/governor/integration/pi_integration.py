@@ -2,7 +2,8 @@
 
 It starts a second, throw-away governor (ROS_DOMAIN_ID 73, NATS subjects robot.pi.safety.test.*,
 no metrics port) next to the deployed one, feeds it fake /scan, /cmd_vel_in and heartbeats,
-sends e-stops over NATS as the picoclaw user and over ROS, and checks what reaches the mock sink.
+sends e-stops over NATS as the picoclaw user and over ROS, checks that neither picoclaw nor ROS can
+clear them and that the operator user can, and checks what reaches the mock sink.
 Nothing here can reach the motors: the config pins sink.kind=mock and real_sink_enabled=false,
 the test refuses anything else, and its domain is not the robot's.
 
@@ -35,6 +36,7 @@ from std_msgs.msg import Bool, Empty
 HERE = Path(__file__).resolve().parent
 CODE = HERE.parent  # contains the safety_governor package
 CONFIG_DIR = Path.home() / ".config" / "safety-governor"
+OPERATOR_CREDENTIALS = "/etc/safety-operator/nats-operator.json"  # root only (role safety_governor)
 DOMAIN = "73"
 SUBJ = {
     "estop_subject": "robot.pi.safety.test.estop",
@@ -134,17 +136,21 @@ def moving(vx, wz=0.0):
 
 
 class Nats:
-    def __init__(self) -> None:
-        creds = json.loads((CONFIG_DIR / "nats-credentials.json").read_text())
+    def __init__(self, creds: dict | None = None) -> None:
+        creds = creds or json.loads((CONFIG_DIR / "nats-credentials.json").read_text())
         cfg = json.loads((CONFIG_DIR / "governor.json").read_text())["nats"]
         self.loop = asyncio.new_event_loop()
         threading.Thread(target=self.loop.run_forever, daemon=True).start()
         self.status: list[dict] = []
+        self.errors: list[str] = []
 
         async def connect():
             tls = ssl.create_default_context(cafile=cfg["ca_file"])
+            async def on_error(exc):
+                self.errors.append(str(exc))
+
             nc = await nats.connect(servers=[cfg["url"]], user=creds["user"], password=creds["password"], tls=tls,
-                                    name="safety-governor-integration-test")
+                                    name=f"safety-governor-integration-test-{creds['user']}", error_cb=on_error)
 
             async def on_status(msg):
                 self.status.append(json.loads(msg.data))
@@ -198,9 +204,11 @@ def main() -> int:
     spinner = threading.Thread(target=executor.spin, daemon=True)
     spinner.start()
     sink = SinkLog(sink_path)
-    bus = None
+    bus = operator = None
     try:
         bus = Nats()
+        operator = Nats(json.loads(subprocess.run(["sudo", "-n", "cat", OPERATOR_CREDENTIALS], capture_output=True,
+                                                  text=True, check=True).stdout))
         ok, _, _ = sink.wait_for(lambda r: True, 20)
         check("governor starts and drives the mock sink", ok)
         if not ok:
@@ -253,9 +261,16 @@ def main() -> int:
         st = [s for s in bus.status if s.get("estop", {}).get("latched")]
         check("NATS status reports the latch", bool(st), f"state={st[-1]['state'] if st else None}")
         t1 = time.time()
-        bus.pub(SUBJ["reset_subject"], b"RESET")
+        bus.pub(SUBJ["reset_subject"], b"RESET")  # picoclaw: the server refuses it
+        time.sleep(1.5)
+        ok = all(is_zero(r) for r in sink.records(t1))
+        denied = [e for e in bus.errors if "permissions violation" in e.lower()]
+        check("RESET as picoclaw is refused (still latched, permissions violation)", ok and bool(denied),
+              denied[-1] if denied else f"errors={bus.errors}")
+        t1 = time.time()
+        operator.pub(SUBJ["reset_subject"], b"RESET")
         ok, dt, rec = sink.wait_for(moving(0.1), 2, since=t1)
-        check("NATS RESET clears it", ok, f"within {dt:.2f}s")
+        check("RESET as operator clears it", ok, f"within {dt:.2f}s")
 
         # 5. E-stop over ROS
         t0 = time.time()
@@ -263,9 +278,15 @@ def main() -> int:
         ok, dt, _ = sink.wait_for(is_zero, 2, since=t0)
         check("ROS /safety/estop true -> zero", ok, f"within {dt:.2f}s")
         time.sleep(0.5)
+        t1 = time.time()
         feeder.reset_pub.publish(Bool(data=True))
-        ok, dt, _ = sink.wait_for(moving(0.1), 2, since=time.time())
-        check("ROS /safety/reset true clears it", ok)
+        time.sleep(1.5)
+        ok = all(is_zero(r) for r in sink.records(t1))
+        check("ROS /safety/reset true is refused (ROS reset off)", ok)
+        t1 = time.time()
+        operator.pub(SUBJ["reset_subject"], b"RESET")
+        ok, dt, _ = sink.wait_for(moving(0.1), 2, since=t1)
+        check("RESET as operator clears it", ok, f"within {dt:.2f}s")
 
         # 6. Heartbeat watchdog (2 s)
         sink.wait_for(moving(0.1), 2)
@@ -305,8 +326,9 @@ def main() -> int:
         except subprocess.TimeoutExpired:
             gov.kill()
             out, _ = gov.communicate()
-        if bus:
-            bus.close()
+        for client in (bus, operator):
+            if client:
+                client.close()
         executor.shutdown()
         spinner.join(timeout=5)
         feeder.destroy_node()

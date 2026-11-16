@@ -242,10 +242,30 @@ def test_reset_drops_commands_from_before_the_reset():
     g = ready()
     g.command(0.0, Velocity(0.1, 0, 0))
     g.estop(0.0, "ros")
-    g.reset(0.1, "ros")
+    g.reset(0.1, "nats")
     d = g.step(0.1)  # the old command is gone: idle, not moving
     assert d.state == core.STATE_IDLE and d.out == ZERO
     assert drive(g, 0.2, Velocity(0.1, 0, 0)).out == Velocity(0.1, 0, 0)
+
+
+def test_reset_only_from_allowed_sources():
+    g = ready()
+    g.estop(0.0, "nats")
+    g.pop_events()
+    assert g.reset(0.1, "ros") is False  # ROS reset is off by default: any node on the Zenoh network could send it
+    assert g.estop_latched and g.step(0.1).out == ZERO
+    (event,) = [e for e in g.pop_events() if e["kind"] == "reset_refused"]
+    assert "ros" in event["detail"]
+    assert g.reset(0.2, "nats") is True and not g.estop_latched
+
+
+def test_ros_reset_when_enabled_and_no_reset_at_all():
+    g = Governor(Config(), reset_sources={"nats", "ros"})
+    g.estop(0.0, "ros")
+    assert g.reset(0.1, "ros") is True
+    g = Governor(Config(), reset_sources=())
+    g.estop(0.0, "nats")
+    assert g.reset(0.1, "nats") is False and g.estop_latched
 
 
 def test_estop_events_and_status():

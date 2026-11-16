@@ -1,9 +1,9 @@
 """ROS 2 node: the only component meant to emit motor commands (runbooks/robot-safety.md).
 
 In:  /cmd_vel_in (Twist), /scan (LaserScan), /safety/estop (Bool true latches),
-     /safety/reset (Bool true clears), /safety/heartbeat (Empty);
-     NATS robot.pi.safety.estop (any payload latches), robot.pi.safety.reset (payload RESET),
-     robot.pi.cmd.heartbeat.
+     /safety/reset (Bool true; refused and logged unless ros.reset_enabled), /safety/heartbeat (Empty);
+     NATS robot.pi.safety.estop (any payload latches), robot.pi.safety.reset (payload RESET; only the
+     operator user may publish it), robot.pi.cmd.heartbeat.
 Out: the sink (mock by default), /safety/status and robot.pi.safety.status (JSON),
      interventions to the journal (identifier safety-governor), metrics on 127.0.0.1.
 
@@ -36,6 +36,7 @@ DEFAULT_ROS = {
     "cmd_out_topic": "/cmd_vel",
     "estop_topic": "/safety/estop",
     "reset_topic": "/safety/reset",
+    "reset_enabled": False,
     "heartbeat_topic": "/safety/heartbeat",
     "status_topic": "/safety/status",
 }
@@ -60,9 +61,12 @@ class SafetyGovernorNode(Node):
         super().__init__("safety_governor")
         self._lock = threading.RLock()
         self._mono = time.monotonic
-        self.gov = Governor(Config.from_dict(cfg.get("limits", {})))
         ros = {**DEFAULT_ROS, **cfg.get("ros", {})}
         self._ros = ros
+        # Reset over ROS is off by default: any node on the Zenoh network could publish /safety/reset.
+        # Over NATS the server lets only the operator user publish the reset subject (runbooks/robot-safety.md).
+        reset_sources = {"nats"} | ({"ros"} if ros.get("reset_enabled") is True else set())
+        self.gov = Governor(Config.from_dict(cfg.get("limits", {})), reset_sources=reset_sources)
 
         sink_cfg = cfg.get("sink", {"kind": "mock"})
         self.sink, note = make_sink(
@@ -75,7 +79,8 @@ class SafetyGovernorNode(Node):
             self._log("warning", note)
         self._log(
             "info",
-            f"sink {self.sink.kind} (real={self.sink.is_real}); limits {json.dumps(self.gov.cfg.as_dict())}",
+            f"sink {self.sink.kind} (real={self.sink.is_real}); reset via {', '.join(sorted(reset_sources))}; "
+            f"limits {json.dumps(self.gov.cfg.as_dict())}",
         )
 
         reliable = QoSProfile(depth=10)
@@ -122,7 +127,7 @@ class SafetyGovernorNode(Node):
         if msg.data:
             self.estop("ros")
         else:
-            self._log("info", "e-stop false ignored: clearing needs /safety/reset true", throttle_key="estop-false")
+            self._log("info", "e-stop false ignored: clearing needs safety-reset (operator)", throttle_key="estop-false")
 
     def _on_reset_msg(self, msg: Bool) -> None:
         if msg.data:
@@ -147,7 +152,7 @@ class SafetyGovernorNode(Node):
             changed = decision.state != self._last_state
             self._last_state = decision.state
         for ev in events:
-            level = "info" if ev["kind"] == "reset" else "warning"
+            level = "info" if ev["kind"] == "reset" else "warning"  # reset_refused is a warning
             out = f" out={json.dumps(ev['out'])}" if "out" in ev else ""
             self._log(level, f"INTERVENTION kind={ev['kind']} reason={ev['reason']} detail={ev['detail']}{out}")
         if changed:
