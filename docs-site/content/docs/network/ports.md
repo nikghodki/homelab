@@ -27,8 +27,7 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | 9400 | 127.0.0.1 | dcgm-exporter | |
 | 6443, 10250 | all | k3s API, kubelet | |
 | 2379, 2380 | 10.100.136.1, 127.0.0.1 | etcd | |
-| 2049, 111 | all | NFS server, rpcbind | undocumented (unverified purpose) |
-| 5201 | all | iperf3 | undocumented |
+| 2049, 111, 5201 | — | NFS server, rpcbind, iperf3 | stopped and disabled 2026-11-15 (role `retired_units`) |
 
 ## dgx-2 (192.168.86.36, 100.124.175.23)
 

@@ -17,3 +17,7 @@ cisco_aibom_timeout_s: 10800
 k3s_node_ip: 10.100.136.2
 k3s_node_external_ip: 192.168.86.36
 k3s_cluster_init: true
+# Found running, unused (checked 2026-11-16: enabled since the install, listening on *:5201, its journal shows no
+# connection ever). Same as dgx-1's. roles/retired_units
+retired_units_system:
+  - {unit: iperf3.service, reason: "unused; run iperf3 -s by hand for a link test"}

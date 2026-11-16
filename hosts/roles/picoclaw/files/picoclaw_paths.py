@@ -2,7 +2,8 @@
 """Point picoclaw's config.json at its own home (role picoclaw; runbooks/robot-safety.md).
 
 Sets the workspace, the DefenseClaw Lite hook paths and the picoclaw-hardware MCP server (node, script,
-motion socket) to the values given as JSON on stdin; leaves everything else as it is (secrets included).
+motion socket) to the values given as JSON on stdin, and removes the hook's unused DCLAW_UPSTREAM_URL;
+leaves everything else as it is (secrets included).
 Prints "changed" when it rewrote the file. --check: report only. Fails if any other string still points
 into the old home.
 
@@ -37,6 +38,9 @@ def main() -> int:
     hook = cfg["hooks"]["processes"]["edge-connector-gate"]
     hook["command"] = ["python3", p["hook"]]
     hook.setdefault("env", {}).update(DCLAW_LIB_PATH=p["hook_lib"], DCLAW_LOG_PATH=p["hook_log"])
+    # The hook evaluates in-process (libdclaw_core.so). Neither it nor the engine reads an upstream URL; the
+    # DCLAW_UPSTREAM_URL=http://127.0.0.1:18970 that came with the install pointed at nothing on the Pi.
+    hook["env"].pop("DCLAW_UPSTREAM_URL", None)
     mcp = cfg["tools"]["mcp"]["servers"]["picoclaw-hardware"]
     mcp["command"] = p["node"]
     mcp["args"] = [p["mcp_server"]]

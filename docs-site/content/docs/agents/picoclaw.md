@@ -28,7 +28,7 @@ Role `picoclaw` (play "PicoClaw (own user)" in `hosts/playbooks/robot.yml`, afte
 | Motion tools | `drive`, `turn`, `explore`, `go_to_room`, `follow_nearest`, `map_room` → the motion bridge socket `/run/robot-motion/motion.sock` → `/cmd_vel_in` + `/safety/heartbeat` → governor |
 | `stop` | latches the governor's e-stop (clearing needs `safety-reset`, a human) and calls the car's `/stop` |
 | Other tools | `status`, `get_sensors`, `horn`, `scan_surroundings` still call the car's HTTP API (no motion). `navigate_to`, `explore_frontier` (Nav2) and `follow_start` (vision follow-me) are disabled: they would drive around the governor |
-| DefenseClaw | in-process Lite hook `/var/lib/picoclaw/.defenseclaw/bin/picoclaw_hook.py` (root:picoclaw, read-only; FFI into the Edge engine, strict); log `.defenseclaw/logs/dclaw_hook.log`. The Edge Connector daemon runs next to it for Fleet ([Edge Connector](../security/edge-connector.md)) |
+| DefenseClaw | in-process Lite hook `/var/lib/picoclaw/.defenseclaw/bin/picoclaw_hook.py` (root:picoclaw, read-only; FFI into the Edge engine, strict); log `.defenseclaw/logs/dclaw_hook.log`; no network upstream (the unused `DCLAW_UPSTREAM_URL` was removed 2026-11-16). The Edge Connector daemon runs next to it for Fleet ([Edge Connector](../security/edge-connector.md)) |
 | NATS rights | publish `/.picoclaw.>`, `robot.pi.>` (may latch the e-stop), **not** `robot.pi.safety.reset` |
 | AIBOM | `/var/lib/picoclaw/.picoclaw` and `/var/lib/picoclaw/roboclaw` scanned nightly |
 | Backups | `/var/lib/picoclaw` and `/etc/picoclaw` are in the Pi's restic paths (minus logs, binaries, `node_modules`) |
