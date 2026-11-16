@@ -20,9 +20,41 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "Argo CD's application controller isn't answering: nothing syncs and the app alerts are blind (runbooks/argocd.md)"
+      # Kyverno enforces (failurePolicy Fail) everywhere except kube-system, kyverno, argocd and edge. Two admission
+      # replicas; the scrape goes through a ClusterIP with ClientIP affinity, so it sees one replica at a time and
+      # `up` is 0 only when no replica answers. Counters below therefore cover about half the requests.
       - alert: KyvernoAdmissionDown
         expr: up{job="kyverno-admission"} == 0
         for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: >-
+            Kyverno's admission controller isn't answering: new pods in enforced namespaces are refused (kube-system,
+            kyverno, argocd keep working). Break glass: runbooks/kyverno.md
+      - alert: KyvernoAdmissionDegraded
+        # kube-state-metrics (P3.3); no series, no alert.
+        expr: kube_deployment_status_replicas_available{namespace="kyverno", deployment="kyverno-admission-controller"} < 2
+        for: 15m
         labels: {severity: warning}
         annotations:
-          summary: "Kyverno's admission controller is down: pods are admitted unchecked (failurePolicy Ignore, runbooks/kyverno.md)"
+          summary: "Only {{ $value }} Kyverno admission replica(s) available: one more failure blocks pod creation (runbooks/kyverno.md)"
+      - alert: KyvernoRejectionsSpike
+        expr: sum(increase(kyverno_admission_requests_total{job="kyverno-admission", request_allowed="false"}[15m])) > 5
+        labels: {severity: warning}
+        annotations:
+          summary: >-
+            Kyverno refused {{ $value | humanize }} requests in 15 min (seen by one replica): a deploy is being blocked
+            or something is probing; see the events and PolicyReports (runbooks/kyverno.md)
+      - alert: KyvernoWebhookErrors
+        expr: sum(rate(http_server_request_duration_count{job="kyverno-admission", http_response_status_code=~"5.."}[10m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Kyverno's admission webhook is answering with 5xx errors: with failurePolicy Fail those requests are refused (runbooks/kyverno.md)"
+      - alert: KyvernoAdmissionSlow
+        # Webhook timeouts: 10 s (ValidatingPolicy), 20 s (verify-images; registry and Sigstore lookups).
+        expr: histogram_quantile(0.99, sum by (le) (rate(kyverno_admission_review_duration_seconds_bucket{job="kyverno-admission"}[10m]))) > 8
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Kyverno admission p99 is {{ $value | humanizeDuration }}, close to the webhook timeout (runbooks/kyverno.md)"

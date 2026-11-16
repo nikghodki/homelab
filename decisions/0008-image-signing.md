@@ -23,12 +23,24 @@ amd64 node (Omarchy).
   close to a hosted runner's free disk, a slow QEMU build and push, and a large share of the monthly minutes for an
   image that only runs as a job on the Sparks. It stays a local build until the self-hosted runner on dgx-2 (P4.8),
   where the same workflow can build and sign it with the same identity. The ROS/Zenoh image is the acceptance case.
-- **SBOM:** BuildKit's SPDX SBOM and provenance per platform live in the image index, so the signature covers them;
-  the arm64 SBOM is also attached as a signed cosign attestation (`spdxjson`) that a policy can require later.
+- **SBOM:** BuildKit's SPDX SBOM (every file) and provenance per platform live in the image index, so the signature
+  covers them; the arm64 SBOM at package level is also attached as a signed cosign attestation (`spdxjson`) that a
+  policy can require later. Package level because Rekor refuses entries over about 32 MB and the ROS image's full
+  SPDX is 33 MB (3.3 MB without the file list).
 - **Admission:** a Kyverno `ImageValidatingPolicy` (`verify-images`) for `ghcr.io/nikghodki/*` with that identity
-  and issuer, `mutateDigest` (the tag in a manifest becomes the verified digest) and `verifyDigest`. Third-party
-  images aren't signed by us; the registry allowlist and digest pinning cover them (runbooks/kyverno.md has the
-  final scope per policy).
+  and issuer, `mutateDigest` (the tag in the Pod becomes the verified digest) and `verifyDigest`. Pods only: a
+  digest written into a Deployment would differ from Git and Argo CD's selfHeal would fight the webhook.
+- **Third-party images:** not signed by us; covered by the registry allowlist and a new **`require-image-digest`**
+  policy (Enforce). It skips `argocd`, `kyverno`, `cnpg-system` and `kube-system`, whose Helm charts / k3s render
+  tags (pinned through the chart version); pinning those charts by digest would mean overriding every chart image
+  for little gain. Every workload namespace from `cluster/apps` gets digests.
+- **Enforce everything**, with `failurePolicy: Fail`, but the webhooks never see `kube-system`, `kyverno`, `argocd`
+  (and `edge` until P3.3 is merged): a dead Kyverno can't stop the cluster's add-ons, Kyverno or Argo CD from
+  restarting. **Two admission replicas**, one per Spark (hard topology spread, PDB 1), so one Spark's OOM doesn't
+  stop admission; about 130 MiB more memory. `require-resource-limits` skips `kube-system`: k3s's coredns and
+  local-path-provisioner come from k3s's packaged manifests (no HelmChartConfig; edits are overwritten on restart).
+- **Packages public** for `mlflow` and `ros-zenoh` (nothing private inside), so neither Kyverno nor the nodes need a
+  registry credential; an image with private code would get a read-only pull Secret instead.
 
 ## Alternatives considered
 
@@ -44,5 +56,7 @@ amd64 node (Omarchy).
 - Kyverno needs to reach the registry and Sigstore's TUF CDN to verify; a registry outage stops new pods that use
   `ghcr.io/nikghodki/*` images in enforced namespaces (not running ones).
 - A signature from a branch, a fork or a laptop is refused; to ship an image it has to be merged.
-- Actions minutes: a cold build of both images and the signing steps run once per image change; see
-  runbooks/build-sign.md for the measured times.
+- Actions minutes: about 4 billed minutes per build of both images (measured; runbooks/build-sign.md), only when an
+  image's files change. Only GitHub-owned actions are allowed in this repo, so the workflow uses pinned binaries
+  and images instead of the docker/sigstore actions.
+- Break glass (a policy back to Audit, or removing Kyverno's webhooks) is in runbooks/kyverno.md and was tested.

@@ -1,4 +1,6 @@
-# Every container (and init container) sets cpu and memory requests and limits. Audit (runbooks/kyverno.md).
+# Every container (and init container) sets cpu and memory requests and limits. Enforce (runbooks/kyverno.md).
+# kube-system is exempt: k3s's coredns and local-path-provisioner come from k3s's own manifests (no HelmChart to
+# configure; edits are overwritten on restart) and the webhooks skip kube-system anyway.
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -7,10 +9,16 @@ metadata:
     policies.kyverno.io/title: Require requests and limits
     policies.kyverno.io/description: Containers must set cpu and memory requests and limits (design, "limits required").
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
+  failurePolicy: Fail
   evaluation:
     background: {enabled: true}
   matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system]
     resourceRules:
       - apiGroups: [""]
         apiVersions: [v1]

@@ -1,0 +1,41 @@
+# Third-party images are pinned by digest (image@sha256:...). Enforce (runbooks/kyverno.md).
+# ghcr.io/nikghodki/* is left to verify-images, which writes the verified digest into the Pod (verifyDigest).
+# Not in the platform namespaces whose Helm charts render tags (argocd, kyverno, cnpg-system) or in kube-system (k3s);
+# there the tag is pinned in the chart version and restrict-registries + disallow-latest-tag apply.
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-image-digest
+  annotations:
+    policies.kyverno.io/title: Require image digests
+    policies.kyverno.io/description: >-
+      Every image outside ghcr.io/nikghodki needs a digest. Platform namespaces with chart-rendered tags are exempt.
+spec:
+  validationActions: [Deny]
+  failurePolicy: Fail
+  evaluation:
+    background: {enabled: true}
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kyverno, argocd, cnpg-system]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image)
+        + (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+        + (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers.map(c, c.image) : [])
+    - name: bad
+      expression: >-
+        variables.images.filter(i, !i.startsWith('ghcr.io/nikghodki/') && !i.contains('@sha256:'))
+  validations:
+    - expression: size(variables.bad) == 0
+      messageExpression: >-
+        'images must be pinned by digest (image@sha256:...): ' + variables.bad.join(', ')

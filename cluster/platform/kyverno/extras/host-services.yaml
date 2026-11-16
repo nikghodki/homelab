@@ -1,4 +1,6 @@
 # Fixed ClusterIPs (static band, cluster/README.md) that VictoriaMetrics on dgx-2 scrapes from the host.
+# Two admission replicas: ClientIP affinity keeps the scrapes on one of them (counters from two pods behind one
+# target would look like resets); it moves to the other when that one goes away.
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,6 +9,7 @@ metadata:
 spec:
   type: ClusterIP
   clusterIP: 10.43.0.110
+  sessionAffinity: ClientIP
   selector:
     app.kubernetes.io/component: admission-controller
     app.kubernetes.io/instance: kyverno

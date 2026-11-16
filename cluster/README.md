@@ -14,21 +14,23 @@ cluster/
 │   └── smoke.yaml         SOPS canary (apps/_smoke)
 ├── platform/<component>/  values.yaml for the Helm chart and extras/ (kustomize: Services, NetworkPolicies, SOPS secrets)
 │   ├── argocd/            Argo CD 3.6 + KSOPS in the repo-server
-│   ├── kyverno/           Kyverno 1.20, admission + reports controllers
+│   ├── kyverno/           Kyverno 1.20, admission (2 replicas) + reports controllers
 │   ├── cnpg-operator/     CloudNativePG 1.30 operator, no clusters yet
 │   └── cluster-dns/       CoreDNS zone for *.nghodki.ai (forwards to edge-dnsmasq on dgx-1)
 └── apps/                  workloads, one folder per app (README.md); `_smoke` is the SOPS canary
 ```
 
-Kyverno's policies are in [`policies/kyverno`](../policies/kyverno) (app `kyverno-policies`).
+Kyverno's policies are in [`policies/kyverno`](../policies/kyverno) (app `kyverno-policies`), Enforce since P3.5.
 
 ## Rules
 
 - **Pin everything.** Helm charts by version in the Application, images by digest when a manifest here names an
-  image. No `latest`.
+  image (Kyverno refuses third-party images without one). Our own `ghcr.io/nikghodki/*` images may be named by tag:
+  Kyverno verifies the signature and writes the digest into the Pod (runbooks/build-sign.md). No `latest`.
 - **Requests and limits on every container**, one replica for now, and a `nodeSelector` on
   `nghodki.ai/role: gpu` (Sparks) or `agent-node` (Omarchy). Nothing goes on the Jetson unless it is meant to
-  (it is tainted). Kyverno audits limits, tags, registries and privileged pods (runbooks/kyverno.md).
+  (it is tainted). Kyverno **enforces** signed `ghcr.io/nikghodki` images, limits, tags, registries, digests and no
+  privileged pods (runbooks/kyverno.md); check new manifests with `kyverno apply policies/kyverno --resource <dir>`.
 - **Secrets** are Kubernetes Secret manifests named `*.enc.yaml`, SOPS-encrypted (`.sops.yaml` encrypts only
   `data`/`stringData` under `cluster/`) and listed in a KSOPS generator (`secret-generator.yaml`). CI fails on a
   plaintext Secret anywhere in `cluster/` (`.github/scripts/check-sops.sh`).
