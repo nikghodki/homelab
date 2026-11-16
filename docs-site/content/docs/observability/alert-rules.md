@@ -20,7 +20,7 @@ others every 4 h.
 | `FleetGpuHot` | fleet-thermal | DCGM GPU temperature over 85 °C | 10m | warning |
 | `FleetHostHot` | fleet-thermal | not GB10: hottest fleet-metrics sensor over 85 °C | 10m | warning |
 | `FleetHostHot` (`hardware: gb10`) | fleet-thermal | Sparks: over 95 °C (median 58.8, max 94.1, critical trip 104.8 °C) | 15m | warning |
-| `FleetGpuThermalThrottling` | fleet-thermal | over 30 s of thermal clock slowdown in 15 min (`DCGM_FI_DEV_THERMAL_VIOLATION`, enabled in `stacks/gpu/dcgm-exporter/counters.csv`) | 5m | warning |
+| `FleetGpuThermalThrottling` | fleet-thermal | over 30 s of thermal clock slowdown in 15 min (`DCGM_FI_DEV_THERMAL_VIOLATION_total`, enabled in `stacks/gpu/dcgm-exporter/counters.csv`) | 5m | warning |
 | `FleetPiHot` | fleet-thermal | Pi over 78 °C (it throttles from 80) | 5m | warning |
 | `FleetGpuMetricsMissing` | fleet-thermal | a Spark reports fleet-metrics GPU but no DCGM (gpu stack down?) | 15m | warning |
 | `ObservabilityComponentDown` | fleet-stack | any scrape target `up == 0`. For `grafana` and `temporal` it doesn't push (Gatus checks both) | 10m | warning |

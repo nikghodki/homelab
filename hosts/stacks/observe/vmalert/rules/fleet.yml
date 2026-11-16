@@ -71,10 +71,10 @@ groups:
         labels: {severity: warning, hardware: gb10}
         annotations:
           summary: "{{ $labels.fleet_host }} hottest sensor at {{ $value | humanize }}°C for 15 minutes (GB10 critical trip 104.8 °C)"
-      # DCGM_FI_DEV_THERMAL_VIOLATION: ns of thermal clock slowdown since the driver loaded (enabled in stacks/gpu's
+      # DCGM_FI_DEV_THERMAL_VIOLATION (_total after the host collector's remote write): ns of thermal clock slowdown since the driver loaded (enabled in stacks/gpu's
       # counters file). dgx-1 had 5.7 s in its first 22.6 h, so 30 s within 15 min is sustained throttling.
       - alert: FleetGpuThermalThrottling
-        expr: max by (fleet_host) (increase(DCGM_FI_DEV_THERMAL_VIOLATION[15m])) / 1e9 > 30
+        expr: max by (fleet_host) (increase(DCGM_FI_DEV_THERMAL_VIOLATION_total[15m])) / 1e9 > 30
         for: 5m
         labels: {severity: warning}
         annotations:
