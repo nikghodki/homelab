@@ -29,6 +29,10 @@ All match Pods; the `ValidatingPolicy` ones also check Deployments, StatefulSets
 | `disallow-privileged` | Enforce | no `privileged` container, no `hostNetwork`/`hostPID`/`hostIPC` | **allowlist**: `kube-system` (k3s add-ons, kube-vip: hostNetwork + NET_ADMIN/NET_RAW), `kyverno`, `cnpg-system` |
 | `require-resource-limits` | Enforce | every container and init container has cpu and memory **requests and limits** | **`kube-system`**: k3s's `coredns` (no cpu limit) and `local-path-provisioner` (none) come from k3s's packaged manifests, not a HelmChart, so there's no HelmChartConfig to set them and edits under `/var/lib/rancher/k3s/server/manifests` are overwritten when k3s restarts |
 
+**Ephemeral containers** (`kubectl debug`) go through the `pods/ephemeralcontainers` subresource, which the image and
+privilege policies match too since 2026-11-16 (code review #10; before, a debug container from any registry, `:latest`
+or privileged was admitted: tested). `require-resource-limits` doesn't apply (ephemeral containers can't have resources).
+
 "Webhook-excluded namespaces" = `kube-system`, `kyverno`, `argocd`, `edge`. Everything else
 (`default`, `smoke`, `cnpg-system`, and every new namespace from `cluster/apps`) is enforced.
 

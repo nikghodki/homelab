@@ -31,8 +31,10 @@ features:
   logging:
     format: json
 
-# Hooks not needed here: the legacy-policy check (fresh v1.20 install) and the pre-delete webhook cleanup (with
-# failurePolicy Ignore a leftover webhook can't block anything; runbooks/kyverno.md says how to remove one).
+# Hooks not needed here: the legacy-policy check (fresh v1.20 install) and the pre-delete webhook cleanup (one more
+# job and image for an uninstall that is done by hand). Since P3.5 the policies are failurePolicy Fail: if the kyverno
+# app is ever deleted, its leftover webhooks refuse every pod CREATE outside the excluded namespaces until they are
+# removed, in the same step (runbooks/kyverno.md, "Removing Kyverno"; code review #27).
 # Helm test pods are skipped by Argo CD.
 upgrade:
   legacyPolicyCheck:
