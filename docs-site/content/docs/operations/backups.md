@@ -30,8 +30,8 @@ snapshots in `/var/backups/homelab`. All copies are on **dgx-2's disk** (one cop
 
 | Protected by the running backups | Not protected |
 |---|---|
-| dgx-1: front door config, nginx config, LiteLLM's DB dump (from the CNPG primary in k3s) and the stopped Docker copy's config, DefenseClaw, DGXMM data/config/secrets, Open WebUI DB | anything on dgx-2 outside `/opt/homelab` and Pocket ID's PV (Docker volumes: Grafana, Loki, VictoriaMetrics, Temporal and MLflow Postgres, MLflow artifacts, Phoenix) |
-| dgx-2: `/opt/homelab` (stack configs, rendered secrets); Pocket ID's PV in k3s, `pocket-id.db` as a SQLite snapshot (since 2026-11-16) | k3s etcd (local snapshots only) |
+| dgx-1: front door config, nginx config, LiteLLM's DB dump (from the CNPG primary in k3s) and the stopped Docker copy's config, DefenseClaw, DGXMM data/config/secrets, Open WebUI DB, k3s etcd snapshots | Docker volumes on dgx-2: Loki, VictoriaMetrics, MLflow artifacts, Phoenix, Alertmanager (silences) |
+| dgx-2: `/opt/homelab` (stack configs, rendered secrets); Pocket ID's PV in k3s, `pocket-id.db` as a SQLite snapshot (since 2026-11-16); `pg_dump`s of MLflow (`mlflow-db.sql.gz`) and Temporal (`temporal-db.sql.gz`, `temporal-visibility-db.sql.gz`); Grafana's volume with `grafana.db` as a SQLite snapshot; k3s etcd snapshots (all since 2026-11-16) | the CNPG `ops-db` (P3.8) |
 | Jetson: Hermes state, HA config + DB snapshot, DefenseClaw, LiveKit config, roboclaw | model weights (re-downloadable) |
 | Pi: picoclaw, DefenseClaw, maps, workspace, units | the Dell |
 
@@ -55,8 +55,18 @@ Then record it in decision 0002 (or a new decision).
 2. `ansible-playbook playbooks/backups.yml --check --diff`, then for real. Add the Dell if wanted.
 3. Do a restore test (`restic -r ... restore latest --target /tmp/restore-test` on a host, using `/etc/restic/env`).
 4. Add an alert: there is none today for a failed or missing backup (the journal has `SyslogIdentifier=homelab-backup`).
-5. Consider adding the Docker volumes on dgx-2 that matter (Temporal, MLflow; Pocket ID is covered since its move) with dumps in
-   `restic_backup_pre_commands`.
+5. Temporal, MLflow, Grafana and etcd snapshots are in since 2026-11-16 (dumps in `restic_backup_pre_commands`).
+
+## Restoring a database dump or snapshot
+
+On the host, as root, with `/etc/restic/env` loaded (`set -a; . /etc/restic/env; set +a`):
+
+```bash
+restic restore latest --host dgx-2 --include /var/backups/homelab/temporal-db.sql.gz --target /tmp/restore
+# Postgres: into a scratch database first, e.g.
+gunzip -c /tmp/restore/var/backups/homelab/temporal-db.sql.gz | docker exec -i jobs-postgresql-1 psql -U temporal -d scratch
+# SQLite snapshots: /var/backups/homelab/sqlite/<name>.sqlite3, copy over the stopped service's file
+```
 
 ## Other copies that exist
 

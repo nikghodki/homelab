@@ -17,6 +17,8 @@ restic_backup_paths:
   - /home/nikghodki-dgx/workspace/dgx-model-manager/secrets
   # Open WebUI's volume in k3s (local-path PV on dgx-1, runbooks/open-webui.md); the PVC's UID is in the name
   - /var/lib/rancher/k3s/storage/pvc-c23bf76c-16ed-4d59-9ce8-4188cc12cceb_open-webui_open-webui-data
+  # k3s etcd snapshots (every 12 h, 5 kept; runbooks/k3s.md)
+  - /var/lib/rancher/k3s/server/db/snapshots
 restic_backup_excludes:
   - /home/nikghodki-dgx/workspace/dgx-model-manager/data/dgxmm.sqlite3
   - /home/nikghodki-dgx/workspace/dgx-model-manager/data/gguf
