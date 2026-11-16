@@ -93,8 +93,9 @@ it to Loki as `{service_name="edge-caddy"}` ([Observability](../observability/in
 the method, host, URI, status, duration, size, `User-Agent` and `api_key_hash` (the first 8 hex digits of the
 SHA-256 of the caller's API key, the start of LiteLLM's token hash). `Authorization`, `Cookie` and `Set-Cookie` are
 `REDACTED`, other key headers and key-like query parameters are hashed, and the `X-Edge-Origin` token is never logged.
-`remote_ip` is **not** the client: kube-proxy masquerades both paths, so it's the pod network's address on the Spark
-that took the connection. LogQL and details: `runbooks/edge.md`, "Access log".
+`remote_ip` is a pod-network address (kube-proxy masquerades both paths): for k3s nodes (Sparks, Jetson, Dell) it's
+the caller's own node (`10.42.1.x` dgx-1, `10.42.0.x` dgx-2, `10.42.2.x` Jetson, `10.42.3.x` Dell); for any other
+client, the Spark that took the connection. LogQL and details: `runbooks/edge.md`, "Access log".
 
 ## Gotchas
 
