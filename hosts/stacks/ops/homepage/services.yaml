@@ -30,8 +30,9 @@
         icon: open-webui.svg
         siteMonitor: https://webui.nghodki.ai/health
     - LiteLLM:
-        href: https://model.nghodki.ai
-        description: Model gateway (OpenAI-compatible API)
+        # The admin UI (behind Pocket ID, then LiteLLM's login); the API itself is https://model.nghodki.ai/v1/
+        href: https://litellm-admin.nghodki.ai/ui/
+        description: Model gateway admin (API at model.nghodki.ai/v1)
         icon: mdi-api
         siteMonitor: https://model.nghodki.ai/health/liveliness
     - DGXMM:
