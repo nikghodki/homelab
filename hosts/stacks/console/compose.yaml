@@ -1,4 +1,5 @@
-# Console stack on dgx-2 (plan P1.13; architecture: namespace `console`). Deployed by playbooks/console.yml.
+# Console stack on dgx-2 (plan P1.13). STOPPED since 2026-11-16: Pocket ID runs in k3s (cluster/apps/pocket-id); this is
+# the rollback copy until 2026-11-23 (playbooks/console.yml refuses to run without -e pocketid_docker_rollback=true).
 # pocket-id: passkey-only OIDC provider at https://id.nghodki.ai (dgx-1 Caddy terminates TLS, D25).
 # The launcher at https://ops.nghodki.ai (Homepage, plan P1.15) moved to the Dell: stacks/ops.
 name: console

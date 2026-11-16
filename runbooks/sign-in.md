@@ -2,7 +2,7 @@
 
 | Piece | Where |
 |---|---|
-| Pocket ID 2.19.3 | k3s, `cluster/apps/pocket-id` (Argo CD app `pocket-id`, namespace `console`), pinned to dgx-2, fixed ClusterIP `10.43.0.155:1411` ([below](#pocket-id-in-k3s)). Until 2026-11-23 the stopped Docker copy on dgx-2 (`hosts/stacks/console`, LAN port 1411) is the fallback |
+| Pocket ID 2.19.3 | k3s (since 2026-11-16), `cluster/apps/pocket-id` (Argo CD app `pocket-id`, namespace `console`), pinned to dgx-2, fixed ClusterIP `10.43.0.155:1411` ([below](#pocket-id-in-k3s)). Until 2026-11-23 the stopped Docker copy on dgx-2 (`hosts/stacks/console`, LAN port 1411) is the fallback |
 | `https://id.nghodki.ai` | the front door (`cluster/platform/edge/caddy/Caddyfile`, `@id`); http is redirected because passkeys need HTTPS |
 | Sign-in for apps without their own login | `edge/edge-auth` (oauth2-proxy, client `edge-auth`, callback `https://auth.nghodki.ai`), called by the front door: [below](#apps-without-their-own-login-one-block-in-the-caddyfile), [decision 0011](../decisions/0011-one-sign-in-proxy.md) |
 | Groups, users, OIDC clients | `identity/pocket-id.yaml`, applied by `hosts/files/pocket-id/pocketid_sync.py`. A client with `groups` gets `isGroupRestricted` (Pocket ID 2.x ignores the allowed groups without it; set on every client on 2026-11-16) |
@@ -40,6 +40,36 @@ Pocket ID refuses to start ("there's already one instance of Pocket ID running")
 database holds another instance's recent health check. A clean stop removes it; after an unclean one (or on a copy
 of a running database), clear it in the copy before starting: `sqlite3 "$DST/pocket-id.db" 'delete from francis_hosts'`,
 only when no other Pocket ID uses that file.
+
+### The move from Docker (2026-11-16)
+
+#148 (inert: the pod waited in `data-present`, the door on the Docker copy). Cutover at 15:21, `~/pocketid-move/cutover.sh`
+on dgx-1: `docker stop` the Docker copy (0.8 s; a clean stop leaves no `francis_hosts` row), `rsync` the volume into
+the PV on dgx-2 (1.1 MB, done at +2.9 s), delete the waiting pod: **Ready at +6.9 s**. A ~2 Hz probe of `/healthz` and
+the discovery document through the door: 926 requests, **none failed**; the one in flight on each path was held by
+Caddy for ~9-10 s (`lb_try_duration 10s`).
+
+Verified after it, with a one-time sign-in link (`pocketid_sync.py --login-link`, exchanged through the API, never
+printed) and a cookie jar: edge-auth for ops, docs, status, mlflow, dgxmanager and litellm-admin (each 200 after the
+sign-in), Grafana (`/api/user`: `nikghodki`, Grafana Admin), Phoenix (viewer `ADMIN`), Temporal UI (session token
+accepted by `/api/v1/namespaces`), Argo CD (`loggedIn`, groups `admins`), LiteLLM's SSO (`proxy_admin`,
+`login_method: sso`). Same issuer and signing key (`kid`), so existing sessions and tokens stayed valid.
+`pocketid_sync.py --dry-run` reaches the API with the static key and shows no change.
+
+### Rollback (until 2026-11-23)
+
+The Docker copy is stopped with its data as of 15:21 (`console_pocket-id-data` on dgx-2). Anything changed since
+(new passkeys, sessions, clients) is only in the PV: copy it back first if it matters (both stopped).
+
+```bash
+kubectl -n console scale deploy/pocket-id --replicas=0     # pause Argo CD's auto-sync for `pocket-id` first (runbooks/argocd.md)
+# optional, on dgx-2: sudo rsync -aHAX --delete <PV path>/ /var/lib/docker/volumes/console_pocket-id-data/_data/ (owner 1000)
+ssh nikghodki-dgx-2@192.168.86.36 'docker update --restart unless-stopped console-pocket-id-1 && docker start console-pocket-id-1'
+```
+
+Caddy uses the Docker copy as soon as the pod's health check fails. On 2026-11-23: PR "Pocket ID: drop the Docker
+fallback" (the second upstream, `hosts/stacks/console`, `playbooks/console.yml`), then delete the container and the
+volume.
 
 ## Change users or clients
 
