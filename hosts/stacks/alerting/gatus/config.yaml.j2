@@ -3,7 +3,8 @@
 # name on a Spark.
 metrics: true
 storage: {type: sqlite, path: /data/gatus.db}
-# No `security:` here: Gatus' OIDC panics at start without Pocket ID. The sign-in is oauth2-proxy (status-proxy) in front.
+# No `security:` here: Gatus' OIDC panics at start without Pocket ID. People sign in at the front door (edge-auth,
+# decision 0011); status-gate lets only the door through to the UI.
 alerting:
   ntfy:
     url: http://ntfy
@@ -17,13 +18,20 @@ endpoints:
   - {name: webui.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: webui.nghodki.ai}, <<: *web}
   - {name: dgxmanager.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: dgxmanager.nghodki.ai}, <<: *web}
   - {name: ha.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: ha.nghodki.ai}, <<: *web}
-  # Homepage behind oauth2-proxy (P1.15). Signed out, oauth2-proxy answers 302 to Pocket ID; ignore-redirect checks that 302.
+  # Homepage (P1.15), signed in by the front door (edge-auth, decision 0011). Signed out, the door answers 302 to Pocket ID;
+  # ignore-redirect checks that 302.
   - {name: ops.nghodki.ai (Homepage), group: web, url: "https://192.168.86.11/", headers: {Host: ops.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
-  # Docs site on the Dell's ops stack (runbooks/docs-site.md). Signed out, oauth2-proxy-docs answers 302 to Pocket ID.
+  # Docs site on the Dell's ops stack (runbooks/docs-site.md). Signed out, the door answers 302 to Pocket ID.
   - {name: docs.nghodki.ai, group: web, url: "https://192.168.86.11/", headers: {Host: docs.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
   # The alerting stack's own routes through the front door (the phone uses Tailscale HTTPS to the Dell instead).
   - {name: ntfy.nghodki.ai, group: web, url: "https://192.168.86.11/v1/health", headers: {Host: ntfy.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[BODY].healthy == true"], alerts: [{type: ntfy}]}
   - {name: status.nghodki.ai, group: web, url: "https://192.168.86.11/health", headers: {Host: status.nghodki.ai}, client: {insecure: true}, <<: *web}
+  # The sign-in proxy (edge-auth in k3s, decision 0011) answers on its callback host, and the backends of the signed-in
+  # routes refuse requests that don't come through the door (403 without the edge origin token).
+  - {name: auth.nghodki.ai (edge-auth), group: web, url: "https://192.168.86.11/ping", headers: {Host: auth.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
+  - {name: Homepage gate refuses direct access, group: web, url: "http://192.168.86.49:4180/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
+  - {name: docs gate refuses direct access, group: web, url: "http://192.168.86.49:4181/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
+  - {name: status gate refuses direct access, group: web, url: "http://192.168.86.49:8081/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
   - {name: Home Assistant (direct), group: home, url: "http://192.168.86.211:8123/", <<: *web}
   # dgx-2's observe stack, watched from outside. VictoriaMetrics and Alertmanager aren't on the LAN, so they're checked
   # by a heartbeat: vmalert's always-firing Watchdog -> Alertmanager -> this external endpoint every 5 min. Silence for
@@ -34,7 +42,7 @@ endpoints:
   # Temporal in the jobs stack (plan P4.7, runbooks/temporal.md). The UI check goes through the front door; TLS isn't verified (no homelab CA in Gatus).
   - {name: Temporal frontend (gRPC), group: jobs, url: "tcp://192.168.86.36:7233", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: temporal.nghodki.ai, group: jobs, url: "https://192.168.86.11/healthz", headers: {Host: temporal.nghodki.ai}, client: {insecure: true}, <<: *web}
-  # MLflow in the ml stack (plan P6.5, runbooks/mlflow.md). Signed out, oauth2-proxy answers 302 to Pocket ID; the job API's
+  # MLflow in the ml stack (plan P6.5, runbooks/mlflow.md). Signed out, the door answers 302 to Pocket ID; the job API's
   # /health is the one path without basic auth.
   - {name: mlflow.nghodki.ai, group: ml, url: "https://192.168.86.11/", headers: {Host: mlflow.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
   - {name: MLflow job API, group: ml, url: "http://192.168.86.36:5000/health", interval: 1m, conditions: ["[STATUS] == 200", "[BODY] == OK"], alerts: [{type: ntfy}]}

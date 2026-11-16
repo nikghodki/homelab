@@ -13,12 +13,6 @@ clients:
     callbackURLs: [https://grafana.nghodki.ai/login/generic_oauth]
     launchURL: https://grafana.nghodki.ai
     groups: [admins]
-  - id: gatus
-    name: Gatus
-    callbackURLs: [https://status.nghodki.ai/authorization-code/callback]
-    launchURL: https://status.nghodki.ai
-    pkce: false        # Gatus 5.38 doesn't send PKCE
-    groups: [admins]
   - id: phoenix
     name: Phoenix
     callbackURLs: [https://phoenix.nghodki.ai/oauth2/pocketid/tokens]
@@ -53,3 +47,4 @@ clients:
 removedClients:
   - docs
   - ops
+  - gatus
