@@ -17,6 +17,11 @@ misconfigurations:
   - id: KSV-0056
     paths: ["cluster/platform/kube-vip/rbac.yaml"]
     statement: kube-vip must update Services to publish their LoadBalancer IP
+  # k3s's CoreDNS: the file is a partial server-side-apply patch (replicas, node affinity), not the pod spec. The pod's
+  # security context is k3s's: all capabilities dropped but NET_BIND_SERVICE, no privilege escalation, read-only root.
+  - id: KSV-0118
+    paths: ["cluster/platform/cluster-dns/coredns-replicas.ssa-patch.yaml"]
+    statement: a patch of k3s's CoreDNS Deployment (replicas and affinity only); the pod spec is k3s's
   # The tailnet front door is the Sparks' Tailscale IPs as externalIPs (decision 0007). The CVE-2020-8554 risk (anyone
   # who can create a Service can claim an IP) is limited by who can create Services: Argo CD from Git, and admins.
   - id: KSV-0108
