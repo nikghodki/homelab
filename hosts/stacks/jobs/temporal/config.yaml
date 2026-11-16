@@ -1,0 +1,147 @@
+# enable-template
+# Temporal server config (runbooks/temporal.md). Same values the image's embedded template produced for this stack's
+# environment, plus mTLS on the frontend and authorization by client certificate ("mTLS and authorization").
+# Rendered by the server at start (Go template; only the database password comes from the environment).
+log:
+    stdout: true
+    level: info
+
+persistence:
+    numHistoryShards: 4   # fixed for the life of the database
+    defaultStore: default
+    visibilityStore: visibility
+    datastores:
+        default:
+            sql:
+                pluginName: postgres12
+                databaseName: temporal
+                connectAddr: "postgresql:5432"
+                connectProtocol: tcp
+                user: temporal
+                password: '{{ env "POSTGRES_PWD" }}'
+                maxConns: 20
+                maxIdleConns: 20
+                maxConnLifetime: 1h
+        visibility:
+            sql:
+                pluginName: postgres12
+                databaseName: temporal_visibility
+                connectAddr: "postgresql:5432"
+                connectProtocol: tcp
+                user: temporal
+                password: '{{ env "POSTGRES_PWD" }}'
+                maxConns: 10
+                maxIdleConns: 10
+                maxConnLifetime: 1h
+
+global:
+    membership:
+        maxJoinDuration: 30s
+        broadcastAddress: ""
+    pprof:
+        port: 0
+    tls:
+        # Frontend (gRPC 7233, HTTP 7243): server certificate from the homelab Temporal CA, and every client must
+        # present a certificate from the same CA. Internode traffic (history, matching, worker) stays inside this
+        # container's network namespace and the stack's Docker network; none of those ports are published.
+        frontend:
+            server:
+                requireClientAuth: true
+                certFile: /run/temporal/tls/server.crt
+                keyFile: /run/temporal/tls/server.key
+                clientCaFiles:
+                    - /run/temporal/tls/ca.crt
+        # The server's own system worker (schedules, batch, per-namespace workers) is a frontend client too.
+        systemWorker:
+            certFile: /run/temporal/tls/system-worker.crt
+            keyFile: /run/temporal/tls/system-worker.key
+            client:
+                serverName: temporal
+                rootCaFiles:
+                    - /run/temporal/tls/ca.crt
+        expirationChecks:
+            warningWindow: 720h
+            errorWindow: 168h
+            checkInterval: 24h
+    metrics:
+        prometheus:
+            timerType: histogram
+            listenAddress: "0.0.0.0:9090"
+    authorization:
+        # Temporal's default authorizer with the homelab claim mapper (build/tlsclaims.go): roles come from the client
+        # certificate's URI SANs, urn:homelab:temporal:system:<role> or urn:homelab:temporal:ns:<namespace>:<role>.
+        authorizer: default
+        claimMapper: homelab-tls-uri
+        permissionsClaimName: permissions
+
+services:
+    frontend:
+        rpc:
+            grpcPort: 7233
+            membershipPort: 6933
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
+            httpPort: 7243
+    matching:
+        rpc:
+            grpcPort: 7235
+            membershipPort: 6935
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
+    history:
+        rpc:
+            grpcPort: 7234
+            membershipPort: 6934
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
+    worker:
+        rpc:
+            grpcPort: 7239
+            membershipPort: 6939
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
+
+clusterMetadata:
+    enableGlobalNamespace: false
+    failoverVersionIncrement: 10
+    masterClusterName: active
+    currentClusterName: active
+    clusterInformation:
+        active:
+            enabled: true
+            initialFailoverVersion: 1
+            rpcName: frontend
+            rpcAddress: '{{ env "BIND_ON_IP" }}:7233'
+            httpAddress: '{{ env "BIND_ON_IP" }}:7243'
+
+dcRedirectionPolicy:
+    policy: noop
+
+archival:
+    history:
+        state: enabled
+        enableRead: true
+        provider:
+            filestore:
+                fileMode: "0666"
+                dirMode: "0766"
+    visibility:
+        state: enabled
+        enableRead: true
+        provider:
+            filestore:
+                fileMode: "0666"
+                dirMode: "0766"
+
+namespaceDefaults:
+    archival:
+        history:
+            state: disabled
+            URI: "file:///tmp/temporal_archival/development"
+        visibility:
+            state: disabled
+            URI: "file:///tmp/temporal_vis_archival/development"
+
+# With an authorizer the system worker reaches the frontend as a client (with its certificate above).
+publicClient:
+    hostPort: '{{ env "BIND_ON_IP" }}:7233'
+
+dynamicConfigClient:
+    filepath: /run/temporal/dynamicconfig.yaml
+    pollInterval: 60s

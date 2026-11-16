@@ -1,0 +1,19 @@
+diff --git a/cmd/server/main.go b/cmd/server/main.go
+index a1f8e8d..5e12e2f 100644
+--- a/cmd/server/main.go
++++ b/cmd/server/main.go
+@@ -209,7 +209,13 @@ func buildCLI() *cli.App {
+ 				}
+ 
+ 				// Authorization mappers: claim and audience
+-				claimMapper, err := authorization.GetClaimMapperFromConfig(&cfg.Global.Authorization, logger)
++				// Homelab patch: roles from the client certificate's URI SANs (tlsclaims.go).
++				var claimMapper authorization.ClaimMapper
++				if cfg.Global.Authorization.ClaimMapper == tlsURIClaimMapperName {
++					claimMapper = newTLSURIClaimMapper()
++				} else {
++					claimMapper, err = authorization.GetClaimMapperFromConfig(&cfg.Global.Authorization, logger)
++				}
+ 				if err != nil {
+ 					return cli.Exit(fmt.Sprintf("Unable to instantiate claim mapper: %v.", err), 1)
+ 				}

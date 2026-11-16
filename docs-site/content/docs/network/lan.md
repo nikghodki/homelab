@@ -48,7 +48,7 @@ Services that publish on all interfaces or on a LAN address (full list in [Ports
 | dgx-2 | 6006 | Phoenix | Pocket ID or break-glass admin |
 | dgx-2 | 4317–4320 | OTLP receivers | none |
 | dgx-2 | 1411 | Pocket ID | passkeys |
-| dgx-2 | 7233 | Temporal gRPC | **none** (no mTLS yet) |
+| dgx-2 | 7233 | Temporal gRPC | mTLS, client certificate from the Temporal CA; roles per namespace |
 | dgx-2 | 8233, 9233 | Temporal UI, metrics | UI: Pocket ID |
 | dgx-2 | 4181, 5000 | MLflow (UI gate, job API) | front door token (sign-in at the door); basic auth |
 | dgx-2 | 8000 | restic rest-server (TLS) | per-host htpasswd |

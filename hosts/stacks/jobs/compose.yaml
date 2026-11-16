@@ -1,5 +1,7 @@
 # Jobs stack on dgx-2 (plan P4.7; interim until k3s, architecture namespace `jobs`). Deployed by playbooks/jobs.yml.
 # Temporal server with PostgreSQL persistence, the Web UI and admin-tools (schema setup + CLI). runbooks/temporal.md.
+# The frontend requires mTLS; every client (UI, admin-tools, the server's system worker, workers elsewhere) has a
+# certificate from the homelab Temporal CA (hosts/files/pki/temporal) whose URI SANs name its Temporal roles.
 name: jobs
 
 x-restart: &restart
@@ -33,7 +35,12 @@ services:
       SQL_PORT: "5432"
       SQL_USER: temporal
       SQL_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      # `temporal` CLI: mTLS with the admin-tools certificate (system admin; runbooks/temporal.md)
       TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_TLS_SERVER_NAME: temporal
+      TEMPORAL_TLS_SERVER_CA_CERT_PATH: /run/admin-tools/tls/ca.crt
+      TEMPORAL_TLS_CLIENT_CERT_PATH: /run/admin-tools/tls/admin-tools.crt
+      TEMPORAL_TLS_CLIENT_KEY_PATH: /run/admin-tools/tls/admin-tools.key
     volumes:
       - ./admin-tools:/run/admin-tools:ro
     healthcheck:
@@ -44,22 +51,20 @@ services:
     depends_on:
       postgresql: {condition: service_healthy}
 
+  # temporalio/server 1.32.2 plus the homelab claim mapper (roles from client certificates), built here from
+  # ./temporal/build; bump the tag when anything in that folder changes. Config: ./temporal/config.yaml.
   temporal:
     <<: *restart
-    image: temporalio/server:1.32.2@sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670
+    image: homelab/temporal-server:1.32.2-homelab.2
+    build:
+      context: ./temporal/build
     environment:
-      DB: postgres12
-      DB_PORT: "5432"
-      POSTGRES_SEEDS: postgresql
-      POSTGRES_USER: temporal
+      TEMPORAL_SERVER_CONFIG_FILE_PATH: /run/temporal/config.yaml
       POSTGRES_PWD: ${POSTGRES_PASSWORD:?set in .env}
-      NUM_HISTORY_SHARDS: "4"   # fixed for the life of the database
-      PROMETHEUS_ENDPOINT: 0.0.0.0:9090
-      DYNAMIC_CONFIG_FILE_PATH: /run/temporal/dynamicconfig.yaml
     volumes:
       - ./temporal:/run/temporal:ro
     ports:
-      - "192.168.86.36:7233:7233"   # frontend gRPC, LAN only (workers on Omarchy and the Sparks); no mTLS yet
+      - "192.168.86.36:7233:7233"   # frontend gRPC, LAN only; mTLS required (client certificate from the Temporal CA)
       - "192.168.86.36:9233:9090"   # Prometheus metrics, scraped by VictoriaMetrics
     depends_on:
       admin-tools: {condition: service_healthy}
@@ -73,6 +78,12 @@ services:
       TEMPORAL_DEFAULT_NAMESPACE: homelab
       TEMPORAL_CORS_ORIGINS: https://temporal.nghodki.ai
       TEMPORAL_DISABLE_NEWS_FETCH: "true"
+      # mTLS to the frontend with the ui certificate (system admin: the UI itself is admins-only through Pocket ID)
+      TEMPORAL_TLS_CA: /run/ui/tls/ca.crt
+      TEMPORAL_TLS_CERT: /run/ui/tls/ui.crt
+      TEMPORAL_TLS_KEY: /run/ui/tls/ui.key
+      TEMPORAL_TLS_SERVER_NAME: temporal
+      TEMPORAL_TLS_ENABLE_HOST_VERIFICATION: "true"
       # Sign-in through Pocket ID (P1.13); only the admins group may use the client (identity/pocket-id.yaml).
       TEMPORAL_AUTH_ENABLED: "true"
       TEMPORAL_AUTH_LABEL: Pocket ID
@@ -83,6 +94,7 @@ services:
       TEMPORAL_AUTH_SCOPES: openid,profile,email
     volumes:
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+      - ./ui:/run/ui:ro
     # Reach id.nghodki.ai at the front door's LAN VIP and trust the homelab web CA from the host's bundle (role homelab_ca).
     extra_hosts: ["id.nghodki.ai:192.168.86.11"]
     ports:
