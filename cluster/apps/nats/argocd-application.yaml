@@ -1,0 +1,23 @@
+# NOT DEPLOYED. The Argo CD Application for cluster/apps/nats, kept here (not in cluster/bootstrap/apps, which `root`
+# syncs) so that merging the prepared manifests starts nothing. The cutover (runbooks/nats.md, user present, robot
+# docked, e-stop latched) moves this file to cluster/bootstrap/apps/nats.yaml in its own PR.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nats
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: apps
+  source:
+    repoURL: git@github.com:nikghodki/homelab.git
+    targetRevision: main
+    path: cluster/apps/nats
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nats
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}

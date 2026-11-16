@@ -6,5 +6,6 @@
 tailscale_vip_guard_vips:
   - 192.168.86.10   # API server VIP (kube-vip)
   - 192.168.86.11   # front door VIP (edge)
+  - 192.168.86.12   # NATS VIP (decision 0014; nothing on it until the NATS cutover, runbooks/nats.md)
 tailscale_vip_guard_port: 41641
 tailscale_vip_guard_file: /etc/homelab/tailscale-vip-guard.nft

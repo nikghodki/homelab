@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: nats-tls
+    namespace: nats
+type: kubernetes.io/tls
+stringData:
+    tls.crt: ENC[AES256_GCM,data:LpqrmUcNPBeCOIfV0qZaV2NfZjpOuYaPBh2fqxBBa5Vk063k9ItA/wrCthPQdt4cKxG0l+Px7NHhwTVn7qK71iVK4pyWQHox3nLPoCMbH/moo29TMCJ5tm97vKOOGySdEsJiQvCVR9fpin74CEumJzi0KvYCPXbCZjZz/LWDAenXsQs/6ANAl80zmIyiZPVc8Q54BmN8t1ZK5+ZAOrdLcBcOb5gYwmQ2vF9/R7eTThxSAj4AAHn2CoFEVPRTqNsn/OVKaxqf3aUafVW0KMkWfCDhb/+mJZD2+zjWQeSpP+cSO3C9nQsKJkaOVVXo9Lx9hiWpxoTkD2xbD/QGnUxqZkO1YRFXLhq2Dsyks33PT1TB9fBKyPNZcaMWj11QTnB8Ny6E81oPC5tF+83JlvmciBxvsl7Eju9LeYXIcPZZCJLDsmbfEtc+sfBa7aw57t+099FylKewUOX4f1jUDQPCWZYlvlaRXeg25GBPfynXLImPgGqjvg02Sd6WPKrp4/VkE5KqHXYRjC2De9JFcryXqy4gyJFk0rJzU8fkg7/ElP2BFE8eduGwp8X/tX43c80VCAIjdRElJpWlU2L0v6BMuAajhNKjcPMp4Lklwuj8oWZHa458PYeEtACToKrD/6HcXhLIWGol7YpxR+0SlhJ5moGsQj8Jvue02S1NajT2SN/RuCRkcEVYsrAEOX8UWvHxCd+0d2aBq+rMDSYQMyc0FpsBEkADfaQxgyMhZIfTJPVtwzS12Yzp+2VZeLM7VNMVKzH/Z8nFmxBXtdZi8GpoTIRxWPtP3N37jhsox/y24unTEuHqj2yvlGaWi0WDCRPOby/wLppNssJZ7RSugk1f3tQM1FfIxM1jbRJNB5LOpAFQamGOmYfOM+hfkdBbrcTC9PGxMZJw99chFoVf2QZ1rwkg6X0qnXJLZh0/W5Gbc+eD0AqbTJFHFr7KyWeYvPS/jqS/A4j4eeZ6yCIJFLtMo3gRPuCY,iv:uex21AJHhjYEh7F68io4jT4xlaUmHt5z3Qlls/ZotrE=,tag:2xvEH5VG7fuzKg7I55jOvQ==,type:str]
+    tls.key: ENC[AES256_GCM,data:aSp57zKpFPqABbxPPV8i9aWxyq81c4uFvRqNhLiLWwNlogfF8U6ZqMjT7/lMzpB5VxMjtdGP6G6owtJhYtMSTWXnLg+WRvsMSI8+A9S7Ckk+l55iOr7nzoKyMv6RYO5skNgJud3RqIbDkkPbLwt8y3bGTRpELgR94CcBFLi9bRb3QsK1UavGjLdehVCUGTBAiS5kVrXXlarOcnTx8reZZKd+1pqhC0Vm8HnSu6ehITTEldXhKnDbFSwleFSvFd90JbrSOpxp3p6O5rkxeI3gmOkgFqxsb2LHeJ3mcolrzm7v0j4=,iv:nbByxUnAHTMS66OXDjIKqSckVo3OeY2YmpJhH+trgc4=,tag:p5wzvGTsgYFzfyNSTCOSvg==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSArTG1xVW4yQzlJdEtzNVBh
+            WHE4OFRscjdwY0wxM2REQjFsSkZtaDNRcHlNCk8wbzJKT2pmSm9RT2JZMkdsTHRR
+            aDc0M2V2Zm80SkNWaVFuaFl4WFNwR3MKLS0tIFFoZnNVUUJrd3BzTy9POXFYOHY1
+            ZzdKd1ZqczlCUVM5WUxVVnk5OTNXbkUKiEoqlmKYgiHEM+CnOthuLN2tPTRCslvv
+            w2fA/u957G5RFaltbkobbBg0linTSMLasnpM0FnN7c3c0aCKsJDgnA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T21:57:23Z"
+    mac: ENC[AES256_GCM,data:EoLrcxcdtZINhfYnlQGmZ3MXp6ffqi6Wf0rdc31YGoFoF5bVlpRfYpbAbMyeH5K/3PmMN4Ie2n2W2w4cRhUh+fwL41aCe7yn+EvcSXKiudqkB75+/bWVMdZhJOxbitg7ISmJjlPtviqFwV+fGIipbuHg5aeBkXvzXEpeULwQW3M=,iv:D7qswSnr9nHqAyUgvo2sh3cMEofI6iyqfwtY7hNTcaI=,tag:SVNuXcJ47QSqdZWLY7RlqQ==,type:str]
+    version: 3.13.3

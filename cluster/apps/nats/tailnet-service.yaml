@@ -1,0 +1,16 @@
+# NOT IN kustomization.yaml until the cutover (runbooks/nats.md, step "move the clients"). The tailnet path: kube-proxy
+# on each Spark DNATs its own Tailscale IP :4222/:8883 to the NATS pods, as the front door does (decision 0007). On
+# dgx-1 that takes 100.65.137.82:4222/:8883 from the Docker server the moment it is applied (KUBE-SERVICES runs
+# before DOCKER in nat PREROUTING), so it goes in only with the Docker server stopped. Needs the Tailscale grants for
+# dgx-2 :4222/:8883 (policies/tailscale/policy.hujson, the same cutover).
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-tailnet
+spec:
+  type: ClusterIP
+  externalIPs: [100.65.137.82, 100.124.175.23]
+  selector: {app.kubernetes.io/name: nats}
+  ports:
+    - {name: client, port: 4222, targetPort: client, protocol: TCP}
+    - {name: mqtt, port: 8883, targetPort: mqtt, protocol: TCP}

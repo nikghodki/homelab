@@ -1,0 +1,51 @@
+# Who may talk to the NATS pods (k3s enforces NetworkPolicies with kube-router; kubelet probes come from the node and
+# are allowed by it). Clients arrive masqueraded (externalTrafficPolicy Cluster, externalIPs), so their source is a
+# node address, not the client's: the client ports are open to any source and guarded by TLS and the NATS users.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nats-clients
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: nats}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - {port: 4222, protocol: TCP}
+        - {port: 8883, protocol: TCP}
+---
+# Routes only between the three servers (mutual TLS on top). The monitoring port (8222, no auth) is reachable from no
+# pod and no host: use `kubectl -n nats port-forward` (runbooks/nats.md).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nats-routes
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: nats}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: nats}
+      ports: [{port: 6222, protocol: TCP}]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: nats}
+      ports: [{port: 6222, protocol: TCP}]
+    # The route names (nats-N.nats-headless...) are resolved by kube-dns.
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]

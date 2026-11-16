@@ -17,7 +17,7 @@ their own accounts. Request/reply between agents is planned to go through LiteLL
 | Limits | `max_payload: 1MB` |
 | Secrets | `secrets/bus.enc.yaml`: bcrypt `nats_*_password_hash` rendered into `nats.conf`; plaintext passwords for clients |
 | Health | Gatus `NATS (TLS)` (tcp 4222), `NATS MQTT (picoclaw)` (tcp 8883) |
-| k3s target | `bus`, 3 replicas (dgx-1, dgx-2, a small one on the Jetson) |
+| k3s | prepared, not deployed (decision 0014, `runbooks/nats.md`): `cluster/apps/nats`, 3 servers (dgx-1, dgx-2, the Jetson), JetStream R3, VIP `192.168.86.12` and the Sparks' Tailscale IPs; the cutover is user-present with the e-stop latched |
 
 ## Accounts and permissions (`nats.conf.j2`)
 
