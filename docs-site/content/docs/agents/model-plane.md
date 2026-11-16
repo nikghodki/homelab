@@ -11,13 +11,13 @@ session. This page describes its role and interfaces only; don't change it from 
 | Piece | Role | Where |
 |---|---|---|
 | DGXMM | Owns the GPUs (D3). Plans what fits in GB10 unified memory, starts and stops engines (vLLM, llama.cpp) as Docker containers, holds requests while an on-demand model loads, downloads weights | dgx-1 container `dgxmm` (10.100.136.1:8090, the direct cable: only the Sparks reach it), UI at `dgxmanager.nghodki.ai/dgxmm/`; a probe container on dgx-2 |
-| LiteLLM | OpenAI-compatible gateway with keys and budgets; agents call it, never engines (D4) | dgx-1 `litellm-proxy` :4000, `model.nghodki.ai` |
-| Front door | `model.nghodki.ai` paths (the Caddyfile's `(model_plane)`): `/v1/` and `/health` → LiteLLM, `/dgxmm/` → DGXMM, both on dgx-1's direct-cable address 10.100.136.1 (nginx-gateway did this until 2026-11-15) | k3s `edge` |
+| LiteLLM | OpenAI-compatible gateway with keys and budgets; agents call it, never engines (D4) | k3s `litellm/litellm` since 2026-11-16: 2 pods (one per Spark), ClusterIP 10.43.0.150:4000, `model.nghodki.ai`; reaches DGXMM's on-demand gateway through a relay on dgx-1 (10.100.136.1:8091) |
+| Front door | `model.nghodki.ai` paths (the Caddyfile's `(model_plane)`): `/v1/` and `/health` → LiteLLM (10.43.0.150:4000; the stopped Docker copy on dgx-1's cable address 10.100.136.1:4000 is the fallback until 2026-11-23), `/dgxmm*` → 308 to `dgxmanager.nghodki.ai` (nginx-gateway did this until 2026-11-15) | k3s `edge` |
 | KServe backend | Optional later (PK.1–PK.4); a draft lives on DGXMM branch `feature/kserve-backend` | — |
 
 ## A call
 
-`agent → http(s)://model.nghodki.ai/v1/chat/completions → Caddy (k3s) → litellm-proxy → engine`. Caddy
+`agent → http(s)://model.nghodki.ai/v1/chat/completions → Caddy (k3s) → LiteLLM pod (k3s) → relay on dgx-1 → DGXMM → engine`. Caddy
 allows 30-minute reads and doesn't buffer, because an on-demand model can take minutes to start.
 
 ## Routes and aliases: pending P2.0

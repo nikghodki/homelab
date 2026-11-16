@@ -23,7 +23,7 @@ jobs, so jobs must leave the service reserve alone.
 | Stack (`/opt/homelab/<name>`) | Containers | Published on | Playbook |
 |---|---|---|---|
 | `observe` | victoriametrics, vmalert, alertmanager, loki, tempo, otel-defenseclaw, otel-fleet, grafana, phoenix | 0.0.0.0: 3000 (Grafana), 6006 (Phoenix), 4317–4318 (DefenseClaw OTLP), 4319–4320 (fleet OTLP) | `observe.yml` |
-| `console` | pocket-id | 192.168.86.36:1411 | `console.yml` |
+| `console` | pocket-id: **stopped 2026-11-16** (moved into k3s; kept until 2026-11-23 as the rollback) | was 192.168.86.36:1411 | `console.yml` (rollback only) |
 | `jobs` | temporal, postgresql, admin-tools, ui | 192.168.86.36: 7233 (gRPC), 8233 (UI), 9233 (metrics) | `jobs.yml` |
 | `ml` | mlflow, postgresql, api (Caddy) | 192.168.86.36: 4181 (UI gate for the front door), 5000 (job API) | `ml.yml` |
 | `gpu` | dcgm-exporter 4.8.4 | 127.0.0.1:9400 | `gpu.yml` |
@@ -31,6 +31,9 @@ jobs, so jobs must leave the service reserve alone.
 | `sim` (on demand) | isaaclab, mujoco (profile `jobs`, never start by themselves) | none | run by hand |
 
 Also seen: a `dgxmm-node-probe` container (DGXMM session's; not in this repo).
+
+k3s pods here since 2026-11-16 (P3.7): Pocket ID (`console/pocket-id`, pinned: its local-path volume is on this disk),
+the primary of LiteLLM's CNPG cluster `data/litellm-db` (preferred placement) and one of the two LiteLLM proxy pods.
 
 systemd: `k3s` (server, `cluster-init`), `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `earlyoom` and
 `gpu-oom-guard` (`roles/memory_guard`, as on dgx-1). Timers: `cisco-aibom`, `lynis-audit`, `homelab-backup`,

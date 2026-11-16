@@ -109,7 +109,7 @@ The docs site's Status page (`docs-site/content/docs/decisions/status.md`) mirro
 | P3.4 | ✅ | Argo CD + KSOPS; merge-to-deploy 178 s (#57–#59) |
 | P3.5 | ✅ | Kyverno Enforce, 6 policies, 2 admission replicas (#65, #68); `build-sign.yml` with cosign keyless (#62–#64). The signed-image acceptance case waits until the GHCR packages are public (you) |
 | P3.6 | ⬜ | Tetragon |
-| P3.7 | 🔄 | Open WebUI in k3s 2026-11-16 (#124, #127, #128; Docker copy removed after 2026-11-23). LiteLLM, NATS, CNPG wait on you (plans in the platform report); Gatus/ntfy stay on the Dell (0009); observability: its session |
+| P3.7 | 🔄 | In k3s on 2026-11-16: Open WebUI (#124, #127, #128), LiteLLM with its Postgres on CNPG `data/litellm-db` (#142, #145, #153) and Pocket ID (#148, #159); their Docker copies are removed after 2026-11-23. NATS waits on you (plans in the platform report); Gatus/ntfy stay on the Dell (0009); observability: its session |
 | P3.8 | ⬜ | etcd/CNPG backups to SeaweedFS (after P3.7) |
 | P3.9 | ⬜ | Incident runbooks (interim notes in the docs site's Incident playbooks) |
 

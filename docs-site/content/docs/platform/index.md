@@ -7,7 +7,7 @@ Two deployment systems run side by side:
 
 | | Docker stacks (interim) | k3s (target) |
 |---|---|---|
-| What | Almost every service today | Argo CD, Kyverno (Enforce), CNPG operator, CoreDNS zone; kube-vip, the `edge` front door and kube-state-metrics (P3.3, cut over 2026-11-15) |
+| What | Almost every service today | Argo CD, Kyverno (Enforce), CNPG operator, CoreDNS zone; kube-vip, the `edge` front door and kube-state-metrics (P3.3, cut over 2026-11-15); Open WebUI, LiteLLM with its CNPG database, Pocket ID (P3.7, 2026-11-16) |
 | Source | `hosts/stacks/<name>/compose.yaml` + templates | `cluster/` and `policies/kyverno` |
 | Applied by | Ansible (`hosts/playbooks/<name>.yml`), by a person, from dgx-1 | Argo CD, polling `main` every 2 min |
 | Secrets | SOPS → `.env` / private templates at deploy time | SOPS → KSOPS in the repo-server |
@@ -19,6 +19,6 @@ are the production services.
 - [k3s](k3s.md): nodes, etcd, labels, taints, versions, snapshots.
 - [Argo CD](argocd.md): app of apps, adding an app, sync timing, deploy key, age key, break-glass.
 - [Kyverno](kyverno.md): the six policies (Enforce), exclusions, break-glass.
-- [CloudNativePG](cnpg.md): operator only.
+- [CloudNativePG](cnpg.md): the operator and LiteLLM's `litellm-db`.
 - [Docker stacks](docker-stacks.md): every stack, its host, playbook and k3s target; the `compose_stack` role.
 - [Image signing](image-signing.md): `build-sign.yml`, cosign keyless, SBOMs.

@@ -13,14 +13,14 @@ sequenceDiagram
   participant DNS as edge-dns (k3s, port 53 on a Spark)
   participant C as edge-caddy (k3s, port 443 on a Spark)
   participant G as Grafana (dgx-2 port 3000)
-  participant P as Pocket ID (dgx-2 port 1411)
+  participant P as Pocket ID (k3s pod on dgx-2)
   B->>DNS: grafana.nghodki.ai A?
   DNS-->>B: the answering Spark's Tailscale IP (tailnet) or 192.168.86.11 (LAN VIP)
   B->>C: TLS, wildcard cert from the homelab web CA
   C->>G: reverse_proxy 192.168.86.36:3000
   G-->>B: redirect to id.nghodki.ai (OIDC, PKCE)
   B->>C: id.nghodki.ai
-  C->>P: reverse_proxy 192.168.86.36:1411
+  C->>P: reverse_proxy 10.43.0.155:1411
   P-->>B: passkey prompt, then back to Grafana
 ```
 
@@ -28,7 +28,7 @@ sequenceDiagram
   edge-dns replica answers with its own Spark (P3.3, [DNS](../network/dns.md)). LAN clients would have to use the
   VIP 192.168.86.11 as their resolver for `nghodki.ai` (unverified how each LAN device is configured; the Nest
   router's DHCP doesn't hand it out by itself).
-- model, dgxmanager and ha go straight to their backends too (LiteLLM and DGXMM on dgx-1's direct-cable address, HA on the Jetson).
+- model, dgxmanager and ha go straight to their backends too (LiteLLM at its ClusterIP 10.43.0.150, DGXMM on dgx-1's direct-cable address, HA on the Jetson).
 - TLS: the device must trust the homelab web CA, installed once from `http://ca.nghodki.ai`. See [PKI](../security/pki.md).
 - Every service behind the front door has the same shape. The full table is in [Front door](../network/front-door.md).
 
@@ -79,14 +79,16 @@ Details: [Deploying](../operations/deploy.md).
 
 ```mermaid
 flowchart LR
-  A["Agent or Open WebUI"] -- "http(s)://model.nghodki.ai/v1" --> C["Caddy (k3s, edge)"]
-  C --> L["litellm-proxy :4000 (dgx-1)"]
-  L --> D["DGXMM-started engine (vLLM / llama.cpp)"]
+  A["Agent"] -- "http(s)://model.nghodki.ai/v1" --> C["Caddy (k3s, edge)"]
+  W["Open WebUI (k3s)"] -- "10.43.0.150:4000/v1" --> L
+  C --> L["LiteLLM (k3s, 2 pods, 10.43.0.150:4000)"]
+  L --> R["relay 10.100.136.1:8091 (dgx-1)"]
+  R --> D["DGXMM on-demand gateway, then the engine (vLLM / llama.cpp)"]
 ```
 
 Hermes's main profile calls `http://model.nghodki.ai/v1` with model `qwen3.8-27b` (a model name, not an alias: the
-alias plan, P2.0, is still open). The DefenseClaw guardrail plugin for LiteLLM is written and tested but not enabled
-yet (P2.4). Details: [Model plane](../agents/model-plane.md).
+alias plan, P2.0, is still open). The DefenseClaw guardrail plugin in LiteLLM checks every prompt (on since
+2026-11-15, P2.4). Details: [Model plane](../agents/model-plane.md).
 
 ## A robot command and an e-stop
 

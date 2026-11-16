@@ -43,10 +43,13 @@ phone still gets ntfy over Tailscale.
 
 Symptoms: sign-in pages fail; Temporal UI restarts in a loop; Argo CD login loops.
 
-1. `ssh nikghodki-dgx-2@192.168.86.36 'sudo docker ps --filter name=pocket-id; sudo docker logs --tail 50 console-pocket-id-1'`.
+1. `kubectl -n console get pods -l app.kubernetes.io/name=pocket-id -o wide; kubectl -n console logs deploy/pocket-id --tail 50`
+   (k3s since 2026-11-16, pinned to dgx-2: dgx-2 down means Pocket ID down).
 2. Check it through the front door: `curl -sk https://192.168.86.11/healthz -H 'Host: id.nghodki.ai'`.
 3. Use break-glass while it's down ([Pocket ID: break-glass](../security/identity.md)).
-4. `ansible-playbook playbooks/console.yml` redeploys it (data is in the volume; not backed up).
+4. Argo CD keeps it deployed; the data is in the PV on dgx-2 (restic on dgx-2). Until 2026-11-23 the stopped Docker
+   copy is the rollback (`runbooks/sign-in.md`, "Rollback"); `playbooks/console.yml` refuses to start it without
+   `-e pocketid_docker_rollback=true`.
 
 ## Wi-Fi drop or router reboot
 

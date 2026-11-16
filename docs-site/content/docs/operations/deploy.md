@@ -33,9 +33,12 @@ Collections: community.general, ansible.posix, community.docker, community.sops 
 | `edge-connector.yml` | `edge` (Pi) | role `edge_connector` |
 | `bus.yml` | `bus` (dgx-1) | stack `bus`; operator safety CLI |
 | `fleet.yml` | `bus` (dgx-1) | stack `fleet` |
+| `litellm.yml` | `litellm` (dgx-1) | stack `litellm`: rollback only since 2026-11-16 (`-e litellm_docker_rollback=true`) |
+| `litellm-bridges.yml` | `litellm` (dgx-1) | stack `litellm-bridges` (relays for the LiteLLM pods) |
+| `litellm-usage.yml` | `litellm` (dgx-1) | role `litellm_usage_exporter` (and the read-only role in the CNPG primary) |
 | `gpu.yml` | `sparks`; `jetson_group` | stack `gpu`; role `jetson_cdi` |
 | `observe.yml` | `observe` (dgx-2) | stack `observe` |
-| `console.yml` | `observe` (dgx-2) | stack `console` (Pocket ID) |
+| `console.yml` | `observe` (dgx-2) | stack `console` (Pocket ID): rollback only since 2026-11-16 (`-e pocketid_docker_rollback=true`) |
 | `jobs.yml` | `observe` (dgx-2) | stack `jobs` (Temporal) + namespace |
 | `ml.yml` | `observe` (dgx-2) | stack `ml` (MLflow) + client env file |
 | `backups.yml` | `observe`; all | stack `backup` + `restic_install` + `restic_prune`; `restic_install` + `restic_backup` everywhere |
@@ -64,7 +67,7 @@ Collections: community.general, ansible.posix, community.docker, community.sops 
 
 ## Hand-run pieces (outside the repo)
 
-The front door (`~/edge-gateway`), nginx-gateway, LiteLLM, Open WebUI, Home Assistant, Hermes, LiveKit and the
+The front door (`~/edge-gateway`), nginx-gateway, Home Assistant, Hermes, LiveKit and the
 control center are changed by hand. Back up the file first (`cp x x.bak-<what>-<date>`), change it, restart the
 container or unit, check, and describe the change in a PR (or a runbook) so the next person knows.
 
@@ -72,4 +75,4 @@ container or unit, check, and describe the change in a PR (or a runbook) so the 
 
 - Gatus green; no new alerts on the phone.
 - `docker ps` on the host: no restarting containers.
-- For k3s changes: `docker ps` on the Sparks too, and `curl http://127.0.0.1:4000/health/liveliness` on dgx-1.
+- For k3s changes: `docker ps` on the Sparks too, and `curl http://10.43.0.150:4000/health/liveliness` (LiteLLM) from a Spark.

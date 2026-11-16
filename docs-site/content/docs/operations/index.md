@@ -38,7 +38,9 @@ Never use the laptop's `gh` or `git`: they are a work account.
 | kubectl | dgx-1 `~/.kube/config` |
 | Deployed stacks | `/opt/homelab/<stack>` on each host |
 | Front door and DNS | dgx-1 `~/edge-gateway` (outside the repo) |
-| LiteLLM, DGXMM | dgx-1 (LiteLLM: `hosts/stacks/litellm`; DGXMM: its own repo) |
+| LiteLLM | k3s, `cluster/apps/litellm`, database CNPG `data/litellm-db` (since 2026-11-16) |
+| DGXMM | dgx-1, its own repo |
+| Pocket ID | k3s, `cluster/apps/pocket-id`, pinned to dgx-2 (since 2026-11-16) |
 | Open WebUI | k3s, `cluster/apps/open-webui` (since 2026-11-16) |
 | Hermes | Jetson, users `nikjetson` and `hermes-nikhil` |
 | Robot | Pi user units |
@@ -64,7 +66,7 @@ kubectl get nodes                                   # 4 Ready
 kubectl get applications -n argocd                  # all Synced/Healthy
 curl -s -o /dev/null -w '%{http_code}\n' http://192.168.86.49:8081/health   # Gatus via status-gate: 200
 curl -s http://192.168.86.49:8085/v1/health        # ntfy
-curl -s http://127.0.0.1:4000/health/liveliness    # LiteLLM
+curl -s http://10.43.0.150:4000/health/liveliness  # LiteLLM (k3s ClusterIP)
 docker ps                                          # dgx-1 containers
 ```
 

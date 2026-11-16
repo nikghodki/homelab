@@ -17,7 +17,7 @@ commit the SOPS file in a PR, merge, deploy the playbooks that use it, check, an
 | Fleet OTA / emergency / audit keys, device key | `fleet` → `dclaw_ota_hmac_key`, `dclaw_emergency_key`, `dclaw_audit_key_*`, `dclaw_device_key_*` | gateway and devices together; a device key changes by re-registering (`register` replaces it) | heartbeats, a policy push |
 | OIDC client secrets | `console` → `oidc_<client>_secret` (regenerate in Pocket ID, then the sync script writes SOPS) | the app's playbook; for Argo CD also `cluster/platform/argocd/extras/oidc.enc.yaml` | sign in |
 | Sign-in (edge-auth) | `cluster/platform/edge/edge-auth.enc.yaml` → `cookie-secret` (32 random bytes, base64url), `client-secret`; `edge_origin_token` (+ `origin-token`) | merge, restart `edge-auth` (cookie: everyone signs in again); token: restart `edge-caddy`, then `ops.yml`, `alerting.yml`, `ml.yml` (`runbooks/sign-in.md`) | sign in; `verify-edge-auth.sh` |
-| Pocket ID static API key | `console` → `pocketid_static_api_key` | `console.yml` | `pocketid_sync.py --dry-run` |
+| Pocket ID static API key | `console` → `pocketid_static_api_key` | rebuild the KSOPS Secret `cluster/apps/pocket-id/pocket-id.enc.yaml` (byte for byte, with the trailing newline), merge, restart the pod (`runbooks/sign-in.md`) | `pocketid_sync.py --dry-run` |
 | Pocket ID encryption key | `console` → `pocketid_encryption_key` | **don't rotate casually**: it encrypts Pocket ID's data (unverified whether Pocket ID supports re-keying) | — |
 | ntfy users/token | `observe` → `ntfy_*_password(_hash)`, `ntfy_alerts_token` (hash with `ntfy user hash`) | `alerting.yml`, `observe.yml` (Alertmanager), phone settings | test alert |
 | ntfy.sh backup topic | `observe` → `ntfy_sh_backup_topic_token` (128 random bits) | `observe.yml`; resubscribe the phone | `amtool` dead-man test |
@@ -29,11 +29,11 @@ commit the SOPS file in a PR, merge, deploy the playbooks that use it, check, an
 | Argo CD deploy key | `argocd` → `argocd_deploy_key(_pub)` | re-create `argocd/repo-homelab` | `argocd --core ... repo list` |
 | restic passwords | `backup` → per host | `backups.yml` (a new repo password needs `restic key add/remove`) | a backup run |
 | LiveKit key | `voice` → `livekit_api_key`, `livekit_api_secret` | by hand on the Jetson ([Voice](../services/voice.md)) | old key refused |
-| LiteLLM master key | `litellm` → `litellm_master_key` | `litellm.yml`; DGXMM's `secrets/litellm_master_key` + `docker restart dgxmm` (no `/key/regenerate`: the salt key encrypts) | `/model/info` 401 with the old key |
-| LiteLLM salt key | `litellm` → `litellm_salt_key` | **two boots** with `LITELLM_MIGRATE_FROM_MASTER_KEY` (runbooks/litellm.md); `pg_dump` first | every DB route listed in `/model/info` |
+| LiteLLM master key | `litellm` → `litellm_master_key` | rebuild `cluster/apps/litellm/litellm.enc.yaml` (`.github/scripts/litellm-k3s-secrets.py`), merge, `kubectl -n litellm rollout restart deploy/litellm`; DGXMM's `secrets/litellm_master_key` + `docker restart dgxmm` (no `/key/regenerate`: the salt key encrypts) | `/model/info` 401 with the old key |
+| LiteLLM salt key | `litellm` → `litellm_salt_key` | **two boots** with `LITELLM_MIGRATE_FROM_MASTER_KEY`, in k3s with one replica and on a test pod first (runbooks/litellm.md); `pg_dump` first | every DB route listed in `/model/info` |
 | LiteLLM virtual keys | `litellm` → `picoclaw_pi_litellm_key`, `defenseclaw_jetson_judge_litellm_key`, `cisco_aibom_litellm_key` | create the new key, deploy, then `/key/delete` the old | old key 401 |
-| LiteLLM Postgres / UI | `litellm` → `litellm_postgres_password`, `litellm_ui_password` | `ALTER USER` first, then `litellm.yml` | readiness `db: connected` |
-| Phoenix API key (LiteLLM) | `litellm` → `phoenix_api_key` (Phoenix system key `litellm-dgx-1`) | `litellm.yml`; delete the old key in Phoenix | a trace arrives |
+| LiteLLM database / Redis / UI | `litellm` → `litellm_db_password` (CNPG owner), `litellm_redis_password`, `litellm_ui_password` (`litellm_postgres_password` is the stopped Docker copy's) | database: `ALTER USER` in the primary, then rebuild `cluster/apps/data/litellm-db.enc.yaml` and `litellm.enc.yaml`, merge, restart the pods together; Redis and UI: rebuild the Secrets, merge, restart | readiness `db: connected` |
+| Phoenix API key (LiteLLM) | `litellm` → `phoenix_api_key` (Phoenix system key `litellm-dgx-1`) | rebuild `litellm.enc.yaml`, merge, restart the pods; delete the old key in Phoenix | a trace arrives |
 
 ## Not in SOPS / not rotated yet
 

@@ -30,8 +30,8 @@ snapshots in `/var/backups/homelab`. All copies are on **dgx-2's disk** (one cop
 
 | Protected by the running backups | Not protected |
 |---|---|
-| dgx-1: front door config, nginx config, LiteLLM config + DB dump, DefenseClaw, DGXMM data/config/secrets, Open WebUI DB | anything on dgx-2 outside `/opt/homelab` (Docker volumes: Grafana, Loki, VictoriaMetrics, Pocket ID, Temporal and MLflow Postgres, MLflow artifacts, Phoenix) |
-| dgx-2: `/opt/homelab` (stack configs, rendered secrets) | k3s etcd (local snapshots only) |
+| dgx-1: front door config, nginx config, LiteLLM's DB dump (from the CNPG primary in k3s) and the stopped Docker copy's config, DefenseClaw, DGXMM data/config/secrets, Open WebUI DB | anything on dgx-2 outside `/opt/homelab` and Pocket ID's PV (Docker volumes: Grafana, Loki, VictoriaMetrics, Temporal and MLflow Postgres, MLflow artifacts, Phoenix) |
+| dgx-2: `/opt/homelab` (stack configs, rendered secrets); Pocket ID's PV in k3s, `pocket-id.db` as a SQLite snapshot (since 2026-11-16) | k3s etcd (local snapshots only) |
 | Jetson: Hermes state, HA config + DB snapshot, DefenseClaw, LiveKit config, roboclaw | model weights (re-downloadable) |
 | Pi: picoclaw, DefenseClaw, maps, workspace, units | the Dell |
 
@@ -55,7 +55,7 @@ Then record it in decision 0002 (or a new decision).
 2. `ansible-playbook playbooks/backups.yml --check --diff`, then for real. Add the Dell if wanted.
 3. Do a restore test (`restic -r ... restore latest --target /tmp/restore-test` on a host, using `/etc/restic/env`).
 4. Add an alert: there is none today for a failed or missing backup (the journal has `SyslogIdentifier=homelab-backup`).
-5. Consider adding the Docker volumes on dgx-2 that matter (Pocket ID, Temporal, MLflow) with dumps in
+5. Consider adding the Docker volumes on dgx-2 that matter (Temporal, MLflow; Pocket ID is covered since its move) with dumps in
    `restic_backup_pre_commands`.
 
 ## Other copies that exist

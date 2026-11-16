@@ -131,7 +131,7 @@ Argo CD apps `kube-vip`, `edge`, `kube-state-metrics` (PR #72, decision 0007). C
 ## Not installed (on purpose)
 
 Tetragon (P3.6); the NVIDIA device plugin (the cluster doesn't touch the GPUs; k3s registers an `nvidia`
-runtime but nothing requests GPUs); workloads (P3.7); off-host snapshots (P3.8); metrics-server, an Ingress
+runtime but nothing requests GPUs); most workloads (P3.7: Open WebUI, LiteLLM and Pocket ID moved on 2026-11-16); off-host snapshots (P3.8); metrics-server, an Ingress
 controller, ServiceLB.
 
 ## Decision 0005 in one paragraph

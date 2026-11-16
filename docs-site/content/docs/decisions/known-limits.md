@@ -7,7 +7,7 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 
 | Area | Limit | Mitigation / plan |
 |---|---|---|
-| Availability | dgx-1 is a single point of failure for web, DNS, NATS, Fleet, LiteLLM and the operator's tools (F6) | P3.3 moved web and DNS into k3s (cut over 2026-11-15); LiteLLM and DGXMM (model, dgxmanager), NATS and Fleet still need dgx-1 (P3.7) |
+| Availability | dgx-1 is a single point of failure for web, DNS, NATS, Fleet, LiteLLM and the operator's tools (F6) | P3.3 moved web and DNS into k3s (cut over 2026-11-15); LiteLLM runs on both Sparks since 2026-11-16, but the models behind it (DGXMM, dgxmanager) and its relays are on dgx-1; NATS and Fleet still need dgx-1 (P3.7) |
 | Availability | A GPU job can take a Spark and all its services down (unified memory) | caps on our jobs, earlyoom/gpu-oom-guard (`roles/memory_guard`), P2.7 reserves |
 | Availability | Alerting needs the Dell or dgx-2; both down = silence | accepted |
 | Network | Everything is on Wi-Fi; a router reboot hits every host | P0.11 for the Sparks |
@@ -19,8 +19,8 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 | Security | No DefenseClaw webhooks (they refuse private receivers). The LiteLLM guardrail and the DefenseClaw judges are on since 2026-11-15 (decision 0012) | alerts come from metrics and logs instead |
 | Security | SSH password authentication still enabled | after every admin path has a key |
 | Recovery | Backups conflict with decision 0002; no off-site copy; no restore test | user decision |
-| Recovery | Pocket ID, Temporal, MLflow, Grafana data live in Docker volumes that the backups don't cover | add dumps |
-| Ops | Hermes is hand-run: not in Ansible or Argo CD; Renovate can't see it (Open WebUI is in Argo CD since 2026-11-16). LiteLLM (#96) and Home Assistant (#85) are in Git | P3.7, P4.5 |
+| Recovery | Temporal, MLflow, Grafana data live in Docker volumes that the backups don't cover (Pocket ID's PV is backed up since its move, 2026-11-16) | add dumps |
+| Ops | Hermes is hand-run: not in Ansible or Argo CD; Renovate can't see it (Open WebUI is in Argo CD since 2026-11-16). LiteLLM is in Argo CD since 2026-11-16 (#145, #153); Home Assistant (#85) is in Git | P3.7, P4.5 |
 | Ops | No incident runbooks yet (P3.9) | [Incident playbooks](../operations/incidents.md) |
 | Ops | The Dell is weak (2 cores, 8 GB, HDD) | decision 0009 |
 | Robot | Not driving autonomously: mock sink; on-blocks test pending | P5.2 final test |
@@ -59,7 +59,7 @@ docs.
 | R9 | losing the age key | offline copies; restore drill quarterly (not yet done) |
 | R10 | no UPS | open |
 | R11 | CopilotKit Intelligence licensing | confirmed (0004) |
-| R12 | LiteLLM is critical for everything | pinned 1.109.1; HA later |
+| R12 | LiteLLM is critical for everything | pinned 1.109.1; 2 replicas in k3s since 2026-11-16 (the models behind it are still on dgx-1) |
 | R13 | Isaac Sim limits on Spark | headless only |
 | R14 | sim-to-real gap | staged gates (architecture §15.5) |
 | R15 | sim jobs vs LLM batch on dgx-2 | job caps; DGXMM budget later |
