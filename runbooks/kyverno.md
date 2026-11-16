@@ -54,8 +54,9 @@ With `edge` enforced, edge-caddy and edge-dns can only be recreated while a Kyve
 GHCR packages pushed from this private repo are **private**. Kyverno (to read signatures) and the nodes (to pull)
 need either the package set to public, or a pull credential:
 
-- **Public** (chosen for `mlflow` and `ros-zenoh`, which contain nothing private): github.com → Packages →
-  `<name>` → Package settings → Change visibility → Public. Nothing else to configure.
+- **Public** (decision 0008, for `mlflow` and `ros-zenoh`, which contain nothing private): github.com → Packages →
+  `<name>` → Package settings → Change visibility → Public (UI only; the API can't change it). Nothing else to
+  configure. **Not done yet**: until then every `ghcr.io/nikghodki` image is refused with `UNAUTHORIZED`.
 - **Private** (for an image with private code): a classic PAT with only `read:packages`, as a SOPS-encrypted
   `kubernetes.io/dockerconfigjson` Secret in `kyverno` (add `credentials: {secrets: [ghcr-pull]}` to
   `verify-images`) and in the workload's namespace (`imagePullSecrets`).
@@ -94,16 +95,24 @@ kubectl patch validatingpolicy disallow-latest-tag --type merge -p '{"spec":{"va
 kubectl -n argocd patch application root --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
 ```
 
-**B. Kyverno down and pods refused** (both admission replicas gone; `KyvernoAdmissionDown`). kube-system, kyverno
-and argocd are never blocked, so Kyverno and Argo CD can still restart. If it doesn't come back:
+**B. Kyverno down or hung, pods refused** (`KyvernoAdmissionDown`, errors like `failed calling webhook ... kyverno-svc`).
+kube-system, kyverno and argocd are never blocked, so Kyverno and Argo CD can still restart; look first:
+`kubectl -n kyverno get pods; kubectl -n kyverno describe deploy kyverno-admission-controller`. To admit unchecked
+until it's fixed (tested 2026-11-15):
 
 ```bash
-kubectl -n kyverno get pods; kubectl -n kyverno describe deploy kyverno-admission-controller
-# Remove the resource webhooks: the API server stops calling Kyverno, everything is admitted unchecked.
+# 1. Stop selfHeal (else the kyverno app scales it straight back up).
+kubectl -n argocd patch application root    --type json -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]'
+kubectl -n argocd patch application kyverno --type json -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]'
+# 2. Stop the admission controller. On a clean shutdown Kyverno removes its own webhooks.
+kubectl -n kyverno scale deploy kyverno-admission-controller --replicas=0
+# 3. Webhooks left over (pods that crashed can't clean up): delete them. A *running* Kyverno recreates them at once,
+#    which is why step 2 comes first.
 kubectl delete validatingwebhookconfiguration,mutatingwebhookconfiguration -l webhook.kyverno.io/managed-by=kyverno
-```
-
-Kyverno recreates its webhooks when an admission replica is ready again. The policy webhooks
+# 4. When fixed: root's automated sync back on; root restores the kyverno app, which restores 2 replicas; Kyverno
+#    recreates the webhooks (about 40 s).
+kubectl -n argocd patch application root --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+``` The policy webhooks
 (`kyverno-policy-validating-webhook-cfg`) also fail closed, which only matters for creating or changing policies.
 
 **C. Permanent:** a PR that sets the policy to `validationActions: [Audit]` (or adds the exemption). Argo CD applies
@@ -111,7 +120,39 @@ it within about 3 minutes.
 
 ## Acceptance (P3.5, 2026-11-15)
 
-In a scratch namespace (deleted afterwards). Results are in the PR that switched to Enforce.
+In a scratch namespace `p35-scratch` (deleted afterwards), right after the Enforce merge (#65). Pods with cpu/memory
+requests and limits and the pinned `docker.io/rancher/mirrored-pause:3.6@sha256:74c4…a893` unless the test changes
+that; rejections checked with `kubectl create --dry-run=server` (goes through every admission webhook).
+
+| Test | Result |
+|---|---|
+| control: compliant pod | **admitted and Running** (dgx-1) |
+| (a) unsigned `ghcr.io/nikghodki/mlflow:buildcache` | **rejected** by `verify-images`. While the packages are private the reason is `UNAUTHORIZED` from GHCR (Kyverno can't read the image), not the missing signature; re-run after making them public (below) |
+| (b) signed `ghcr.io/nikghodki/ros-zenoh:kilted-1` | **pending: rejected with `UNAUTHORIZED`** while the package is private. After it is made public, expect admitted with the image rewritten to `…:kilted-1@sha256:…` |
+| (c) `quay.io/argoproj/argocd:latest` | **rejected** (`require-image-digest`; with that one in Audit, `disallow-latest-tag`: "images without a tag, or tagged latest") |
+| (d) no requests/limits | **rejected** (`require-resource-limits`: "containers without cpu/memory requests and limits: c") |
+| (e) `privileged: true` / `hostNetwork: true` | **rejected** (`disallow-privileged`) |
+| extra: `docker.io/library/busybox@sha256:…` | **rejected** (`restrict-registries`) |
+| extra: Deployment with `:latest` | **rejected** before any pod (`disallow-latest-tag`, autogen) |
+| (f) break glass A | `root` and `kyverno-policies` selfHeal off; `require-image-digest` → Audit: (c) still refused by `disallow-latest-tag`; `disallow-latest-tag` → Audit: **(c) admitted**; still Audit 30 s later (no selfHeal). Root's `automated` back on: both policies back to **Deny 11 s later**, (c) refused again |
+| (f) fail closed + break glass B | `kyverno-svc` pointed at no endpoints (a hung Kyverno): a compliant pod in `p35-scratch` **refused** ("no endpoints available for service kyverno-svc"); the same pod in `argocd`, `kube-system` and `kyverno` **admitted**. Admission scaled to 0: Kyverno removed its webhooks on shutdown (0 left), compliant pod **admitted**. Root's `automated` back on: Service and 2 replicas restored, webhooks recreated, policies enforcing again in about 40 s |
+
+Re-run (a) and (b) once the packages are public:
+
+```bash
+NS=p35-scratch; kubectl create ns $NS
+for img in ghcr.io/nikghodki/mlflow:buildcache ghcr.io/nikghodki/ros-zenoh:kilted-1; do
+cat <<P | kubectl create --dry-run=server -o jsonpath='{.spec.containers[0].image}{"\n"}' -f -
+apiVersion: v1
+kind: Pod
+metadata: {name: t, namespace: $NS}
+spec:
+  containers:
+    - {name: c, image: "$img", resources: {requests: {cpu: 10m, memory: 16Mi}, limits: {cpu: 50m, memory: 32Mi}}}
+P
+done   # expect: buildcache refused (no signature); kilted-1 printed with @sha256:...
+kubectl delete ns $NS
+```
 
 ## Removing Kyverno
 
@@ -125,7 +166,11 @@ namespaces: delete the webhooks in the same step.
 | Pod | Request / limit | anon | incl. cache | peak |
 |---|---|---|---|---|
 | admission controller (Audit, 1 replica, 2026-11-15) | 128Mi / 384Mi | 64 MiB | 65 MiB | 77 MiB |
-| reports controller | 64Mi / 256Mi | 43 MiB | 44 MiB | 62 MiB |
+| admission controller, Enforce, dgx-1 (after the tests) | 128Mi / 384Mi | 52 MiB | 54 MiB | 57 MiB |
+| admission controller, Enforce, dgx-2 (after the tests) | 128Mi / 384Mi | 65 MiB | 66 MiB | 72 MiB |
+| reports controller | 64Mi / 256Mi | 46 MiB | 47 MiB | 65 MiB |
+
+The second replica adds 128 Mi of requests (384 Mi limit); Kyverno in total now requests 320 Mi.
 
 The CRD-migration Job (`kyverno-migrate-resources`, a post-upgrade hook = Argo CD PostSync) runs briefly when the
 app syncs (limit 256Mi).

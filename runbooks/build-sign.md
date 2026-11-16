@@ -80,8 +80,14 @@ So a build of both images costs about 4 billed minutes (jobs round up to the min
 
 | Image | Digest (index: linux/amd64 + linux/arm64) | Tags |
 |---|---|---|
-| `ghcr.io/nikghodki/mlflow` | `sha256:ac9c9ca6befcb06384381b87619d6f71d886d610f2ec94690e7d6e5501fae8a0` | `3.18.0-psycopg2.9.13`, `sha-f5c4656542d7` |
-| `ghcr.io/nikghodki/ros-zenoh` | `sha256:77e2acdc5628b45d35029a1ee243ab0bd3e4a9e7ad1e98461ec792cbfdd45e8d` | `kilted-1`, `sha-f5c4656542d7` |
+| `ghcr.io/nikghodki/mlflow` | `sha256:e367371fcab5a8da9093cbb717ac55dde8b2cf97fa215a71f931208efdeb50df` | `3.18.0-psycopg2.9.13`, `sha-c91dcbb2d59f` |
+| `ghcr.io/nikghodki/ros-zenoh` | `sha256:f03a2e921d9bf15cf69371617361caec7455fa8182147bd0a806dd109dd7bc4e` | `kilted-1`, `sha-c91dcbb2d59f` |
+
+From the `workflow_dispatch` run 43788337169 (both jobs ~2 min). Each signature was checked in the run with
+`cosign verify --certificate-identity https://github.com/nikghodki/homelab/.github/workflows/build-sign.yml@refs/heads/main
+--certificate-oidc-issuer https://token.actions.githubusercontent.com` (exit 0), and the SBOM attestation with
+`cosign verify-attestation --type spdxjson` and the same identity. The run now also prints the certificate's subject
+and issuer, and checks that a wrong identity (`...@refs/heads/not-main`) is refused.
 
 Later builds move the tags; the run summary lists each build's digest and the verified certificate identity.
 
