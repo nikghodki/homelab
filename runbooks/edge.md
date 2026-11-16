@@ -27,12 +27,12 @@ dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and n
 - **Not through Caddy**: `nats`, `fleet` (dgx-1), `backup` (dgx-2), the host names (`jetson`, `pi`, ...) and
   `k8s` (the API VIP on the LAN; on the tailnet, the answering Spark's Tailscale IP).
 - **The model plane** (what nginx-gateway served until 2026-11-15) is the `(model_plane)` snippet, used by
-  `model.nghodki.ai`, `dgxmanager.nghodki.ai` (plus its `/` → `/dgxmm/` 302) and the door by IP or an unknown name
+  `model.nghodki.ai` and the door by IP (dgxmanager: DGXMM UI only, `/` → `/dgxmm/` 302) or an unknown name
   (nginx's default server): `/v1/*` and `/health*` → LiteLLM `10.100.136.1:4000` (no buffering, 30 min timeouts),
   `/dgxmm/*` → DGXMM `10.100.136.1:8090` (SSE, 1 h read timeout, 1 MB request limit), `/dgxmm/ondemand/*` → 404
   (LiteLLM-only, on the Docker network), `/v1` and `/dgxmm` → 301 to the slashed path, anything else → a JSON 404.
   `10.100.136.1` is dgx-1's direct-cable address: only the two Sparks (where Caddy runs) reach it.
-  `dgxmanager.nghodki.ai/v1/` reaching LiteLLM is inherited from nginx (its default server), kept as it was.
+  `dgxmanager.nghodki.ai` serves the DGXMM UI only (2026-11-15); `/v1/` there returns a JSON 404 pointing at `model.nghodki.ai`.
 - **DGXMM** publishes `:8090` only on `10.100.136.1` and trusts `X-Forwarded-For` from `10.100.136.2` (the Caddy pod
   on dgx-2) and `172.23.0.1` (the pod on dgx-1, masqueraded onto the Docker network `gateway`):
   `DGXMM_BIND` / `DGXMM_TRUSTED_PROXIES` in `~/workspace/dgx-model-manager/.env` (the user's repo, not in Git here).
