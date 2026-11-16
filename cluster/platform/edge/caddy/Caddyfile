@@ -52,6 +52,7 @@
 			max_size 1MB
 		}
 		reverse_proxy 10.100.136.1:8090 {
+			import strip_session_cookie
 			header_up X-Real-IP {remote_host}
 			header_up Cookie "_edge_auth[^;]*(;\s*)?" ""
 			flush_interval -1
@@ -71,6 +72,7 @@
 	@litellm path /v1/* /health*
 	handle @litellm {
 		reverse_proxy 10.100.136.1:4000 {
+			import strip_session_cookie
 			header_up X-Real-IP {remote_host}
 			flush_interval -1
 			transport http {
@@ -129,8 +131,15 @@
 	import session_check {args[1]}
 	reverse_proxy {args[0]} {
 		header_up X-Edge-Origin {env.EDGE_ORIGIN_TOKEN}
-		header_up Cookie "_edge_auth[^;]*(;\s*)?" ""
+		import strip_session_cookie
 	}
+}
+
+# The sign-in cookies (`_edge_auth`, `_edge_auth_csrf*`, decision 0011) are for edge-auth only: every backend proxy
+# drops them, signed-in route or not (only edge-auth's own routes keep them), so a compromised backend can't replay a
+# session through the door. Use it in every new reverse_proxy to a backend.
+(strip_session_cookie) {
+	header_up Cookie "_edge_auth[^;]*(;\s*)?" ""
 }
 
 (nghodki_routes) {
@@ -148,7 +157,9 @@
 	handle @id {
 		@plain protocol http
 		redir @plain https://{host}{uri} 308
-		reverse_proxy 192.168.86.36:1411
+		reverse_proxy 192.168.86.36:1411 {
+			import strip_session_cookie
+		}
 	}
 
 	# Homepage launcher (Dell ops stack): the docs Caddy's gate on :4180 in front of it.
@@ -196,7 +207,9 @@
 	# Observability on dgx-2
 	@grafana host grafana.nghodki.ai
 	handle @grafana {
-		reverse_proxy 192.168.86.36:3000
+		reverse_proxy 192.168.86.36:3000 {
+			import strip_session_cookie
+		}
 	}
 
 	# Gatus and ntfy run on the Dell (hosts/stacks/alerting, runbooks/alerting.md). Gatus' UI: the status gate on :8081;
@@ -204,7 +217,9 @@
 	@status host status.nghodki.ai
 	handle @status {
 		handle /health {
-			reverse_proxy 192.168.86.49:8081
+			reverse_proxy 192.168.86.49:8081 {
+				import strip_session_cookie
+			}
 		}
 		handle {
 			import signed_in 192.168.86.49:8081 admins
@@ -214,13 +229,16 @@
 	@ntfy host ntfy.nghodki.ai
 	handle @ntfy {
 		reverse_proxy 192.168.86.49:8085 {
+			import strip_session_cookie
 			flush_interval -1
 		}
 	}
 
 	@phoenix host phoenix.nghodki.ai
 	handle @phoenix {
-		reverse_proxy 192.168.86.36:6006
+		reverse_proxy 192.168.86.36:6006 {
+			import strip_session_cookie
+		}
 	}
 
 	# MLflow (dgx-2 ml stack): its Caddy's gate on :4181. Jobs use the basic-auth API on :5000 directly.
@@ -234,7 +252,9 @@
 	handle @temporal {
 		@plain protocol http
 		redir @plain https://{host}{uri} 308
-		reverse_proxy 192.168.86.36:8233
+		reverse_proxy 192.168.86.36:8233 {
+			import strip_session_cookie
+		}
 	}
 
 	# Argo CD (runbooks/argocd.md): the server runs insecure; TLS ends here.
@@ -243,6 +263,7 @@
 		@plain protocol http
 		redir @plain https://{host}{uri} 308
 		reverse_proxy 10.43.0.100:80 {
+			import strip_session_cookie
 			flush_interval -1
 		}
 	}
@@ -253,6 +274,7 @@
 		route {
 			import session_check admins
 			reverse_proxy 100.65.137.82:4000 {
+				import strip_session_cookie
 				header_up Host {upstream_hostport}
 				header_up X-Real-IP {remote_host}
 				header_up X-Forwarded-For {remote_host}
@@ -264,7 +286,9 @@
 	@control host controlcenter.nghodki.ai
 	handle @control {
 		# RoboClaw Control Center on the Jetson (uvicorn :8200)
-		reverse_proxy 192.168.86.211:8200
+		reverse_proxy 192.168.86.211:8200 {
+			import strip_session_cookie
+		}
 	}
 
 	# DGXMM's UI only (2026-11-15: LiteLLM's /v1/ no longer answers here; use model.nghodki.ai for model requests).
@@ -273,7 +297,9 @@
 	handle @dgxmm {
 		# Liveness for Gatus and Homepage without a session: DGXMM's SPA shell (static HTML, no API, no data).
 		handle /dgxmm/healthz {
-			reverse_proxy 10.100.136.1:8090
+			reverse_proxy 10.100.136.1:8090 {
+				import strip_session_cookie
+			}
 		}
 		handle {
 			route {
@@ -292,6 +318,7 @@
 	@ha host ha.nghodki.ai
 	handle @ha {
 		reverse_proxy 192.168.86.211:8123 {
+			import strip_session_cookie
 			header_up X-Real-IP {remote_host}
 			flush_interval -1
 		}
@@ -302,6 +329,7 @@
 	@webui host webui.nghodki.ai
 	handle @webui {
 		reverse_proxy 10.43.0.130:8080 100.65.137.82:3100 {
+			import strip_session_cookie
 			lb_policy first
 			lb_try_duration 5s
 			health_uri /health

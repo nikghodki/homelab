@@ -91,8 +91,9 @@ clients.
   ID is down, signed-in sessions work until their next hourly refresh; new sign-ins fail.
 - The session cookie goes to every `*.nghodki.ai` backend, including routes not behind sign-in (Home Assistant, Open
   WebUI, ...); the signed-in routes strip it. A compromised backend could replay it through the door for up to 7
-  days. Acceptable for one admin on a home network; rotating the cookie secret signs everyone out. Stripping it on
-  every route is a one-line follow-up in `(nghodki_routes)`.
+  days. Acceptable for one admin on a home network; rotating the cookie secret signs everyone out. **Done
+  2026-11-16:** every backend proxy imports `strip_session_cookie`, so no backend receives `_edge_auth*` any more
+  (only edge-auth's own routes keep it).
 - The edge origin token travels in clear over the LAN from the Sparks to the Dell/dgx-2, as the session cookies did
   before (Caddy → oauth2-proxy was plain HTTP too). Anyone who can read LAN traffic and take the token can bypass
   sign-in for these four apps; rotate it (runbooks/sign-in.md) if a LAN device is suspect.
