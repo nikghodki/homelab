@@ -66,16 +66,17 @@ prompts, datasets, endpoints, AI dependencies, secrets). Decision 0003; runbooks
 | Install | `/opt/cisco-aibom/venv` from `.github/requirements-aibom.txt` (same universal lock as CI; rebuilt when the lock changes) |
 | Unit | `cisco-aibom.timer` (~04:20 + up to 20 min; Jetson 01:30), `cisco-aibom.service` as root but read-only: `CapabilityBoundingSet=CAP_DAC_READ_SEARCH`, `ProtectSystem=strict`, `ProtectHome=read-only`, `Nice=19`, idle I/O, `OOMPolicy=continue` |
 | Memory cap | Sparks 6G (`group_vars/sparks.yml`), Jetson 3G, Pi 1500M, default 4G |
-| Memory guard | Sparks: skip an image target when MemAvailable is under 20 GiB (`aibom.skipped`). Code dirs always scanned |
-| Remote images | The Jetson runs code-dir scans only; dgx-2 scans its images by digest (`cisco_aibom_remote_images`) and reports them as `host: jetson`, `scanned_on: dgx-2` |
+| Memory guard | Sparks: skip an image or remote code-dir target when MemAvailable is under 20 GiB (`aibom.skipped`). Local code dirs always scanned |
+| Remote images | The Jetson runs no image scans; dgx-2 scans its images by digest (`cisco_aibom_remote_images`) and reports them as `host: jetson`, `scanned_on: dgx-2` |
+| Remote code dirs | dgx-2 copies the Jetson's two Hermes checkouts before each run (rsync over SSH from a read-only, forced-command rsync daemon on the Jetson; secrets, `.env` files, venvs and `node_modules` excluded on both ends, lockfiles kept) and scans the copy under its memory guard, reported as `host: jetson`, `scanned_on: dgx-2`, with the commit (`cisco_aibom_remote_dirs`, `cisco_aibom_mirror_modules`) |
 | Reports | `/var/lib/cisco-aibom/<host>-<date>.json`, root only, 30 days |
 | Summary | journal, `SyslogIdentifier=cisco-aibom` → Loki → Grafana "AI inventory" |
 
 | Host | Code dirs | Container images |
 |---|---|---|
-| dgx-1 | `~/workspace/dgx-model-manager`, `/opt/homelab/litellm` | `litellm-proxy`, `open-webui` (both stopped since their move into k3s, 2026-11-16) |
-| dgx-2 | — | `observe-phoenix-1` |
-| Jetson | both Hermes checkouts, `~/workspace/roboclaw` | — |
+| dgx-1 | `~/workspace/dgx-model-manager`, `/opt/homelab/litellm` | none (LiteLLM and Open WebUI are in k3s; their images not scanned yet) |
+| dgx-2 | the Jetson's two Hermes checkouts (copies) | `observe-phoenix-1`, the Jetson's Home Assistant (by digest) |
+| Jetson | `~/workspace/roboclaw` | — |
 | Pi | `/var/lib/picoclaw/.picoclaw`, `/var/lib/picoclaw/roboclaw`, `~/workspace/roboclaw` | — |
 
 Per host, not central: secrets found in scanned code never leave the host; only counts and names go to Loki (secret

@@ -1,0 +1,32 @@
+# Other hosts' code dirs, copied here (cisco_aibom_remote_dirs): this host's key and their pinned host keys
+- name: Remote code dirs name modules their hosts serve
+  ansible.builtin.assert:
+    that:
+      - item.host != inventory_hostname
+      - hostvars[item.host].cisco_aibom_mirror_modules | default([]) | selectattr('name', 'equalto', item.name) | list | length == 1
+    fail_msg: "{{ item.host }} serves no module {{ item.name }} (cisco_aibom_mirror_modules), or it is this host"
+    quiet: true
+  loop: "{{ cisco_aibom_remote_dirs }}"
+
+- name: SSH key for copying other hosts' code dirs (made here, never leaves this host)
+  ansible.builtin.command:
+    cmd: ssh-keygen -q -t ed25519 -N "" -C "cisco-aibom-mirror@{{ inventory_hostname }}" -f {{ cisco_aibom_mirror_key }}
+    creates: "{{ cisco_aibom_mirror_key }}"
+
+- name: Host keys of the hosts copied from (read from each host, not scanned over the network)
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_ed25519_key.pub
+  delegate_to: "{{ item }}"
+  loop: "{{ cisco_aibom_remote_dirs | map(attribute='host') | unique | list }}"
+  register: cisco_aibom_mirror_hostkeys
+
+- name: Pinned known_hosts for the copies
+  ansible.builtin.copy:
+    dest: /etc/cisco-aibom/mirror_known_hosts
+    content: |
+      {% for r in cisco_aibom_mirror_hostkeys.results %}
+      {{ hostvars[r.item].ansible_host }} {{ (r.content | b64decode).split()[:2] | join(' ') }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: "0644"

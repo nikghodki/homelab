@@ -17,9 +17,9 @@ secrets. Decision: decisions/0003-cisco-ai-defense-tools.md.
 
 | Host | Code dirs (read in place) | Container images (of the running containers) |
 |---|---|---|
-| dgx-1 | DGXMM `~/workspace/dgx-model-manager`, LiteLLM stack `/opt/homelab/litellm` | `litellm-proxy`, `open-webui` |
-| dgx-2 | — | `observe-phoenix-1`; and the **Jetson's** Home Assistant image by digest (below) |
-| jetson | Hermes `~nikjetson/.hermes/hermes-agent`, Hermes `~hermes-nikhil/.hermes/hermes-agent`, `~/workspace/roboclaw` | none here (`cisco_aibom_image_scans: false`); scanned on dgx-2 |
+| dgx-1 | DGXMM `~/workspace/dgx-model-manager`, LiteLLM stack `/opt/homelab/litellm` | none since LiteLLM and Open WebUI moved to k3s (2026-11-16); their k3s images are not scanned yet |
+| dgx-2 | the **Jetson's** two Hermes checkouts, from a local copy (below) | `observe-phoenix-1`; and the **Jetson's** Home Assistant image by digest (below) |
+| jetson | `~/workspace/roboclaw` (the Hermes checkouts are scanned on dgx-2) | none here (`cisco_aibom_image_scans: false`); scanned on dgx-2 |
 | pi | PicoClaw `/var/lib/picoclaw/.picoclaw` (config, workspace, skills) and its MCP server `/var/lib/picoclaw/roboclaw` (own user since 2026-11-15, runbooks/robot-safety.md), `~/workspace/roboclaw` | — |
 
 ### Another host's images, scanned on dgx-2
@@ -46,8 +46,64 @@ Jetson's: `/var/lib/cisco-aibom/jetson-<date>.json` **on dgx-2**, journal lines 
 under `jetson`. Remote images must be pinned by digest (the role and the job both refuse a tag).
 
 First run, 2026-11-15: Home Assistant 2026.11.1 took 57 min on dgx-2 (docker-cp fallback, ~10,900 Python files),
-314 components, 1.3G cgroup peak. The Jetson's own code-dir scans peak at ~1.24 GB RSS, and each Hermes checkout
-hits the 3 h limit there; moving those to dgx-2 is the next step.
+314 components, 1.3G cgroup peak.
+
+### Another host's code dirs, copied to dgx-2
+
+The Jetson's Hermes checkouts (~8,000 Python files each) never finished there: each hit the 3 h limit, a run took over
+6 h and peaked at ~1.2 GB RSS (1.5G cgroup) on the 8 GB Orin. Since 2026-11-16 dgx-2 copies them and scans the copy:
+
+```yaml
+# host_vars/dgx-2.yml
+cisco_aibom_remote_dirs:
+  - {host: jetson, name: hermes-agent}                 # a module the Jetson serves (below)
+  - {host: jetson, name: hermes-agent-hermes-nikhil}
+# host_vars/jetson.yml
+cisco_aibom_mirror_modules:
+  - {name: hermes-agent, path: /home/nikjetson/.hermes/hermes-agent, owner: nikjetson, excludes: [...]}
+  - {name: hermes-agent-hermes-nikhil, path: /home/hermes-nikhil/.hermes/hermes-agent, owner: hermes-nikhil, excludes: [...]}
+```
+
+- **Copy, not git.** Both checkouts are at upstream commit `97a9ae8` but have ~240 plugin files deleted locally
+  (Hermes' own setup), so a `git fetch` of the commit would scan code that doesn't run. The copy is the working tree
+  as it is; its `.git/HEAD` and branch refs come along, so each result records `commit`.
+- **Each run refreshes the copy first**: `rsync -rt --delete --delete-excluded` into
+  `/var/lib/cisco-aibom/mirror/jetson/<name>` (root 0700), regular files only (no symlinks, owners or devices).
+  Refresh failures are the target's error; a stale copy is never scanned. The first copy took ~16 min over the
+  Jetson's Wi-Fi, later ones only send changes. Copies of dirs no longer configured are deleted.
+- **Read-only on the Jetson.** dgx-2's key (`/etc/cisco-aibom/mirror_ed25519`, made on dgx-2, never leaves it) is
+  installed for the system user `aibom-mirror` with `restrict,from="192.168.86.36",command=...`: it can only start
+  `/usr/local/sbin/cisco-aibom-mirror-rsyncd` (sudo, that exact command), an rsync daemon on stdin/stdout with
+  `/etc/cisco-aibom/mirror-rsyncd.conf`: `read only`, `use chroot`, `list = no`, each module read as its owner, at
+  nice 19 / idle I/O. No port is opened. dgx-2 pins the Jetson's host key (read from the Jetson by Ansible).
+- **Secrets stay on the Jetson.** The exclusions (`cisco_aibom_mirror_excludes` + the module's `excludes`) are
+  enforced by the daemon (its `filter`: the client can't even ask for them) and again by the client; then the job
+  checks the copy's file names and, on any hit, deletes the copy and fails the target. Excluded: `.env`, `.env.*`,
+  `*.env`, `.envrc`, `*.key`, `*.pem`, `*.p12`, `*.pfx`, keystores, `id_*` keys, `.netrc`, `.npmrc`, `.pypirc`,
+  `.git-credentials`, `auth.json`, `credentials.json`, `token.json`, `*.token`, `secrets.{yaml,yml,json,toml}`,
+  databases and logs, `venv/`, `.venv/`, `node_modules/`, `__pycache__/`, `*.egg-info/`, `dist/`, `build/`, all of
+  `.git` but HEAD and refs, and Hermes' git-ignored local state (`/.hermes/`, `install-stamp.json`, the built web UI).
+  Lockfiles and manifests stay (AIBOM skips venvs, `node_modules`, `dist` and `build` itself, so leaving them out
+  changes no result). Check of 2026-11-16, by name only: the served tree is the git-tracked files minus the excluded
+  `.env.example`, `.envrc`, two `.npmrc`, plus `.git` HEAD/refs and `ui-tui/dist` (since excluded); no `.env`, key or
+  token file; Hermes keeps its config and secrets in `~/.hermes`, outside the checkout.
+- **Same memory guard as images**: `MemoryMax=6G`, and the target is skipped under `cisco_aibom_image_min_mem_gib`
+  (20 GiB on the Sparks; per-name override in `cisco_aibom_image_min_mem_gib_by_container`).
+- Results are the Jetson's, like its image: `jetson-<date>.json` on dgx-2 and journal lines with `"host": "jetson"`,
+  `"scanned_on": "dgx-2"`; entries have `"method": "remote-copy"`, `source` (`aibom-mirror@192.168.86.211::<name>`),
+  `copy` and `commit`.
+
+```bash
+# what the Jetson serves (names only), from dgx-2
+sudo rsync -r --list-only -e "ssh -i /etc/cisco-aibom/mirror_ed25519 -o UserKnownHostsFile=/etc/cisco-aibom/mirror_known_hosts" \
+  aibom-mirror@192.168.86.211::hermes-agent/ | wc -l
+# the scanned commit and method
+sudo python3 -c 'import json,glob; d=json.load(open(sorted(glob.glob("/var/lib/cisco-aibom/jetson-*.json"))[-1])); [print(n, t.get("method"), t.get("commit"), t.get("status")) for n, t in d["targets"].items()]'
+```
+
+To add a dir: a module in the serving host's `cisco_aibom_mirror_modules`, an entry in the scanning host's
+`cisco_aibom_remote_dirs`, then `playbooks/aibom.yml` on both (the scanning host first makes its key; the serving host
+then installs it).
 
 Not scanned remotely: `ros-zenoh` (built on the Jetson from a digest-pinned base, no registry digest, no AI
 components). The Pi runs no containers.
@@ -101,8 +157,8 @@ A loaded model can use most of a Spark's unified (CPU+GPU) memory; both Sparks c
 grep MemAvailable /proc/meminfo
 sudo journalctl -t cisco-aibom --since today -o cat | grep -E '"aibom.skipped"|"event": "aibom"'
 ```
-Each Hermes checkout on the Jetson is about 8,000 Python files and takes over an hour on the Orin, so the Jetson
-starts at 01:30 with a 3 h limit per target.
+dgx-2's run (its own container, the Jetson's two Hermes copies and its Home Assistant image) has a 3 h limit per
+target and 10 h in all. The Jetson only scans `roboclaw` now (1 h default limit, 01:30).
 
 ```bash
 # the Jetson's images, scanned on dgx-2

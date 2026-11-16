@@ -91,6 +91,14 @@
         state: absent
       when: cisco_aibom_llm_api_key | length == 0
 
+    - name: Copies of other hosts' code dirs (runbooks/aibom.md)
+      ansible.builtin.include_tasks: mirror_client.yml
+      when: cisco_aibom_remote_dirs | length > 0
+
+    - name: This host's code dirs, served read-only for those copies
+      ansible.builtin.include_tasks: mirror_server.yml
+      when: cisco_aibom_mirror_modules | length > 0
+
     - name: Service and timer
       ansible.builtin.template:
         src: "{{ item }}.j2"

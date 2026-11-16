@@ -36,7 +36,8 @@ k3s pods here since 2026-11-16 (P3.7): Pocket ID (`console/pocket-id`, pinned: i
 the primary of LiteLLM's CNPG cluster `data/litellm-db` (preferred placement) and one of the two LiteLLM proxy pods.
 
 systemd: `k3s` (server, `cluster-init`), `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `earlyoom` and
-`gpu-oom-guard` (`roles/memory_guard`, as on dgx-1). Timers: `cisco-aibom`, `lynis-audit`, `homelab-backup`,
+`gpu-oom-guard` (`roles/memory_guard`, as on dgx-1). Timers: `cisco-aibom` (also the Jetson's Hermes checkouts, copied
+here first, and its Home Assistant image), `lynis-audit`, `homelab-backup`,
 `homelab-backup-prune` (Sunday 05:00).
 
 ## Memory

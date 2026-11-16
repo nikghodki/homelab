@@ -27,18 +27,31 @@ restic_backup_sqlite:
   - {name: home-assistant, path: /home/nikjetson/homeassistant/config/home-assistant_v2.db}
 # Cisco AIBOM (runbooks/aibom.md); DefenseClaw's own AIBOM above keeps running next to it
 cisco_aibom_enabled: true
-# Code dirs only. No image scans here (one took ~1.1 GiB with ~3 GiB free): dgx-2 scans this host's images by digest
-# (cisco_aibom_remote_images in host_vars/dgx-2.yml), reported as host "jetson".
+# Small code dirs only. The Hermes checkouts (~8,000 Python files each: over 3 h per checkout and ~1.2 GB RSS here)
+# and this host's images are scanned on dgx-2 (cisco_aibom_remote_dirs / cisco_aibom_remote_images in
+# host_vars/dgx-2.yml), reported as host "jetson".
 cisco_aibom_image_scans: false
 cisco_aibom_memory_max: 3G
-# Each Hermes checkout is ~8,000 Python files: over an hour per install on the Orin, so start early
 cisco_aibom_time: "*-*-* 01:30:00"
-cisco_aibom_timeout_s: 10800
-cisco_aibom_unit_timeout: 10h
 cisco_aibom_dirs:
-  - {name: hermes-agent, path: /home/nikjetson/.hermes/hermes-agent}
-  - {name: hermes-agent-hermes-nikhil, path: /home/hermes-nikhil/.hermes/hermes-agent}
   - {name: roboclaw, path: /home/nikjetson/workspace/roboclaw}
+# Served read-only to dgx-2, which copies them before each scan (runbooks/aibom.md "Another host's code dirs").
+# Besides the role's exclusions: Hermes' git-ignored local state (installer stamps, the built web UI, shims).
+cisco_aibom_mirror_hermes_excludes:
+  - /.hermes/
+  - /install-stamp.json
+  - /.bytecode-fingerprint
+  - /.web_ui_build.lock
+  - /hermes_cli/web_dist/
+cisco_aibom_mirror_modules:
+  - name: hermes-agent
+    path: /home/nikjetson/.hermes/hermes-agent
+    owner: nikjetson
+    excludes: "{{ cisco_aibom_mirror_hermes_excludes }}"
+  - name: hermes-agent-hermes-nikhil
+    path: /home/hermes-nikhil/.hermes/hermes-agent
+    owner: hermes-nikhil
+    excludes: "{{ cisco_aibom_mirror_hermes_excludes }}"
 # k3s (plan P3.2, design D2): etcd member + tainted worker. Memory is tight (Hermes x2, Home Assistant, LiveKit, ...).
 k3s_role: server
 k3s_etcd_only: true

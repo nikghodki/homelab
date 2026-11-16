@@ -10,6 +10,64 @@ cisco_aibom_image_scans: true
 # [{host: jetson, name: homeassistant, image: "repo:tag@sha256:...", paths: [/usr/src/homeassistant]}]
 # `paths`: extra dirs for the docker-cp fallback (containerd image store; the working dir, /app, /opt, /srv always).
 cisco_aibom_remote_images: []
+# Other hosts' code dirs, copied here and scanned here; reported as that host's (`host`, `scanned_on`), under the
+# same memory guard as image targets (threshold keyed by `name`). [{host: jetson, name: hermes-agent}]: `name` is a
+# module that host serves (cisco_aibom_mirror_modules there). Each run refreshes the copy first: rsync over SSH
+# (this host's own key, the other host's pinned host key) from a read-only rsync daemon, into
+# <state>/mirror/<host>/<name>. Regular files only; the exclusions below are applied by both ends.
+cisco_aibom_remote_dirs: []
+cisco_aibom_mirror_key: /etc/cisco-aibom/mirror_ed25519
+cisco_aibom_mirror_timeout_s: 1800
+# Serving side: code dirs other hosts may copy, read-only, each read as its owner. [{name, path, owner, excludes}]
+# (`excludes`: extra rsync patterns for this dir). The SSH key of each host that lists one of them in
+# cisco_aibom_remote_dirs is installed for `cisco_aibom_mirror_user`, with a forced command (the daemon) only.
+cisco_aibom_mirror_modules: []
+cisco_aibom_mirror_user: aibom-mirror
+# Never copied (rsync patterns, any depth unless anchored with "/"). File patterns (no "/") are also checked on the
+# copy: a hit deletes it and fails the target. Lockfiles and manifests stay; AIBOM skips venvs and node_modules
+# itself, so leaving them out changes no result.
+cisco_aibom_mirror_excludes:
+  # secrets and credentials (by name; values are never looked at)
+  - .env
+  - .env.*
+  - "*.env"
+  - .envrc
+  - "*.key"
+  - "*.pem"
+  - "*.p12"
+  - "*.pfx"
+  - "*.jks"
+  - "*.keystore"
+  - "id_rsa*"
+  - "id_ecdsa*"
+  - "id_ed25519*"
+  - .netrc
+  - .npmrc
+  - .pypirc
+  - .git-credentials
+  - auth.json
+  - credentials.json
+  - token.json
+  - "*.token"
+  - "secrets.y*ml"
+  - secrets.json
+  - secrets.toml
+  # runtime state and logs
+  - "*.db"
+  - "*.db-*"
+  - "*.sqlite"
+  - "*.sqlite3"
+  - "*.log"
+  # environments and caches
+  - venv/
+  - .venv/
+  - node_modules/
+  - __pycache__/
+  - "*.pyc"
+  - "*.egg-info/"
+  # build output (AIBOM skips dist/ and build/ too; a bundle can inline build-time values)
+  - dist/
+  - build/
 cisco_aibom_time: "*-*-* 04:20:00"
 cisco_aibom_keep_days: 30
 cisco_aibom_memory_max: 4G   # systemd MemoryMax of the unit (the Sparks: 6G, group_vars/sparks.yml)
