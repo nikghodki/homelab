@@ -64,10 +64,12 @@ def test_render_never_contains_more_than_hash8_and_escapes_labels():
 def test_sql_cuts_the_hash_and_reads_no_prompts():
     for sql in (ex.KEYS_SQL, ex.RECENT_SQL, ex.DAY_SQL):
         assert "messages" not in sql and "response" not in sql and "proxy_server_request" not in sql
-    assert "left(token, 8)" in ex.KEYS_SQL and "~ '^[0-9a-f]{64}$'" in ex.KEYS_SQL
-    assert ex.KEYS_SQL.replace(ex.HASH8.format(col="token"), "").count("token") == 0  # the full hash never
+    cut = {"token": "case when token ~ '^[0-9a-f]{64}$' then left(token, 8) when coalesce(token, '') <> '' then 'nonhash' end",
+           "api_key": "case when api_key ~ '^[0-9a-f]{64}$' then left(api_key, 8) "
+                      "when coalesce(api_key, '') <> '' then 'nonhash' end"}
+    assert cut["token"] in ex.KEYS_SQL and ex.KEYS_SQL.replace(cut["token"], "").count("token") == 0
     for sql in (ex.RECENT_SQL, ex.DAY_SQL):
-        assert "left(api_key, 8)" in sql and sql.replace(ex.HASH8.format(col="api_key"), "").count(" api_key") == 0
+        assert cut["api_key"] in sql and sql.replace(cut["api_key"], "").count(" api_key") == 0
 
 
 def test_source_names_the_calling_host():

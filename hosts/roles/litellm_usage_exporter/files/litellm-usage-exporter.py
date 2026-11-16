@@ -36,17 +36,24 @@ SRC_NODES = dict(kv.split("=", 1) for kv in os.environ.get(
 LOCAL_NAME = os.environ.get("SRC_LOCAL", "dgx-1 (local)")
 BUCKETS = (0.25, 0.5, 1, 2.5, 5, 10, 20, 30, 60, 120, 300, 600)
 
-HASH8 = ("case when {col} ~ '^[0-9a-f]{{64}}$' then left({col}, 8) "
-         "when coalesce({col}, '') <> '' then 'nonhash' end")
-KEYS_SQL = f'select key_alias, {HASH8.format(col="token")} from "LiteLLM_VerificationToken"'
-COLS = (f"request_id, metadata->>'user_api_key_alias', {HASH8.format(col='api_key')}, model_group, status, "
-        "prompt_tokens, completion_tokens, request_duration_ms, "
-        'extract(epoch from ("endTime" - "startTime")) * 1000, requester_ip_address')
+# Key hashes are cut to their first 8 hex digits in SQL; a value that isn't a 64-digit hex hash becomes 'nonhash'.
+# Plain string constants (no formatting): the only parameter is the look-back, passed to execute().
+KEYS_SQL = ("select key_alias, case when token ~ '^[0-9a-f]{64}$' then left(token, 8) "
+            "when coalesce(token, '') <> '' then 'nonhash' end "
+            'from "LiteLLM_VerificationToken"')
 # startTime is UTC without a time zone (LiteLLM writes it so)
-RECENT_SQL = (f'select {COLS} from "LiteLLM_SpendLogs" '
+RECENT_SQL = ("select request_id, metadata->>'user_api_key_alias', "
+              "case when api_key ~ '^[0-9a-f]{64}$' then left(api_key, 8) "
+              "when coalesce(api_key, '') <> '' then 'nonhash' end, "
+              "model_group, status, prompt_tokens, completion_tokens, request_duration_ms, "
+              'extract(epoch from ("endTime" - "startTime")) * 1000, requester_ip_address '
+              'from "LiteLLM_SpendLogs" '
               "where \"startTime\" > (now() at time zone 'utc') - make_interval(secs => %s)")
-DAY_SQL = (f"select metadata->>'user_api_key_alias', {HASH8.format(col='api_key')}, model_group, status, "
-           "requester_ip_address, count(*), coalesce(sum(prompt_tokens), 0), coalesce(sum(completion_tokens), 0) "
+DAY_SQL = ("select metadata->>'user_api_key_alias', "
+           "case when api_key ~ '^[0-9a-f]{64}$' then left(api_key, 8) "
+           "when coalesce(api_key, '') <> '' then 'nonhash' end, "
+           "model_group, status, requester_ip_address, count(*), "
+           "coalesce(sum(prompt_tokens), 0), coalesce(sum(completion_tokens), 0) "
            'from "LiteLLM_SpendLogs" '
            "where \"startTime\" > (now() at time zone 'utc') - interval '24 hours' group by 1, 2, 3, 4, 5")
 
