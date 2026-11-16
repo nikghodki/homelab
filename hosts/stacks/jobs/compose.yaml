@@ -22,6 +22,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    # Peak 131 MiB (cgroup, 2026-11-16).
+    mem_limit: 1g
 
   # Creates or upgrades the temporal and temporal_visibility schemas, then idles so that
   # `docker compose exec admin-tools temporal ...` works. Healthy once the schemas are current.
@@ -68,6 +70,8 @@ services:
       - "192.168.86.36:9233:9090"   # Prometheus metrics, scraped by VictoriaMetrics
     depends_on:
       admin-tools: {condition: service_healthy}
+    # Peak 123 MiB (cgroup, 2026-11-16). Room for the ops agent's workflows.
+    mem_limit: 1g
 
   ui:
     <<: *restart
