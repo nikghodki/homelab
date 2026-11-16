@@ -38,7 +38,7 @@
 
     - name: Fleet config keys
       vars:
-        defenseclaw_fleet_have: "{{ (defenseclaw_fleet_current.content | b64decode | from_yaml).fleet | default({}) }}"
+        defenseclaw_fleet_have: "{{ (defenseclaw_fleet_current.content | b64decode | from_yaml).fleet | default({}, true) }}"
       ansible.builtin.command:
         argv:
           - "{{ ansible_facts['env']['HOME'] }}/.local/bin/defenseclaw"
@@ -48,6 +48,6 @@
           - "{{ item.value | string | lower if item.value is boolean else item.value }}"
       loop: "{{ defenseclaw_fleet_config | dict2items }}"
       loop_control: {label: "fleet.{{ item.key }}"}
-      when: defenseclaw_fleet_have.get(item.key, false) != item.value
+      when: item.key not in defenseclaw_fleet_have or defenseclaw_fleet_have[item.key] != item.value
       changed_when: true
       notify: Restart DefenseClaw gateway
