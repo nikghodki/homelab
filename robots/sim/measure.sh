@@ -27,17 +27,20 @@ echo "job $name, log $log, samples $samples"
 echo "t_s,gpu_util_pct,job_gpu_mib,cgroup_mib,host_avail_gib" >"$samples"
 
 sample() {
-  # The container can exit between two commands here; a failed sample is skipped, not fatal.
-  local cid=$1 util pids gpu cgdir cg p avail
+  # The container can exit between two commands here; a failed read leaves its field empty. Nothing may fail inside
+  # $(( )): bash abandons the whole sampling loop on an arithmetic error, which also turned the watchdog off.
+  local cid=$1 util pids gpu cgdir cur pk cg="" avail
   util=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -1)
   pids="|$(docker top "$cid" -eo pid | tail -n +2 | tr '\n' '|')"
   gpu=$(nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader,nounits |
     awk -F', ' -v p="$pids" 'index(p, "|" $1 "|") {s += $2} END {print s + 0}')
   cgdir="/sys/fs/cgroup/system.slice/docker-${cid}.scope"
-  cg=$(($(cat "$cgdir/memory.current") / 1048576))
-  p=$(($(cat "$cgdir/memory.peak") / 1048576))
-  if [ "$p" -gt "$peak" ]; then peak=$p; fi
+  if cur=$(cat "$cgdir/memory.current") && [[ $cur =~ ^[0-9]+$ ]]; then cg=$((cur / 1048576)); fi
+  if pk=$(cat "$cgdir/memory.peak") && [[ $pk =~ ^[0-9]+$ ]] && ((pk / 1048576 > peak)); then
+    peak=$((pk / 1048576))
+  fi
   avail=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
+  [[ $avail =~ ^[0-9]+$ ]] || return 1
   echo "$(($(date +%s) - start)),$util,$gpu,$cg,$(echo "scale=1; $avail / 1048576" | bc)" >>"$samples"
   if [ "$avail" -lt "$min_avail_kib" ]; then
     echo "watchdog: MemAvailable below ${min_avail_gib} GiB, stopping $name" | tee -a "$log"
