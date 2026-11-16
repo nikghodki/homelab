@@ -1,0 +1,7 @@
+# Close Tailscale's UDP port on the kube-vip VIPs on both Sparks (runbooks/edge.md, known issues).
+# Always --check --diff first. Doesn't restart tailscaled.
+- name: Tailscale VIP guard
+  hosts: sparks
+  become: true
+  roles:
+    - role: tailscale_vip_guard

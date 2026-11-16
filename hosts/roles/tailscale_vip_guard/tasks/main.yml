@@ -1,0 +1,42 @@
+---
+# Tailscale never uses the kube-vip VIPs as a path to a Spark (runbooks/edge.md, known issues).
+# Loads its own nftables table; does not restart tailscaled.
+- name: Directory for the rule
+  ansible.builtin.file:
+    path: "{{ tailscale_vip_guard_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Rule file
+  ansible.builtin.template:
+    src: tailscale-vip-guard.nft.j2
+    dest: "{{ tailscale_vip_guard_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/nft -c -f %s
+  notify: Reload the VIP guard
+
+- name: Unit
+  ansible.builtin.template:
+    src: tailscale-vip-guard.service.j2
+    dest: /etc/systemd/system/tailscale-vip-guard.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: tailscale_vip_guard_unit
+  notify:
+    - Reload systemd
+    - Reload the VIP guard
+
+- name: Flush handlers (systemd sees the unit, the rule is current)
+  ansible.builtin.meta: flush_handlers
+
+- name: Unit is enabled and started
+  ansible.builtin.systemd_service:
+    name: tailscale-vip-guard.service
+    enabled: true
+    state: started
+  when: not (ansible_check_mode and tailscale_vip_guard_unit is changed)

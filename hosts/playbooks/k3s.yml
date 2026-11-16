@@ -37,3 +37,6 @@
 
 - name: Etcd leader stays on a Spark
   ansible.builtin.import_playbook: etcd-leader-pin.yml
+
+- name: No Tailscale paths over the kube-vip VIPs
+  ansible.builtin.import_playbook: tailscale-vip-guard.yml
