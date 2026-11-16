@@ -1,0 +1,18 @@
+# Host-side relays on dgx-1 for LiteLLM in k3s (runbooks/litellm.md "In k3s"): DGXMM's on-demand gateway and the
+# DefenseClaw gateway on the direct-cable address. Always --check --diff first.
+- name: LiteLLM bridges
+  hosts: litellm
+  become: true
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: litellm-bridges
+        compose_stack_src: "{{ playbook_dir }}/../stacks/litellm-bridges"
+  tasks:
+    - name: Both relays listen on the cable address
+      ansible.builtin.wait_for:
+        host: 10.100.136.1
+        port: "{{ item }}"
+        timeout: 30
+      loop: [8091, 18970]
+      when: not ansible_check_mode
