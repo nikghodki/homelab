@@ -5,7 +5,8 @@ receivers:
     scrapers:
       cpu: {}
       load: {}
-      memory: {}
+      # MemAvailable as system.linux.memory.available (vmalert FleetMemoryLow on GB10)
+      memory: {metrics: {system.linux.memory.available: {enabled: true}}}
       paging: {}
       network: {}
       processes: {}

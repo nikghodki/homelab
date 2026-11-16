@@ -5,8 +5,9 @@ groups:
       - alert: FleetHostSilent
         # lag() over a long window: an instant selector only sees samples inside the query step (5m), so a silent
         # host dropped out of `time() - timestamp(...)` before it reached 300 s and the alert could never fire.
-        # Resolves after a day of silence; the Gatus ssh checks still cover that.
-        expr: max by (host_name) (lag(system_memory_usage_bytes{state="used"}[1d])) > 300
+        # Resolves after a day of silence; the Gatus ssh checks still cover that. Inhibited while GatusHostDown fires
+        # for the same fleet_host (Gatus already pushed that the host is down: one push per outage).
+        expr: max by (host_name, fleet_host) (lag(system_memory_usage_bytes{state="used"}[1d])) > 300
         for: 2m
         labels: {severity: critical}
         annotations:
@@ -24,11 +25,29 @@ groups:
         annotations:
           summary: "{{ $labels.host_name }} {{ $labels.mountpoint }} is over 90% full"
       - alert: FleetMemoryLow
-        expr: system_memory_usage_bytes{state="free"} + ignoring(state) system_memory_usage_bytes{state="cached"} < 2e9
+        expr: system_memory_usage_bytes{state="free", fleet_host!~"dgx-.*"} + ignoring(state) system_memory_usage_bytes{state="cached", fleet_host!~"dgx-.*"} < 2e9
         for: 10m
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.host_name }} has under 2 GB free memory"
+      # GB10 (unified memory): the GPU allocates from system RAM. DGXMM plans with 8 GiB safety + 4 GiB OS reserve, so
+      # under 12 GiB MemAvailable a model or a growing service has eaten the margin. Warns before the memory guards act
+      # (earlyoom SIGTERM at 8 GiB, gpu-oom-guard at 6 GiB; roles/memory_guard, runbooks/memory-guard.md). MemAvailable
+      # from the host collector (system.linux.memory.available).
+      - alert: FleetMemoryLow
+        expr: system_linux_memory_available_bytes{fleet_host=~"dgx-.*"} < 12 * 2^30
+        for: 5m
+        labels: {severity: warning, hardware: gb10}
+        annotations:
+          summary: "{{ $labels.fleet_host }} has {{ $value | humanize1024 }}B MemAvailable, under the 12 GiB model margin (the OOM guards act at 8 and 6 GiB)"
+      # Gatus' "<host> ssh" check failing, as an alert that never pushes (Gatus pushes it itself). Only here so
+      # Alertmanager can inhibit FleetHostSilent for the same host (alertmanager.yml.j2).
+      - alert: GatusHostDown
+        expr: label_replace(gatus_results_endpoint_success{group="hosts", name=~".+ ssh"}, "fleet_host", "$1", "name", "(.+) ssh") == 0
+        for: 1m
+        labels: {severity: warning, paging: "false"}
+        annotations:
+          summary: "Gatus can't reach {{ $labels.fleet_host }} on ssh (Gatus pushes this one)"
   - name: fleet-thermal
     rules:
       - alert: FleetGpuHot
@@ -38,11 +57,28 @@ groups:
         annotations:
           summary: "{{ $labels.fleet_host }} GPU at {{ $value | humanize }}°C for 10 minutes"
       - alert: FleetHostHot
-        expr: max by (fleet_host) (fleet_temperature_celsius) > 85
+        expr: max by (fleet_host) (fleet_temperature_celsius{fleet_host!~"dgx-.*"}) > 85
         for: 10m
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.fleet_host }} hottest sensor at {{ $value | humanize }}°C for 10 minutes"
+      # GB10's acpitz runs hot under inference (median 58.8 °C, max 94.1 °C over 36 h; ACPI critical trip 104.8 °C), so
+      # 85 °C was 45 pending episodes in 36 h and no fire (infra review 2026-11 §3.6). Throttling is the real signal:
+      # FleetGpuThermalThrottling below.
+      - alert: FleetHostHot
+        expr: max by (fleet_host) (fleet_temperature_celsius{fleet_host=~"dgx-.*"}) > 95
+        for: 15m
+        labels: {severity: warning, hardware: gb10}
+        annotations:
+          summary: "{{ $labels.fleet_host }} hottest sensor at {{ $value | humanize }}°C for 15 minutes (GB10 critical trip 104.8 °C)"
+      # DCGM_FI_DEV_THERMAL_VIOLATION: ns of thermal clock slowdown since the driver loaded (enabled in stacks/gpu's
+      # counters file). dgx-1 had 5.7 s in its first 22.6 h, so 30 s within 15 min is sustained throttling.
+      - alert: FleetGpuThermalThrottling
+        expr: max by (fleet_host) (increase(DCGM_FI_DEV_THERMAL_VIOLATION[15m])) / 1e9 > 30
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.fleet_host }} GPU thermally throttled for {{ $value | humanize }} s in the last 15 min"
       - alert: FleetPiHot
         expr: max(fleet_temperature_celsius{fleet_host="pi"}) > 78
         for: 5m
@@ -57,9 +93,18 @@ groups:
           summary: "{{ $labels.fleet_host }} reports host metrics but no DCGM GPU metrics (gpu stack down?)"
   - name: fleet-stack
     rules:
+      # for: 10m: most 5-minute episodes were restarts during deploys (infra review 2026-11 §3.6).
       - alert: ObservabilityComponentDown
-        expr: up == 0
-        for: 5m
+        expr: up{job!~"grafana|temporal"} == 0
+        for: 10m
         labels: {severity: warning}
         annotations:
           summary: "{{ $labels.job }} ({{ $labels.instance }}) is not answering"
+      # Grafana and Temporal have Gatus checks on the Dell that push to ntfy themselves (decision 0009): this copy
+      # stays visible in Alertmanager and Grafana but doesn't push (paging=false, alertmanager.yml.j2).
+      - alert: ObservabilityComponentDown
+        expr: up{job=~"grafana|temporal"} == 0
+        for: 10m
+        labels: {severity: warning, paging: "false"}
+        annotations:
+          summary: "{{ $labels.job }} ({{ $labels.instance }}) is not answering (Gatus pushes this one)"

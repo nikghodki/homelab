@@ -23,10 +23,15 @@ route:
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 5m
+    # Copies of checks that Gatus on the Dell already pushes (paging="false" in the vmalert rules): one push per
+    # outage. They stay visible in Alertmanager and Grafana.
+    - matchers: ['paging="false"']
+      receiver: no-push
     - matchers: ['severity="critical"']
       receiver: ntfy-critical
       repeat_interval: 30m
 receivers:
+  - name: no-push
   - name: ntfy
     webhook_configs:
       - url: http://192.168.86.49:8085/fleet-alerts?template=alertmanager
@@ -54,6 +59,10 @@ receivers:
       - url: "https://ntfy.sh/{{ ntfy_sh_backup_topic }}?tpl=1&p=high&tags=warning&t=homelab&m=homelab%3A%20alert%20delivery%20failing"
         send_resolved: false
 inhibit_rules:
+  # Gatus already pushed "<host> ssh" down: no second push from FleetHostSilent for the same host.
+  - source_matchers: ['alertname="GatusHostDown"']
+    target_matchers: ['alertname="FleetHostSilent"']
+    equal: [fleet_host]
   - source_matchers: ['alertname="AlertingHostDown"']
     target_matchers: ['alertname="AlertDeliveryFailing"']
   - source_matchers: ['severity="critical"']
