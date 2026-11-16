@@ -66,9 +66,12 @@ configs:
 
 controller:
   replicas: 1
+  # Caches every resource in the cluster: ~350 MiB with this platform, OOM-killed at 512Mi during the first sync.
+  env:
+    - {name: GOMEMLIMIT, value: 600MiB}
   resources:
-    requests: {cpu: 100m, memory: 192Mi}
-    limits: {cpu: "1", memory: 512Mi}
+    requests: {cpu: 100m, memory: 384Mi}
+    limits: {cpu: "1", memory: 768Mi}
 
 repoServer:
   replicas: 1
