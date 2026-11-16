@@ -19,7 +19,6 @@ litellm-admin      edge
 controlcenter      edge
 dgxmanager         edge
 webui              edge
-coolify            edge
 ha                 edge
 grafana            edge
 status             edge

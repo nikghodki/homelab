@@ -39,7 +39,6 @@ devices without the CA still work over http. A few routes redirect themselves (b
 | `litellm-admin.nghodki.ai` | 100.65.137.82:4000 (LiteLLM on dgx-1, by its Tailscale IP) | LiteLLM UI login | no | Host header rewritten to the upstream |
 | `controlcenter.nghodki.ai` | 192.168.86.211:8200 (Jetson, RoboClaw control center) | none in Caddy (unverified in the app) | no | old :9119 route was dead |
 | `dgxmanager.nghodki.ai` | `/` → 302 `/dgxmm/`, then `nginx-gateway:80` → `dgxmm:8090` | none in Caddy (DGXMM UI; Pocket ID after the DGXMM session) | no | |
-| `coolify.nghodki.ai` | `/app/*` → 100.65.137.82:6001 (soketi), `/terminal/ws` → :6002, rest → :8000 | Coolify login | no | |
 | `webui.nghodki.ai` | 100.65.137.82:3100 (Open WebUI) | Open WebUI accounts | no | 30 min timeouts for streaming |
 | `ha.nghodki.ai` | no Caddy route: falls through to `nginx-gateway`, whose `ha.nghodki.ai` server proxies to 192.168.86.211:8123 | Home Assistant login | no | HA trusts proxies 192.168.86.44 and 100.65.137.82 (P0.16) |
 | `voice-agent.nghodki.ai` | its own site block: `/rtc*`, `/twirp/*` → 100.65.137.82:7880; rest → `nginx-gateway` (voice page; `/token` → `host.docker.internal:7890`) | — | — | **Broken at check time**: nothing listens on dgx-1:7880 (LiveKit runs on the Jetson, 127.0.0.1:7880); `/rtc` returned 502 |

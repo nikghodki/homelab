@@ -64,7 +64,7 @@ Numbers marked "est." are estimates, not measurements.
 │ DGXMM (owns GPU): robot-fast, guard, embed, stt,    │ │ DGXMM (owns GPU): batch, evals, fine-tune, Isaac    │
 │   tts (always on); smart, vision, coder (on demand) │ │   Lab/Sim, MuJoCo; fallback smart, robot-fast       │
 │ LiteLLM replica · DefenseClaw guardrail plugin      │ │ LiteLLM replica · Postgres primary (CNPG)           │
-│ NATS · DNS + proxy replica · Open WebUI · Coolify   │ │ NATS · DNS + proxy replica · Argo CD · Temporal     │
+│ NATS · DNS + proxy replica · Open WebUI             │ │ NATS · DNS + proxy replica · Argo CD · Temporal     │
 │ Postgres standby · OTel Collector · Tetragon        │ │ VictoriaMetrics · Loki · Tempo · Grafana · Phoenix  │
 │ DefenseClaw managed + Fleet gateway (host)          │ │ Gatus · ntfy · SeaweedFS · MLflow · Pocket ID       │
 │ Fleet broker (Mosquitto) + API proxy · dcgm-exp.    │ │ ARC runner · OTel · Tetragon · restic · dcgm-exp.   │
@@ -141,7 +141,7 @@ unless noted. P3.7 moves each into its k3s namespace and removes the Docker copy
 | LiteLLM | dgx-1 | `litellm-proxy` v1.109.1 + Postgres + Redis (hand-run, not in the repo) | `models` (2 replicas); Postgres → `data` (CNPG); Redis → `models` |
 | Open WebUI | dgx-1 | `open-webui` v0.13.3 (hand-run, not in the repo) | `agents` or `models` (decide in P3.7) |
 
-Not moved: DGXMM and its engines (§3.2). Coolify stays a host app.
+Not moved: DGXMM and its engines (§3.2). Coolify was retired on 2026-11-15 (decision 0010), not moved.
 
 ## 4. Network
 

@@ -108,7 +108,8 @@ kube-state-metrics 13 MiB: **~105 MiB** in total. Requests 240 Mi, limits 960 Mi
 
 **Retired since** (2026-11-15, by the user, on both doors): `voice-agent.nghodki.ai` (its Caddy site and DNS
 records; the comparison now covers 17 routes and 26 names). Nothing for the retired Jetson vision service was ever
-routed.
+routed. `coolify.nghodki.ai` (its Caddy site and DNS records), with Coolify itself (decision 0010): 16 routes and 25
+names.
 
 ## Alternatives considered
 

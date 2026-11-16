@@ -278,6 +278,8 @@ Each entry: the overlap, the recommendation, the tradeoff.
   177 MiB, a Postgres 15, a Redis 7.4 (RSAL/SSPL), a `coolify.nghodki.ai` route and an attack surface. If you want a
   "deploy an app from a repo" button later, an Argo CD Application per app (or Argo CD's UI "New App") covers it.
 - **Tradeoff.** Losing a PaaS UI you don't use. Export `/data/coolify` before removing it.
+- **Done 2026-11-15** ([decision 0010](../../decisions/0010-retire-coolify.md)): retired on your decision, with no
+  export kept (you chose not to keep its data).
 
 ### 2.9 fleet-metrics vs node_exporter + jetson-stats + dcgm
 - **Overlap.** CPU/memory/disk overlap with the OTel `hostmetrics` receiver; GPU overlaps with dcgm-exporter.
@@ -552,7 +554,7 @@ MuJoCo, LiveKit, Hermes, picoclaw, ROS 2 + Zenoh, Home Assistant, restic, CNPG, 
 
 ### 5.5 Needs your decision
 
-1. Retire Coolify (#2).
+1. Retire Coolify (#2). Decided and done 2026-11-15 (decision 0010).
 2. Temporal's future: keep for P6.6 or move to Argo Workflows; stop it until then? (#10)
 3. When to retire Homepage (#11).
 4. One DefenseClaw gateway per Jetson host vs one per Hermes user (#12).
