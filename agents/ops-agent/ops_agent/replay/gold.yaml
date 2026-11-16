@@ -1,0 +1,342 @@
+# Gold set for the A0 replay (docs/ambient-agent-design.md §11.2, §11.3). Written 2026-11-16 from the repo, the user's
+# facts and the observability data (VictoriaMetrics, Loki, GitHub API, read-only host reads). All times UTC.
+# trigger.at + as_of_minutes is the replay clock. frozen = recorded outputs for live-only host commands
+# ("host:command" or "host:verb"); only real captured lines or text from the repo docs, marked as such.
+
+- id: G1
+  title: GPU/unified-memory OOM took both Sparks down (2026-11-15)
+  trigger:
+    source: manual
+    at: "2026-11-15T23:05:00Z"
+    labels: {}
+    report: "Both Sparks froze around 14:45 PST and I had to hard-reset them; no alert reached my phone. What happened?"
+    summary: Both DGX Sparks hung and were hard-reset; no alert arrived
+  as_of_minutes: 20
+  frozen:
+    "dgx-1:kernel-prev": |
+      [journalctl -k -b -1 on dgx-1 (boot 2026-11-14 18:49:25 PST .. 2026-11-15 14:51:28 PST), captured 2026-11-16; relevant lines only]
+      2026-11-15T14:46:14-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:46:19-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:46:20-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:46:21-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:46:22-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:46:29-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:46:52-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:49:03-08:00 spark-83dc kernel: redis-server invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+      2026-11-15T14:49:03-08:00 spark-83dc kernel: Out of memory: Killed process 2555404 (chrome) total-vm:1522268804kB, anon-rss:20kB, file-rss:1652kB, shmem-rss:0kB, UID:1000 pgtables:1544kB oom_score_adj:300
+      2026-11-15T14:49:03-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:49:03-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from rmStatus @ system_mem.c:345
+      2026-11-15T14:49:05-08:00 spark-83dc kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T14:51:28-08:00 spark-83dc kernel: ansible-lint invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+      [journal ends here; next boot 2026-11-15 14:59:10 PST]
+    "dgx-2:kernel-prev": |
+      [dgx-2's journal no longer holds the crashed boot (journalctl --list-boots shows only the boot from 15:02:59 PST).
+       Kernel lines below are from Loki {host_name="nikghodki-dgx-2"}, which received nothing from dgx-2 after ~14:47 PST]
+      2026-11-15T22:41:27Z nikghodki-dgx-2 kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T22:41:27Z nikghodki-dgx-2 kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from rmStatus @ system_mem.c:356
+      2026-11-15T22:44:25Z nikghodki-dgx-2 kernel: NVRM: nvAssertOkFailedNoLog: Assertion failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from status @ kernel_graphics_context.c:1178
+      2026-11-15T22:46:19Z nikghodki-dgx-2 kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      2026-11-15T22:46:23Z nikghodki-dgx-2 kernel: NVRM: nvCheckOkFailedNoLog: Check failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from _memdescAllocInternal(pMemDesc) @ mem_desc.c:1359
+      [from incident-gpu-oom.md: 15:00:48 PST dgx-2 kernel "Tainted: [D]=DIE"; the journal ends; 15:02:59 PST dgx-2 boots again.
+       Also an earlier NVRM out-of-memory on dgx-2 at 2026-11-14 22:44 PST that the boot survived]
+  gold:
+    root_cause: >-
+      Model-engine and NCCL test work spanning both Sparks (the DGXMM session's two-Spark model work) exhausted the GB10
+      unified memory on both machines at the same time. GPU (CUDA) allocations come out of the same ~121 GiB pool as
+      every service and are not bounded by container memory limits, and no memory reserve was enforced (DGXMM P2.7
+      pending) and no guard killed the runaway GPU process. The NVIDIA driver logged NV_ERR_NO_MEMORY (dgx-2 from 22:41Z,
+      dgx-1 from 22:46Z), the kernel OOM killer fired on dgx-1 (22:49Z, 22:51Z) and both hosts hung and were hard-reset
+      (dgx-1 up 22:59Z, dgx-2 up 23:03Z). No alert reached the phone because Gatus, ntfy and Alertmanager all ran on
+      dgx-2, one of the failed hosts.
+    key_facts:
+      - "NVRM 'Out of memory [NV_ERR_NO_MEMORY]' on dgx-2 from 22:41:27Z and on dgx-1 from 22:46:14Z (2026-11-15)"
+      - "Both Sparks' fleet_memory_used_bytes rose in lockstep to ~112-114 GiB of ~121.7 GiB (92-94 %) at 22:44:30-22:45:00Z: one job across both Sparks, not two independent failures"
+      - "dgx-1's global OOM killer fired at 22:49:03Z (invoked by redis-server, killed chrome) and 22:51:28Z (ansible-lint); its journal ends 22:51:28Z; it boots again 22:59:10Z, dgx-2 at 23:02:59Z"
+      - "GB10 memory is unified; CUDA allocations are not covered by container/cgroup limits and no reserve was enforced"
+      - "No alert went out because the alerting path (Gatus, ntfy, Alertmanager, VictoriaMetrics) was on dgx-2, which was down"
+    wrong_answers:
+      - "The gpu-oom-guard kill at 23:19:35Z (a python3 holding 106666 MiB of GPU memory) caused the outage: it came after both reboots, the guard had only been installed at ~23:16Z, and the killed process was a deliberate allocate-until-3-GiB-left test loop"
+      - "A memory leak in redis-server, chrome or ansible-lint: they only invoked or were killed by the OOM killer"
+      - "A hardware, power or kernel bug on the Sparks unrelated to memory"
+    expected_fix: >-
+      PRs: bring memory_guard (earlyoom + gpu-oom-guard, live on both Sparks since ~23:16Z, the unit says 'Managed by
+      homelab Ansible (roles/memory_guard)' but no such role is in Git) into Ansible; an issue for the DGXMM memory
+      reserve (P2.7); note the alerting single point of failure (done later by #55/#60: alerting on the Dell, dead man).
+      Nothing live.
+  evidence_notes: >-
+    Verified: dgx-1 `journalctl --list-boots` (boot -1 = 2026-11-14 18:49:25 .. 2026-11-15 14:51:28 PST; boot 0 from
+    14:59:10 PST) and `journalctl -k -b -1` lines above (7 NVRM lines 14:46:14-14:46:52 PST plus 3 at 14:49:03-05; the doc's
+    'ten lines 14:46:14-14:46:22' is roughly right). dgx-2's journal has only the current boot (from 15:02:59 PST), so its
+    side comes from Loki and the doc. Loki: dgx-2 NVRM bursts at 22:41:27, 22:44:25 and 22:46:19-23Z, dgx-1 at 22:46:14Z;
+    both Sparks' log streams stop at ~22:46:30Z and resume after reboot (dgx-1 22:59Z, dgx-2 23:03Z). VictoriaMetrics:
+    fleet_memory_percent/used_bytes for dgx-1 and dgx-2 spike together at 22:42 (26-33 %) and 22:44:30-22:45:00Z (92-94 %),
+    then drop to ~5 %; series gap 22:48-23:00Z (dgx-1) / 22:48-23:04Z (dgx-2); count(gatus_results_endpoint_success) gap
+    22:55-23:10Z. No ALERTS series fired in the window (only ObservabilityComponentDown earlier at 10:12-10:31Z, unrelated),
+    hence a manual trigger. earlyoom + gpu-oom-guard start on dgx-2 23:15:54/23:16:08Z and dgx-1 23:16:47/23:16:53Z; the
+    23:19:35Z guard log prints the killed script's source (torch.empty 1 GiB chunks while MemAvailable > 3072 MiB).
+    Not verified: the exact owner/process of the GPU allocations (not in the logs; the doc names the DGXMM two-Spark work).
+
+- id: G2
+  title: MacBook Air's Claude Code gets ECONNREFUSED for model.nghodki.ai (stale /etc/hosts)
+  trigger:
+    source: manual
+    at: "2026-11-16T09:15:00Z"
+    labels: {}
+    report: "Claude Code on the MacBook Air can't reach model.nghodki.ai: connect ECONNREFUSED 100.78.145.123:443"
+    summary: Claude Code on the MacBook Air gets ECONNREFUSED connecting to model.nghodki.ai
+  as_of_minutes: 10
+  frozen:
+    "jetson:net": |
+      [excerpt of `ss -tlnH` on the Jetson, captured 2026-11-16 ~21:30Z (after the incident), listeners on :53/:80/:443 only]
+      127.0.0.53%lo:53
+      127.0.0.54:53
+      [nothing listens on :80 or :443]
+  gold:
+    root_cause: >-
+      Nothing on the fleet side is broken. The MacBook Air (outside the fleet, design D18) has a static /etc/hosts entry
+      that pins model.nghodki.ai to 100.78.145.123, the Jetson's Tailscale IP, where the front door used to run. The front
+      door is now the in-cluster Caddy on the Sparks (cut over by #79 at 02:39Z, old dgx-1 door stopped by #88/#92 by
+      04:06Z on 2026-11-16), and the Jetson listens on nothing at :443, so the Air's connection is refused before it ever
+      reaches the fleet. /etc/hosts overrides Tailscale's split DNS, which answers model.nghodki.ai with the Sparks'
+      Tailscale IPs. The fleet can't see this client-side failure: a refused connection never reaches Caddy.
+    key_facts:
+      - "100.78.145.123 is the Jetson's Tailscale IP (docs hosts/jetson.md); the Jetson serves nothing on :80/:443, hence ECONNREFUSED"
+      - "The live front door is edge-caddy in k3s (VIP 192.168.86.11 and both Sparks' Tailscale IPs); tailnet DNS answers each Spark's own Tailscale IP, never the Jetson's"
+      - "Gatus edge DNS (VIP, tailnet views), edge Caddy (VIP) and model.nghodki.ai (LiteLLM) were all green in the hour before the report"
+      - "A static /etc/hosts entry (or a resolver cache) on the client wins over Tailscale MagicDNS split DNS"
+      - "The Air is out of scope (D18): the fix is on the client; no fleet change"
+    wrong_answers:
+      - "The front door / LiteLLM is down or refusing connections"
+      - "Tailscale split DNS or CoreDNS is wrong and needs a fleet-side change"
+      - "Restart or restore the old front door (edge-caddy on dgx-1, or a Caddy on the Jetson)"
+    expected_fix: >-
+      Tell the user what to check on the Air: remove the model.nghodki.ai line from /etc/hosts, flush the resolver cache
+      (dscacheutil -flushcache; sudo killall -HUP mDNSResponder), confirm with `dscacheutil -q host -a name model.nghodki.ai`
+      and `curl -sv https://model.nghodki.ai/health/liveliness`. No fleet change, no PR.
+  evidence_notes: >-
+    Trigger time is chosen, not observed: the user's exact symptom time is unknown. In the front-door access log
+    ({service_name="edge-caddy"}, shipped since #102 at 06:06Z 11-16) the first macOS client requests appear at
+    09:28:26Z (curl/8.7.1 /health/liveliness and /v1/models, then claude-cli/2.1.325 claude-vscode /v1/messages at
+    09:31:20Z, api_key_hash 5baa2467), with none of that user agent earlier, consistent with the Air working once the hosts
+    entry was removed; it can't be proven to be the Air because remote_ip/client_ip are pod-network addresses (runbooks/edge.md).
+    The trigger (09:15Z) and as_of (09:25Z) are set before that first success. Gatus min over 08:25-09:25Z = 1 for edge
+    Caddy (VIP), edge DNS (VIP), edge DNS tailnet view (dgx-1/dgx-2), model.nghodki.ai (LiteLLM). Git: #72 edge in k3s
+    (02:17Z), #79 cutover (02:39Z), #88 relay retired (03:39Z), #92 old door stopped (04:06Z), all 2026-11-16 UTC.
+    The Jetson front-door era (Caddy + dnsmasq on the Jetson, moved to dgx-1's edge-gateway on 2026-11-12) is from the
+    user's notes, not the repo; the repo only knows the dgx-1 door as the 'old door'. The Jetson listener check is current,
+    not from the trigger time.
+
+- id: G3
+  title: ntfy alerts not reaching the phone (phone app without the nikhil user)
+  trigger:
+    source: manual
+    at: "2026-11-16T00:40:00Z"
+    labels: {}
+    report: "Grafana was down for a few minutes around 16:06 PST and my phone's ntfy app showed nothing. Are alerts working?"
+    summary: Alerts are not arriving on the phone's ntfy app
+  as_of_minutes: 20
+  frozen:
+    "dell:container-logs alerting-ntfy-1": |
+      [docker logs --timestamps alerting-ntfy-1 on the Dell up to 01:00Z, captured 2026-11-16; 69 'Server stats' lines
+       23:51-00:59Z condensed to the last one; the earlier stats lines all show subscribers=0]
+      2026/11/15 23:50:41 INFO Loaded usage of 0 key(s) in 0s (tag=limit)
+      2026/11/15 23:50:41 INFO Loaded 0 topic(s) in 0s (tag=topic)
+      2026/11/15 23:50:41 INFO Listening on :80[http], ntfy 2.38.0, log level is INFO (tag=startup)
+      2026/11/16 00:59:43 INFO Server stats (emails_received=0, emails_received_failure=0, emails_received_success=0, emails_sent=0, emails_sent_failure=0, emails_sent_success=0, messages_cached=6, messages_published=6, subscribers=0, tag=manager, topics_active=1, topics_unifiedpush=0, users=3, visitors=1)
+  gold:
+    root_cause: >-
+      The alert path up to ntfy works; the phone isn't subscribed with credentials. ntfy on the Dell (moved off dgx-2 by
+      #55, fresh container since 23:50:41Z) runs with auth-default-access deny-all and declarative users: `alerts`
+      (rw, publishes with its token) and `nikhil` (read-only on fleet-alerts, password ntfy_phone_password in
+      secrets/observe.enc.yaml). Alerts were published (6 messages by 00:59Z, no Alertmanager notification failures), but
+      ntfy had zero subscribers: the phone's ntfy app had no `nikhil` user configured for the server, so deny-all refused
+      its subscription and nothing was delivered. Nothing is missing in server.yml.j2 or SOPS.
+    key_facts:
+      - "hosts/stacks/alerting/ntfy/server.yml.j2 declares nikhil with fleet-alerts:ro and auth-default-access deny-all; the publisher side (alerts user + token) is declared too"
+      - "Publishing works: messages_published went 0 -> 6 between 00:02Z and 00:09Z and alertmanager_notifications_failed_total did not increase"
+      - "ntfy reported subscribers=0 from its start at 23:50:41Z until user nikhil logged in at 01:14:02Z; subscribers=1 at 01:14:43Z and 2 at 01:16:43Z"
+      - "The phone needs user nikhil (password ntfy_phone_password) on server https://nikghodki-omarchy-1.tail1cb707.ts.net exactly (runbooks/alerting.md, The phone)"
+    wrong_answers:
+      - "A publisher (Alertmanager/Gatus) credential is missing; PR adding it to server.yml.j2 and SOPS"
+      - "ntfy or the Dell is down"
+      - "Alertmanager can't reach ntfy / notifications are failing"
+    expected_fix: >-
+      No PR: tell the user to add user `nikhil` (password from SOPS key ntfy_phone_password, read by the user, never by the
+      agent) in the phone's ntfy app for https://nikghodki-omarchy-1.tail1cb707.ts.net, subscribe to fleet-alerts, then send
+      the runbook's test alert. Optionally a runbook note that a new phone/subscription needs the user.
+  evidence_notes: >-
+    ntfy container logs on the Dell (sudo docker logs alerting-ntfy-1, read-only): started 23:50:41Z 11-15 (created
+    23:50:35Z, 0 restarts); stats lines show messages_published 1 (00:02:42Z), 2 (00:04:42Z), 4 (00:07:42Z), 6 (00:09:42Z),
+    7 (01:09:43Z) with subscribers=0 throughout; 01:14:02Z 'Logging in user nikhil (http_method=POST,
+    http_path=/v1/account/login ...)' from a LAN client; subscribers 1 at 01:14:43Z, 2 at 01:16:43Z, 1 from 02:22Z on.
+    ntfy logs are not in Loki (container logs on the Dell aren't shipped), so a replay agent can only see them through the
+    frozen output. Gatus failures in the window: observe/Grafana 00:06-00:08Z (the likely published alerts).
+    alertmanager_notifications_failed_total increase = 0 for every integration 11-15 11:00Z .. 11-16 21:00Z; webhook
+    notifications_total +1 in the 00:00Z hour, +15 in the 01:00Z hour. Git: the nikhil user and its read-only access exist
+    since #9 (observe stack on dgx-2) and were kept by #55 (Dell); no commit changed them, so the fix was client-side.
+    Not verified: which device made the 01:14:02Z login (a LAN address, likely a browser, not the phone over Tailscale) and
+    exactly when the phone app got the user; ntfy at INFO doesn't log refused subscriptions.
+
+- id: G4
+  title: "Gatus false alarm: status gate refuses direct access (during #94)"
+  trigger:
+    source: gatus
+    at: "2026-11-16T04:28:00Z"
+    labels: {alertname: GatusEndpointFailing, name: status gate refuses direct access, group: web, severity: warning}
+    summary: "Gatus: 'status gate refuses direct access' (web) failing: http://192.168.86.49:8081/ expected [STATUS] == 403"
+  as_of_minutes: 20
+  frozen: {}
+  gold:
+    root_cause: >-
+      Not an outage: the check is wrong. #94 (merged 04:15:38Z) replaced the status-proxy with status-gate (Caddy) on
+      192.168.86.49:8081 and added the check 'status gate refuses direct access' that expects 403 from
+      http://192.168.86.49:8081/. Gatus runs on the same Dell inside the alerting Docker network, and from there the
+      Dell's own published LAN port times out, so the check never connected (no status code at all) while the gate
+      itself worked. #98 (merged 05:17:02Z) pointed the check at http://status-gate:8081/ on the compose network; it
+      passed with 403 from 05:25Z.
+    key_facts:
+      - "The check was added by #94 (merged 2026-11-16 04:15:38Z); first result 04:18Z already failing"
+      - "It failed without connecting: gatus_results_connected_total did not increase and no status code was recorded until 05:25Z"
+      - "Gatus and status-gate run on the same host (the Dell); the check used the Dell's own published port 192.168.86.49:8081 from inside the alerting network"
+      - "#98 (merged 05:17:02Z) changed the URL to http://status-gate:8081/; first success 05:25Z with code 403"
+      - "The Gatus UI path (status.nghodki.ai through the front door) and the other Dell gates were not affected"
+    wrong_answers:
+      - "The status gate is down or Gatus' status page is broken"
+      - "The token gate lets direct requests through (a security regression)"
+      - "Caused by the CI billing block (G6) or the DefenseClaw quarantines (G5) running at the same time"
+    expected_fix: >-
+      A PR changing the check's URL to the in-network address (http://status-gate:8081/); in the replay it should find or
+      expect that fix ('resolved by #98' if it can see it). No live action.
+  evidence_notes: >-
+    gatus_results_endpoint_success{name="status gate refuses direct access"} = 0 from the first sample at 04:18Z to 05:24Z,
+    1 from 05:25Z (30 s step). increase(gatus_results_connected_total[6m]) and gatus_results_code_total stay flat until
+    05:25Z, then code=403. Gatus alerting default: failure-threshold 3, success-threshold 2; interval 5m for this check, so
+    the alert fires after the third failure (~04:28Z, chosen trigger time); ntfy's messages_published went 18 -> 19
+    between 04:29:45Z and 04:36:45Z (the alert) and 19 -> 20 by 05:29:45Z (the resolve). The 'connected' reasoning is from
+    #98's commit message ('its own published port times out from inside the alerting network'). #98's merge was delayed
+    by the CI billing block (G6): its PR run 43804978224 attempts 1-2 (04:35Z, 04:36Z) were blocked, attempt 3 passed at
+    05:14Z. No ALERTS series (Gatus alerts go straight to ntfy).
+
+- id: G5
+  title: DefenseClaw quarantined Hermes plugins after LLM-judge timeouts (qwen3.8-27b thinking on)
+  trigger:
+    source: manual
+    at: "2026-11-16T04:40:00Z"
+    labels: {}
+    report: "Hermes says a lot of its plugins were quarantined by DefenseClaw on the Jetson in the last 20 minutes. Why?"
+    summary: DefenseClaw on the Jetson is quarantining Hermes plugins and skills
+  as_of_minutes: 30
+  frozen: {}
+  gold:
+    root_cause: >-
+      DefenseClaw's plugin/skill scanner on the Jetson (both installs: nikjetson and hermes-nikhil) calls an LLM judge
+      (qwen3.8-27b through LiteLLM, key defenseclaw-jetson-judge, decision 0012). With thinking on, one analysis took
+      2-5 minutes under load (longer on a ~4.5 min cold start), but DefenseClaw 1.0.9's plugin watcher kills the LLM call
+      after a fixed 120 s. The scanner then fails closed ('the LLM judge did not run, so the scan is incomplete'), blocks
+      the plugin and quarantines it. Fail-closed is the intended behaviour, not the bug; the judge's latency is the cause.
+    key_facts:
+      - "DefenseClaw log: \"Command '[... python -m defenseclaw.llm]' timed out after 120 seconds\" followed by legacy.audit.watcher.block 'scanner failure (fail-closed): the LLM judge did not run' and asset.quarantined"
+      - "The wave started 2026-11-16 04:23:01Z and hit both Jetson DefenseClaw users (nikjetson and hermes-nikhil); 64 timeout blocks (watcher.block with the 120 s message) until 08:27:48Z"
+      - "The judge model is qwen3.8-27b via LiteLLM with key defenseclaw-jetson-judge (decision 0012); with thinking on a scan takes 2-5 min, the watcher allows 120 s"
+      - "Fail-closed quarantine is by design; the quarantined plugins need a re-scan (with approval) once the judge is fast enough"
+      - "The same timeout pattern already happened on 2026-11-15 10:35-12:19Z (36 blocks, nikjetson)"
+    wrong_answers:
+      - "The plugins are malicious / the quarantines are true positives"
+      - "Turn off the LLM analyzer or fail-open the scanner"
+      - "LiteLLM or DGXMM is down (requests were answered, just too slowly)"
+    expected_fix: >-
+      A thinking-off route for the judge: the LiteLLM model qwen3.8-27b-nothink (same DGXMM route, enable_thinking false)
+      and qwen3.8-27b is aliased to qwen3.8-27b-nothink for the defenseclaw-jetson-judge LiteLLM credential (done 2026-11-16, decision 0012,
+      runbooks/litellm.md); note the cold start / 120 s limit; list the quarantined plugins to re-scan (you approve).
+  evidence_notes: >-
+    Loki {service_name="defenseclaw", host_name="nikhil-jetson"}: watcher.block with 'timed out after 120 seconds' per 15 min:
+    11-15 11:00-12:30Z (36 blocks, first quarantine 10:48:04Z 'mattermost'); 11-16 04:30-08:00Z (first block 04:23:01Z,
+    last 08:27:48Z, 64 blocks, both users). asset.quarantined per hour on 11-16: 04Z 16, 05Z 18, 06Z 25, 07Z 8, 08Z 7
+    distinct plugins (browser/*, dashboard_auth/*, image_gen/*, model-providers/*, web/*, ...). The nothink route was
+    live by 06:07:26Z (first X-Litellm-Model-Group: qwen3.8-27b-nothink in the front-door log for the Jetson's
+    /v1/chat/completions; the log starts 06:06Z, so the exact switch time is unknown, between ~04:23Z and 06:07Z).
+    In 06:00-07:00Z the Jetson's judge calls also got 241 x 429 and 92 x 502 (key limit 6 in flight; runbooks/litellm.md
+    gotcha: parallel scans hit 429s and fail closed too); from 07:00Z all 200 with p50 9 s, a few 499 at 120 s. Residual,
+    separate issue: from 08:36Z the quarantines continue with 'returned JSON that was not the expected array of findings' /
+    'not valid JSON' (40 blocks to 20:15Z), i.e. the nothink output format, not timeouts. The 11-15 18:45Z burst (151
+    quarantines, no timeout lines) has another cause, not investigated. No ALERTS fired for any of it (manual trigger).
+    LiteLLM latency metrics (litellm_usage_*) only exist from ~20:00Z 11-16, so judge latency during the wave isn't in VM.
+
+- id: G6
+  title: CI jobs not started (0 steps) because of a GitHub billing / spending-limit block
+  trigger:
+    source: github
+    at: "2026-11-16T04:32:18Z"
+    labels: {alertname: CIRunFailed, workflow: pr-checks, failure_class: infra, run_id: "43804700159", branch: dgxmanager-ui-only, severity: warning}
+    summary: "CI pr-checks failure on dgxmanager-ui-only (infra; 0 steps)"
+  as_of_minutes: 15
+  frozen: {}
+  gold:
+    root_cause: >-
+      External, not the code: GitHub refused to start the jobs because of the account's billing state. Every job of the
+      affected runs failed within ~4 s with 0 steps and no runner, and the check annotation says 'The job was not started
+      because recent account payments have failed or your spending limit needs to be increased. Please check the
+      Billing & plans section in your settings'. Re-running doesn't help until billing is fixed (the 04:34:53Z and 04:36:17Z
+      re-runs failed the same way); after it was resolved, the re-runs from 05:11:54Z passed.
+    key_facts:
+      - "Blocked runs (attempt 1 unless noted): 43804700159 (04:32:14Z, PR dgxmanager-ui-only), 43804826045 (04:33:33Z, push main), 43804867174 (04:33:59Z and its re-run 04:34:52Z), 43804978224 (04:35:02Z and re-run 04:36:17Z, PR auth-docs), 43805973213 (04:45:18Z, PR tool-review-docs)"
+      - "All 8 jobs of each blocked attempt: conclusion failure, 0 steps, empty runner_name, done 1-4 s after start"
+      - "Check annotation: 'The job was not started because recent account payments have failed or your spending limit needs to be increased'"
+      - "Re-runs during the block failed identically; re-runs from 05:11:54Z ran normally and passed"
+      - "The last normal run before the block was build-sign 43803519400 at 04:20:31Z (it failed on a real step, unrelated)"
+    wrong_answers:
+      - "A code or workflow error in the PRs (e.g. a broken pr-checks.yml)"
+      - "Flaky GitHub runners: keep re-running"
+      - "The startup_failure of build-sign 43784947624 at 01:13Z is the same problem (it was a workflow-file error, no jobs)"
+    expected_fix: >-
+      Notify the user with the billing page link (https://github.com/settings/billing); no re-run loop; mention moving long
+      jobs to the self-hosted runner on dgx-2 (project plan risk 'Free Actions minutes run out'). Re-run only after billing
+      is fixed.
+  evidence_notes: >-
+    gh API (read-only): /actions/runs/<id>/attempts/<n>/jobs for every run with run_attempt > 1. The jobs endpoint without
+    an attempt shows only the latest (successful) attempt, and gh run list shows these runs as success/cancelled, so a
+    poller that looks only at the current conclusion misses the block; the replay has to present attempt 1. Annotation
+    read from check-run 133093551012 (run 43804978224, attempt 1, 'Kubernetes manifests'). Block window: first blocked
+    04:32:14Z, last blocked 04:45:18Z, first normal re-run 05:11:54Z (43805973213 attempt 2). The repo is public
+    (created public 2026-11-15T07:53:05Z), so this is the account's billing state, not private-repo minutes; decision
+    0001 still says 'private repo'. No other nikghodki repo had 0-step jobs in the period.
+
+- id: G7
+  title: ha.nghodki.ai failing ~9 h on 2026-11-15 (HA rejects the proxy, fixed by P0.16)
+  trigger:
+    source: gatus
+    at: "2026-11-15T10:25:00Z"
+    labels: {alertname: GatusEndpointFailing, name: ha.nghodki.ai, group: web, severity: warning}
+    summary: "Gatus: 'ha.nghodki.ai' (web) failing: [STATUS] < 400 not met (HTTP 400)"
+  as_of_minutes: 20
+  frozen: {}
+  gold:
+    root_cause: >-
+      Home Assistant itself was fine (Gatus 'Home Assistant (direct)' on 192.168.86.211:8123 stayed green); requests
+      through the front door got HTTP 400 from HA. The front door (then dgx-1's edge-caddy and nginx-gateway relay) adds
+      X-Forwarded-For, and HA's HTTP integration wasn't set up for reverse proxies (use_x_forwarded_for / trusted_proxies),
+      so HA rejects proxied requests with 400. HA 2026.11 keeps these settings in its UI, not in YAML, so it isn't in Git.
+      The user set X-Forwarded-For on and trusted proxies 192.168.86.44 and 100.65.137.82 in HA's UI (P0.16), and the check
+      passed from 19:42Z.
+    key_facts:
+      - "ha.nghodki.ai returned HTTP 400 (gatus_results_code_total code=400) from the first sample at 10:22Z to 19:42Z on 2026-11-15 (~9.3 h)"
+      - "Home Assistant (direct) stayed up the whole time: the problem is the proxy path, not HA"
+      - "HA rejects X-Forwarded-For from an untrusted proxy with 400; HA's reverse-proxy settings live in its UI (P0.16), not in Git"
+      - "The fix was in HA's UI (X-Forwarded-For on, trusted proxies 192.168.86.44 and 100.65.137.82); first 200 at 19:42Z"
+      - "Family-impact service (decision 0013 Q10): notify even in quiet hours"
+    wrong_answers:
+      - "Home Assistant is down or crashed on the Jetson"
+      - "DNS or TLS for ha.nghodki.ai is broken"
+      - "A Caddy/nginx route change in Git is needed (the fix is HA's trusted-proxy setting)"
+    expected_fix: >-
+      Steps for the user in HA's UI (Settings > System > Network / HTTP: use X-Forwarded-For, trusted proxies = the front
+      door's addresses) and a runbook/docs PR recording them; no live action by the agent.
+  evidence_notes: >-
+    gatus_results_endpoint_success{name="ha.nghodki.ai"} = 0 from 10:22Z to 19:42Z, 1 after; gatus_results_code_total
+    code=400 only in that window, code=200 from 19:42Z; connected_total increasing (HA answered). Gatus metrics only start
+    ~10:22Z (Gatus /metrics exposed by #11 at 10:19Z; ObservabilityComponentDown for gatus 10:12-10:22Z), so the failure
+    may have started earlier; the trigger (10:25Z) assumes the 1-minute interval and failure-threshold 3. Gatus and ntfy
+    were then on dgx-2. Not verified: HA's own log line (docker logs on the Jetson no longer reach back to 11-15; HA logs
+    aren't in Loki) and nginx-gateway access logs (none kept). Trusted-proxy values from docs-site services/home-assistant.md;
+    plan P0.16 notes they still name dgx-1 from before the cutover. One later blip: ha.nghodki.ai failed one sample at
+    03:27Z 11-16 during the front-door changes.

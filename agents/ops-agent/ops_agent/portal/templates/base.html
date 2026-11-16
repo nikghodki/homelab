@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Ops agent{% endblock %}</title>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--ink:#e6e8ec;--mute:#9aa3b2;--line:#262b36;--red:#ef5350;--amber:#f5a623;--green:#3fb950;--blue:#58a6ff}
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+a{color:var(--blue);text-decoration:none}header{display:flex;flex-wrap:wrap;gap:.6rem 1rem;align-items:center;padding:.7rem 1rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg)}
+header b{font-size:1.05rem}nav a{margin-right:.8rem}.pill{padding:.1rem .5rem;border-radius:1rem;font-size:.8rem;border:1px solid var(--line)}
+.shadow{color:var(--amber);border-color:var(--amber)}.stopped{color:var(--red);border-color:var(--red)}
+main{max-width:1100px;margin:0 auto;padding:1rem}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:.8rem 1rem;margin:.7rem 0}
+.crit{border-left:4px solid var(--red)}.warning{border-left:4px solid var(--amber)}.info{border-left:4px solid var(--blue)}
+.mute{color:var(--mute);font-size:.88rem}h2{font-size:1rem;margin:1.2rem 0 .3rem;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+pre{white-space:pre-wrap;word-break:break-word;background:#0b0d11;border:1px solid var(--line);border-radius:8px;padding:.6rem;font-size:.82rem;max-height:28rem;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem}td,th{border-bottom:1px solid var(--line);padding:.35rem .4rem;text-align:left;vertical-align:top}
+button{background:#21262d;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.45rem .9rem;font-size:.95rem}
+button.stop{background:#3d1214;border-color:var(--red);color:#ffb4b4}input{background:#0b0d11;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:.4rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.5rem}.kv b{display:block;font-size:1.2rem}
+details summary{cursor:pointer;color:var(--blue)}
+</style></head><body>
+<header><b>ops-agent</b>
+<nav><a href="/">Feed</a><a href="/replay">Replay</a><a href="/audit">Audit</a><a href="https://grafana.nghodki.ai">Grafana</a></nav>
+<span class="pill {{ mode }}">Mode: {{ mode|upper }}{% if git_mode == 'stopped' %} (Git){% endif %}</span>
+<span class="mute">LLM today {{ "{:,}".format(tokens) }} / {{ "{:,}".format(budget) }} tok</span>
+<span style="margin-left:auto">
+{% if mode != 'stopped' %}
+<form method="post" action="/stop" style="display:inline"><!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token (Jinja, not Django: the double-submit token is csrf_token below) --><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<button class="stop" title="Halts the agent: cancels running investigations, stops the worker polling, no model calls">&#9632; Stop</button></form>
+{% else %}
+<form method="post" action="/resume" style="display:inline"><!-- nosemgrep: python.django.security.django-no-csrf-token.django-no-csrf-token --><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<input name="confirm" placeholder="type resume" size="10"> <button>Resume shadow</button></form>
+{% endif %}
+</span></header>
+<main>{% block body %}{% endblock %}</main></body></html>

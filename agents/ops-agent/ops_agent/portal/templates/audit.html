@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Audit{% endblock %}
+{% block body %}
+<h2>Audit log · hash chain {{ 'intact' if chain_ok else 'BROKEN' }} ({{ chain_n }} entries)</h2>
+<table><tr><th>When (UTC)</th><th>Actor</th><th>Action</th><th>Detail</th></tr>
+{% for r in rows %}<tr><td class="mute">{{ r.at.strftime('%m-%d %H:%M:%S') }}</td><td>{{ r.actor }}</td><td>{{ r.action }}</td><td class="mute">{{ r.detail|tojson }}</td></tr>{% endfor %}</table>
+{% endblock %}

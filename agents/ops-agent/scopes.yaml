@@ -1,0 +1,12 @@
+# What the ops agent may use (decision 0013). Shadow mode: read-only everywhere.
+models: [qwen3.8-27b, qwen3.8-27b-nothink]        # LiteLLM key ops-agent (runbooks/litellm.md)
+mcp_servers:                                       # in cluster/apps/ops, all read-only
+  - {name: mcp-grafana, image: docker.io/grafana/mcp-grafana:2.3.0, mode: --disable-write, identity: Grafana Viewer SA ops-agent}
+  - {name: mcp-kubernetes, image: quay.io/containers/kubernetes_mcp_server:v0.1.3, mode: read_only, identity: SA ops/ops-agent-read}
+  - {name: mcp-argocd, image: ghcr.io/argoproj-labs/mcp-for-argocd:v0.9.0, mode: MCP_READ_ONLY, identity: Argo CD account ops-agent (role:readonly)}
+host_access: {user: opsro, verbs: [help, health, units, status, journal, kernel, kernel-prev, containers, container-logs, gpu, net, k3s, certs, defenseclaw]}
+temporal: {namespace: ops-agent, role: writer}
+ntfy: {topic: ops-agent, access: write-only}
+github: none            # Q1: no GitHub write in shadow mode; read via a read-only deploy key
+nats_subjects: []       # none: no robot.*, no safety.*
+a2a_peers: []

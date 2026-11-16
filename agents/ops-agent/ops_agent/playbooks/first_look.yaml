@@ -1,0 +1,122 @@
+# Deterministic first look per incident class (design §5.2): the queries a person runs first, from
+# docs-site/content/docs/operations/incidents.md and the runbooks. They run before (and without) the model.
+# Placeholders: {host} fleet host (dgx-1, dgx-2, jetson, dell, pi), {loki_host} its Loki host_name,
+# {fleet_host} its fleet_host label (dell is "omarchy"), {namespace}, {name}, {alertname}, {endpoint}, {group}.
+# Times are relative to the incident's time (live: now; replay: the replay clock).
+common:
+  - {tool: promql, args: {query: 'ALERTS{alertstate="firing", alertname!="Watchdog"}'}}
+  - {tool: promql, args: {query: 'gatus_results_endpoint_success == 0'}}
+  - {tool: promql, args: {query: 'up == 0'}}
+  - {tool: changes, args: {start: '-3h'}}
+classes:
+  host_down:
+    runbook: "host down unreachable ssh reboot kernel journal previous boot"
+    steps:
+      - {tool: promql, args: {query: 'max by (fleet_host) (timestamp(system_memory_usage_bytes{state="used"}))', start: '-3h'}}
+      - {tool: promql, args: {query: 'gatus_results_endpoint_success{group="hosts"}', start: '-3h'}}
+      - {tool: host, args: {host: '{host}', command: 'kernel-prev'}}
+      - {tool: host, args: {host: '{host}', command: 'health'}}
+  gpu_memory:
+    runbook: "GPU unified memory OOM earlyoom gpu-oom-guard DGXMM reserve"
+    steps:
+      - {tool: promql, args: {query: 'fleet_memory_percent{fleet_host=~"dgx-.*"}', start: '-2h'}}
+      - {tool: promql, args: {query: 'system_memory_usage_bytes{state="free", fleet_host=~"dgx-.*"}', start: '-2h'}}
+      - {tool: promql, args: {query: 'fleet_gpu_percent', start: '-2h'}}
+      - {tool: logs, args: {logql: '{host_name=~"spark-83dc|nikghodki-dgx-2"} |~ "(?i)(out of memory|oom|killed process|earlyoom|gpu-oom|nvrm|xid)"', start: '-2h', limit: 80}}
+      - {tool: host, args: {host: '{host}', command: 'gpu'}}
+      - {tool: host, args: {host: '{host}', command: 'kernel -2h'}}
+  disk:
+    runbook: "disk full filesystem retention volumes"
+    steps:
+      - {tool: promql, args: {query: '1 - system_filesystem_usage_bytes{state="free", fleet_host="{fleet_host}"} / ignoring(state) sum without(state) (system_filesystem_usage_bytes{fleet_host="{fleet_host}"})', start: '-24h'}}
+      - {tool: host, args: {host: '{host}', command: 'health'}}
+  thermal:
+    runbook: "temperature hot fan thermal throttling"
+    steps:
+      - {tool: promql, args: {query: 'fleet_temperature_celsius', start: '-6h'}}
+      - {tool: promql, args: {query: 'count_over_time(ALERTS{alertname=~"FleetHostHot|FleetPiHot", alertstate="pending"}[6h])'}}
+  observability:
+    runbook: "observability component down scrape target up victoriametrics vmalert"
+    steps:
+      - {tool: promql, args: {query: 'up == 0', start: '-2h'}}
+      - {tool: host, args: {host: 'dgx-2', command: 'containers'}}
+  alert_delivery:
+    runbook: "alert delivery ntfy alertmanager notifications failed"
+    steps:
+      - {tool: promql, args: {query: 'sum by (integration, reason) (increase(alertmanager_notifications_failed_total[30m]))'}}
+      - {tool: host, args: {host: 'dell', command: 'container-logs ntfy'}}
+  argocd:
+    runbook: "Argo CD out of sync not healthy sync app"
+    steps:
+      - {tool: promql, args: {query: 'argocd_app_info{sync_status!="Synced"} or argocd_app_info{health_status!="Healthy"}'}}
+      - {tool: argocd, args: {action: get, app: '{name}'}}
+      - {tool: argocd, args: {action: events, app: '{name}'}}
+  kyverno:
+    runbook: "Kyverno admission rejections policy violation enforce"
+    steps:
+      - {tool: promql, args: {query: 'sum by (resource_namespace, policy_name) (increase(kyverno_admission_requests_total{request_allowed="false"}[30m]))'}}
+      - {tool: k8s, args: {action: events, namespace: '{namespace}'}}
+  front_door:
+    runbook: "front door edge caddy DNS VIP kube-vip edge-auth"
+    steps:
+      - {tool: promql, args: {query: 'kube_deployment_status_replicas_available{namespace="edge"}', start: '-1h'}}
+      - {tool: promql, args: {query: 'gatus_results_endpoint_success{group=~"edge|web"}', start: '-1h'}}
+      - {tool: logs, args: {logql: '{service_name="edge-caddy"} |~ "(?i)(error|status\":5)"', start: '-30m', limit: 60}}
+      - {tool: k8s, args: {action: events, namespace: 'edge'}}
+  k3s:
+    runbook: "k3s API etcd quorum member down"
+    steps:
+      - {tool: promql, args: {query: 'gatus_results_endpoint_success{group="k3s"}', start: '-1h'}}
+      - {tool: host, args: {host: '{host}', command: 'k3s'}}
+  sign_in:
+    runbook: "Pocket ID sign-in edge-auth oauth2-proxy"
+    steps:
+      - {tool: promql, args: {query: 'gatus_results_endpoint_success{group="web"}', start: '-1h'}}
+      - {tool: k8s, args: {action: logs, namespace: edge, name: '{name}'}}
+  gatus_check:
+    runbook: "Gatus check {endpoint} gate refuses direct access"
+    steps:
+      - {tool: promql, args: {query: 'gatus_results_endpoint_success{name="{endpoint}"}', start: '-6h'}}
+      - {tool: promql, args: {query: 'gatus_results_duration_seconds{name="{endpoint}"}', start: '-2h'}}
+      - {tool: changes, args: {start: '-6h'}}
+  model_plane:
+    runbook: "LiteLLM DGXMM model cold start on-demand vLLM"
+    steps:
+      - {tool: promql, args: {query: 'gatus_results_endpoint_success{name=~".*(LiteLLM|DGXMM|dgxmanager|model).*"}', start: '-2h'}}
+      - {tool: host, args: {host: 'dgx-1', command: 'containers'}}
+      - {tool: host, args: {host: 'dgx-1', command: 'gpu'}}
+  container_restart:
+    runbook: "pod crash loop restart OOMKilled"
+    steps:
+      - {tool: k8s, args: {action: get, api_version: v1, kind: Pod, namespace: '{namespace}', name: '{name}'}}
+      - {tool: k8s, args: {action: logs, namespace: '{namespace}', name: '{name}', previous: true, tail: 120}}
+      - {tool: k8s, args: {action: events, namespace: '{namespace}'}}
+  k8s_workload:
+    runbook: "pod pending scheduling mount probe failing"
+    steps:
+      - {tool: k8s, args: {action: events, namespace: '{namespace}'}}
+      - {tool: k8s, args: {action: list, api_version: v1, kind: Pod, namespace: '{namespace}'}}
+  defenseclaw:
+    runbook: "DefenseClaw gateway judge scanner quarantine"
+    steps:
+      - {tool: logs, args: {logql: '{service_name="defenseclaw"} |~ "(?i)(error|quarantin|timeout|fail)"', start: '-2h', limit: 80}}
+  robot_edge:
+    runbook: "safety governor lidar edge connector robot"
+    steps:
+      - {tool: promql, args: {query: 'ALERTS{alertname=~"SafetyGovernor.*|Edge.*"}', start: '-2h'}}
+      - {tool: host, args: {host: 'pi', command: 'status robot-motion-bridge'}}
+  log_anomaly:
+    runbook: "errors logs {name}"
+    steps:
+      - {tool: logs, args: {logql: '{host_name="{loki_host}"} |~ "(?i)(error|fail|panic|oom|denied)"', start: '-30m', limit: 80}}
+  ci:
+    runbook: "CI GitHub Actions failure runner billing"
+    steps:
+      - {tool: ci, args: {run_id: '{run_id}'}}
+      - {tool: changes, args: {start: '-6h'}}
+  self:
+    runbook: "ops agent"
+    steps: []
+  generic:
+    runbook: "{alertname}"
+    steps: []

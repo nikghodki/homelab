@@ -26,6 +26,12 @@ case "$name" in
       hosts/roles/ros_zenoh_router/templates/Dockerfile.j2 > "$file"
     if grep -q "{{" "$file"; then echo "unrendered template variable in $file" >&2; exit 1; fi
     ;;
+  ops-agent)
+    # The ops agent (decision 0013): tag = the version in its pyproject.toml.
+    context=agents/ops-agent
+    file="$context/Dockerfile"
+    tag=$(sed -n -E 's/^version = "([^"]+)"/\1/p' agents/ops-agent/pyproject.toml | head -1)
+    ;;
   *) echo "unknown image: $name" >&2; exit 1 ;;
 esac
 if [ -z "$tag" ]; then echo "no tag found for $name" >&2; exit 1; fi

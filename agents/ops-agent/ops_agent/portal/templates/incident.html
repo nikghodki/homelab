@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}INC-{{ inc.id }}{% endblock %}
+{% block body %}
+<div class="card {{ 'crit' if inc.severity == 'critical' else inc.severity }}">
+<b>INC-{{ inc.id }} · {{ inc.severity }} · {{ inc.title }}</b>
+<div class="mute">{{ inc.klass }} · {{ inc.status }} · opened {{ inc.opened_at.strftime('%Y-%m-%d %H:%M') }} UTC by {{ inc.source }}
+{% if inc.family_impact %} · <b style="color:var(--red)">family-facing</b>{% endif %}{% if inc.replay_run %} · replay run {{ inc.replay_run }}{% endif %}</div>
+{% if inc.during_change %}<div>During a change: {{ inc.during_change }}</div>{% endif %}
+</div>
+{% for r in rcas %}
+<h2>RCA · {{ r.engine }} · confidence {{ r.confidence }} · {{ r.tokens }} tokens · {{ r.tool_calls }} tool calls · {{ "%.0f"|format(r.seconds) }} s</h2>
+<div class="card"><pre>{{ r.markdown }}</pre></div>
+{% else %}<p class="mute">No RCA yet.</p>{% endfor %}
+<h2>Evidence ({{ evidence|length }})</h2>
+<table><tr><th>Ref</th><th>Phase</th><th>Tool and arguments</th><th>Result</th></tr>
+{% for e in evidence %}<tr><td>{{ e.ref }}{% if not e.ok %} ✗{% endif %}</td><td class="mute">{{ e.phase }}</td>
+<td><code>{{ e.tool }}</code> <span class="mute">{{ e.args|tojson }}</span>{% if e.link %}<br><a href="{{ e.link }}">open ↗</a>{% endif %}</td>
+<td><details><summary>{{ e.result[:90] }}</summary><pre>{{ e.result }}</pre></details></td></tr>{% endfor %}</table>
+<h2>Events</h2>
+<table>{% for e in events %}<tr><td class="mute">{{ e.occurred_at.strftime('%m-%d %H:%M:%S') }}</td><td>{{ e.source }}</td><td>{{ e.status }}</td><td>{{ e.summary }}</td></tr>{% endfor %}</table>
+{% if notes %}<h2>Notifications</h2><table>{% for n in notes %}<tr><td class="mute">{{ n.created_at.strftime('%m-%d %H:%M') }}</td><td>{{ n.state }}</td><td>{{ n.priority }}</td><td>{{ n.reason or '' }}</td></tr>{% endfor %}</table>{% endif %}
+{% if postmortem %}<h2>Postmortem</h2><div class="card"><pre>{{ postmortem.markdown }}</pre></div>{% endif %}
+{% endblock %}
