@@ -139,6 +139,7 @@ async def github_runs(handle) -> None:
     if s.github_token:
         headers["Authorization"] = "Bearer " + s.github_token
     seen: set[int] = set()
+    started = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=15)   # no incidents for old failures at start
     async with httpx.AsyncClient(base_url="https://api.github.com", timeout=30, headers=headers) as gh:
         # A public repo needs no token (60 requests/hour unauthenticated: one list every 5 min plus the jobs of new
         # failures). A private repo without a token: the API says 404 and the poller stays off (decision 0013 Q1).
@@ -151,6 +152,9 @@ async def github_runs(handle) -> None:
                 runs = (await gh.get(f"/repos/{s.github_repo}/actions/runs", params={"per_page": 30})).json().get("workflow_runs", [])
                 for r in runs:
                     if r["id"] in seen or r.get("status") != "completed" or r.get("conclusion") not in ("failure", "startup_failure", "timed_out"):
+                        continue
+                    if parse_time(r.get("updated_at")) < started:
+                        seen.add(r["id"])
                         continue
                     seen.add(r["id"])
                     jobs = (await gh.get(f"/repos/{s.github_repo}/actions/runs/{r['id']}/jobs")).json().get("jobs", [])
