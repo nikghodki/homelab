@@ -16,7 +16,7 @@ The fleet's own images are built by GitHub Actions from the Dockerfiles in this 
 | Signature | cosign v3 keyless: a Fulcio certificate for the workflow's GitHub OIDC token, logged in Rekor; no key to keep |
 | Identity | `https://github.com/nikghodki/homelab/.github/workflows/build-sign.yml@refs/heads/main` |
 | Issuer | `https://token.actions.githubusercontent.com` |
-| SBOM | BuildKit SPDX + provenance per platform inside the image index (covered by the signature), and the arm64 SPDX as a signed cosign attestation (`--type spdxjson`) |
+| SBOM | BuildKit SPDX (with every file) + provenance per platform inside the image index (covered by the signature), and the arm64 SPDX **at package level** (file list dropped) as a signed cosign attestation (`--type spdxjson`): Rekor refuses entries over ~32 MB and the ROS image's full SPDX is 28 MB |
 | Permissions | workflow default `{}`; the build job gets `contents: read`, `packages: write`, `id-token: write` |
 | Cache | BuildKit layer cache in the registry, tag `ghcr.io/nikghodki/<name>:buildcache` (written only by this job; not a runnable image) |
 

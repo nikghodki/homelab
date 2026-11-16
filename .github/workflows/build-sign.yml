@@ -100,11 +100,19 @@ jobs:
         env:
           REF: ${{ steps.spec.outputs.image }}@${{ steps.build.outputs.digest }}
         run: |
-          cosign sign --yes "$REF"
-          # The arm64 SBOM (what the fleet runs) from BuildKit's attestation, as a signed SPDX attestation.
-          docker buildx imagetools inspect "$REF" --format '{{ json (index .SBOM "linux/arm64").SPDX }}' > sbom.spdx.json
-          test -s sbom.spdx.json && [ "$(head -c 4 sbom.spdx.json)" != "null" ]
-          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
+          # Fulcio/Rekor answer 5xx now and then; cosign itself retries only twice.
+          retry() { for i in 1 2 3 4; do "$@" && return 0; echo "attempt $i failed; retrying in $((i * 20)) s"; sleep $((i * 20)); done; return 1; }
+          retry cosign sign --yes "$REF"
+          # The full BuildKit SBOM (with every file) stays in the signed index. The cosign attestation is the arm64
+          # SBOM at package level: Rekor refuses entries over ~32 MB, and the ROS image's full SPDX is ~28 MB
+          # (~38 MB as a DSSE envelope); without the file list it is ~3 MB.
+          docker buildx imagetools inspect "$REF" --format '{{ json (index .SBOM "linux/arm64").SPDX }}' > sbom-full.spdx.json
+          test -s sbom-full.spdx.json && [ "$(head -c 4 sbom-full.spdx.json)" != "null" ]
+          jq -c 'del(.files) | .packages |= map(del(.hasFiles))
+            | .relationships |= map(select((.spdxElementId | startswith("SPDXRef-File-") | not)
+                and (.relatedSpdxElement | startswith("SPDXRef-File-") | not)))' sbom-full.spdx.json > sbom.spdx.json
+          echo "SBOM: $(jq '.packages | length' sbom.spdx.json) packages, $(wc -c < sbom.spdx.json) bytes (full: $(wc -c < sbom-full.spdx.json))"
+          retry cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
       - name: Verify
         env:
           REF: ${{ steps.spec.outputs.image }}@${{ steps.build.outputs.digest }}
