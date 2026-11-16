@@ -94,14 +94,14 @@ if [ "$QUERY" = 1 ]; then q "$@"; exit 0; fi
 
 echo "## HTTP(S): old $OLD vs new $NEW"
 printf '%-28s %-6s %-36s %-36s %s\n' name scheme old new same
-for name in $(awk '!/^#/ && NF == 2 && $2 == "edge" {print $1}' "$names"); do
+while read -r name <&3; do
   host=$name.nghodki.ai
   for scheme in http https; do
     o=$(probe $scheme "$host" "$OLD"); n=$(probe $scheme "$host" "$NEW")
     same=yes; [ "$o" = "$n" ] || { same=NO; fail=1; }
     printf '%-28s %-6s %-36s %-36s %s\n' "$host" "$scheme" "${o:-error}" "${n:-error}" "$same"
   done
-done
+done 3< <(awk '!/^#/ && NF == 2 && $2 == "edge" {print $1}' "$names")
 
 echo; echo "## Model plane paths: old $OLD vs new $NEW"
 printf '%-50s %-6s %-36s %-36s %s\n' url scheme old new same
@@ -123,7 +123,7 @@ done
 
 echo; echo "## DNS @$DNS ($VIEW view)"
 printf '%-28s %-34s %-10s %s\n' name A AAAA ok
-for name in $(awk '!/^#/ && NF == 2 {print $1}' "$names"); do
+while read -r name <&3; do
   host=$name.nghodki.ai
   got=$(q "$DNS" A "$host" | cut -s -d' ' -f3- | tr ' ' '\n' | grep . | sort | tr '\n' ' ')
   aaaa=$(q "$DNS" AAAA "$host" | awk '{print $1 "/" $2}')
@@ -133,7 +133,7 @@ for name in $(awk '!/^#/ && NF == 2 {print $1}' "$names"); do
   done
   ok=yes; { [ $match = yes ] && [ "$aaaa" = "NOERROR/0" ]; } || { ok=NO; fail=1; }
   printf '%-28s %-34s %-10s %s\n' "$host" "${got:-none}" "$aaaa" "$ok"
-done
+done 3< <(awk '!/^#/ && NF == 2 {print $1}' "$names")
 nx=$(q "$DNS" A no-such-name.nghodki.ai | cut -d' ' -f1)
 echo "no-such-name.nghodki.ai: $nx (want NXDOMAIN)"; [ "$nx" = NXDOMAIN ] || fail=1
 
