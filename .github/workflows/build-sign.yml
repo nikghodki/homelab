@@ -4,6 +4,8 @@ name: build-sign
 # (GitHub OIDC; no keys) and attaches a signed SPDX SBOM. Kyverno admits ghcr.io/nikghodki/* only with this
 # workflow's signature from main (policies/kyverno/verify-images.yaml). Runbook: runbooks/build-sign.md.
 # Not built here: robots/sim/mujoco (~12 GB with the CUDA wheels; decision 0008).
+# Only GitHub-owned actions are allowed in this repo, so buildx, QEMU and cosign are plain tools: binaries pinned by
+# SHA-256, images by digest (like pr-checks.yml).
 on:
   push:
     branches: [main]
@@ -25,8 +27,10 @@ concurrency:
 env:
   BINFMT_IMAGE: tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
   BUILDKIT_IMAGE: moby/buildkit:v0.35.0@sha256:aa632b921ef07411d2cb77292cd34213d4f7b384001d6fceef1e1f25bf9752bb
-  BUILDX_VERSION: v0.39.0
-  COSIGN_VERSION: v3.1.4
+  BUILDX_URL: https://github.com/docker/buildx/releases/download/v0.39.0/buildx-v0.39.0.linux-amd64
+  BUILDX_SHA256: 5fb31a097304fbf6dd4038649a0decf32c2b9510e4047acd7d68b9d700c46194
+  COSIGN_URL: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+  COSIGN_SHA256: 424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa
   PLATFORMS: linux/amd64,linux/arm64
   # What Kyverno and `cosign verify` check (runbooks/build-sign.md).
   CERT_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build-sign.yml@refs/heads/main
@@ -54,40 +58,44 @@ jobs:
       - name: Build spec
         id: spec
         run: .github/scripts/image-spec.sh "${{ matrix.image }}" "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-        with:
-          image: ${{ env.BINFMT_IMAGE }}
-          platforms: arm64
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-        with:
-          version: ${{ env.BUILDX_VERSION }}
-          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
-      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tools (buildx, cosign; pinned by SHA-256), QEMU for arm64, BuildKit builder
+        run: |
+          mkdir -p "$HOME/.docker/cli-plugins" "$HOME/bin"
+          curl -sSfL -o "$HOME/.docker/cli-plugins/docker-buildx" "$BUILDX_URL"
+          echo "$BUILDX_SHA256  $HOME/.docker/cli-plugins/docker-buildx" | sha256sum -c -
+          curl -sSfL -o "$HOME/bin/cosign" "$COSIGN_URL"
+          echo "$COSIGN_SHA256  $HOME/bin/cosign" | sha256sum -c -
+          chmod +x "$HOME/.docker/cli-plugins/docker-buildx" "$HOME/bin/cosign"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          docker buildx version
+          docker run --privileged --rm "$BINFMT_IMAGE" --install arm64
+          docker buildx create --name homelab --driver docker-container --driver-opt "image=$BUILDKIT_IMAGE" --use
+          docker buildx inspect --bootstrap | grep -E '^(Name|Driver|Platforms)'
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
       - name: Build and push
         id: build
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: ${{ steps.spec.outputs.context }}
-          file: ${{ steps.spec.outputs.file }}
-          platforms: ${{ env.PLATFORMS }}
-          push: true
-          tags: ${{ steps.spec.outputs.tags }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          # BuildKit SPDX SBOM and provenance per platform, inside the image index (so covered by the signature).
-          sbom: true
-          provenance: mode=max
-          # Layer cache in the Actions cache (10 GB per repo), one scope per image: unchanged layers aren't rebuilt.
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
-        with:
-          cosign-release: ${{ env.COSIGN_VERSION }}
+        env:
+          CONTEXT: ${{ steps.spec.outputs.context }}
+          FILE: ${{ steps.spec.outputs.file }}
+          IMAGE: ${{ steps.spec.outputs.image }}
+          TAGS: ${{ steps.spec.outputs.tags }}
+        run: |
+          tag_args=(); IFS=, read -ra tags <<< "$TAGS"; for t in "${tags[@]}"; do tag_args+=(--tag "$t"); done
+          # BuildKit SPDX SBOM and provenance per platform go inside the image index (so the signature covers them).
+          # Layer cache in the registry (`:buildcache`, written only from here): unchanged layers aren't rebuilt.
+          docker buildx build "$CONTEXT" --file "$FILE" --platform "$PLATFORMS" --push "${tag_args[@]}" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --sbom=true --provenance=mode=max \
+            --cache-from "type=registry,ref=$IMAGE:buildcache" \
+            --cache-to "type=registry,ref=$IMAGE:buildcache,mode=max,image-manifest=true,oci-mediatypes=true" \
+            --metadata-file metadata.json
+          digest=$(jq -r '."containerimage.digest"' metadata.json)
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Sign (keyless) and attest the SBOM
         env:
           REF: ${{ steps.spec.outputs.image }}@${{ steps.build.outputs.digest }}
@@ -112,3 +120,6 @@ jobs:
             echo "- tags: \`$TAGS\`"
             echo "- signed and SBOM-attested by \`$CERT_IDENTITY\`"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io
