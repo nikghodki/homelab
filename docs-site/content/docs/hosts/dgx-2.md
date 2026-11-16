@@ -33,7 +33,7 @@ jobs, so jobs must leave the service reserve alone.
 Also seen: a `dgxmm-node-probe` container (DGXMM session's; not in this repo).
 
 systemd: `k3s` (server, `cluster-init`), `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `earlyoom` and
-`gpu-oom-guard` (same unmanaged guard as dgx-1). Timers: `cisco-aibom`, `lynis-audit`, `homelab-backup`,
+`gpu-oom-guard` (`roles/memory_guard`, as on dgx-1). Timers: `cisco-aibom`, `lynis-audit`, `homelab-backup`,
 `homelab-backup-prune` (Sunday 05:00).
 
 ## Memory

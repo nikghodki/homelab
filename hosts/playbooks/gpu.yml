@@ -13,3 +13,11 @@
   become: true
   roles:
     - role: jetson_cdi
+
+# Unified-memory OOM protection (runbooks/memory-guard.md). Both Sparks froze
+# solid on 2026-11-15 when a benchmark used up memory with no OOM killer acting.
+- name: Memory guard on the Sparks
+  hosts: sparks
+  become: true
+  roles:
+    - role: memory_guard

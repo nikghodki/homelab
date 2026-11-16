@@ -54,7 +54,7 @@ DGXMM starts model engines (vLLM, llama.cpp) as more containers when models load
 | `otelcol-contrib.service` | host collector; also scrapes dcgm-exporter and the Fleet API metrics |
 | `fleet-metrics.service` | `:9109` |
 | `tailscaled.service` | Tailscale |
-| `earlyoom.service`, `gpu-oom-guard.service` | Memory guards added after the 2026-11-15 OOM. The unit says "Managed by homelab Ansible (roles/memory_guard)", but no such role exists in the repo on any branch (unverified who installed it; likely the DGXMM session) |
+| `earlyoom.service`, `gpu-oom-guard.service` | Memory guards added after the 2026-11-15 OOM, `roles/memory_guard` (playbooks/gpu.yml, `runbooks/memory-guard.md`) |
 | `nvidia-persistenced`, `dgx-dashboard`, `dgx-dashboard-admin` | DGX OS |
 | NFS server (`nfs-server`, `rpcbind`, ...), `iperf3` | Stopped and disabled 2026-11-15 (role `retired_units`): no exports or clients; NFS came with the Jetson reflash tools, iperf3 with a one-off link test. Re-enable `nfs-server` for the next Jetson reflash |
 | user `defenseclaw-gateway.service` | DefenseClaw 1.0.9 gateway with the Fleet gateway, API on 127.0.0.1:18970 |

@@ -8,7 +8,7 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 | Area | Limit | Mitigation / plan |
 |---|---|---|
 | Availability | dgx-1 is a single point of failure for web, DNS, NATS, Fleet, LiteLLM and the operator's tools (F6) | P3.3 moved web and DNS into k3s (cut over 2026-11-15); LiteLLM and DGXMM (model, dgxmanager), NATS and Fleet still need dgx-1 (P3.7) |
-| Availability | A GPU job can take a Spark and all its services down (unified memory) | caps on our jobs, earlyoom/gpu-oom-guard (not in Git), P2.7 reserves |
+| Availability | A GPU job can take a Spark and all its services down (unified memory) | caps on our jobs, earlyoom/gpu-oom-guard (`roles/memory_guard`), P2.7 reserves |
 | Availability | Alerting needs the Dell or dgx-2; both down = silence | accepted |
 | Network | Everything is on Wi-Fi; a router reboot hits every host | P0.11 for the Sparks |
 | Network | No UPS: a power cut hard-stops everything (R10) | buy a UPS; NUT order in architecture §17.3 |

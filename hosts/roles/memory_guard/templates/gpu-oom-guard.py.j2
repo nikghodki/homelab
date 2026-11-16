@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+# Managed by homelab Ansible (roles/memory_guard)
+"""Stop the process holding the most GPU memory when MemAvailable runs low.
+
+On GB10 the GPU allocates from system RAM, but that memory is not charged to
+the process's cgroup or RSS, so neither Docker limits nor the kernel/earlyoom
+victim choice find it (earlyoom would pick k3s pods first: kubelet gives them
+oom_score_adj 999). nvidia-smi does attribute it per host PID.
+
+Below TERM_BELOW_MIB (DGXMM's 8 GiB safety margin) the largest GPU user gets
+SIGTERM, so an engine can exit cleanly; if it is still alive after GRACE_S and
+memory is still short, or MemAvailable falls below KILL_BELOW_MIB, it gets SIGKILL.
+
+Every PROTECT_EVERY_S it also lowers oom_score_adj to PROTECT_ADJ for the processes
+named in PROTECT (k3s, containerd, Tailscale, kube-vip, Caddy, CoreDNS...), so neither
+earlyoom nor the kernel OOM killer picks them; earlyoom 1.7's --avoid only subtracts 300.
+"""
+import ctypes
+import os
+import re
+import signal
+import subprocess
+import time
+
+TERM_BELOW_MIB = {{ memory_guard_term_below_mib }}
+KILL_BELOW_MIB = {{ memory_guard_kill_below_mib }}
+INTERVAL_S = {{ memory_guard_interval_s }}
+COOLDOWN_S = {{ memory_guard_cooldown_s }}
+GRACE_S = {{ memory_guard_term_grace_s }}
+PROTECT = frozenset({{ memory_guard_protect | to_json }})
+PROTECT_ADJ = {{ memory_guard_protect_adj }}
+PROTECT_EVERY_S = 30
+SECRET_ARG = re.compile(r"(?i)(--?[\w-]*(key|token|secret|password)[\w-]*)([= ])\S+")
+
+
+def mem_available_mib():
+    with open("/proc/meminfo") as f:
+        for line in f:
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) // 1024
+    raise RuntimeError("MemAvailable missing from /proc/meminfo")
+
+
+def gpu_processes():
+    out = subprocess.run(
+        ["nvidia-smi", "--query-compute-apps=pid,used_memory",
+         "--format=csv,noheader,nounits"],
+        capture_output=True, text=True, timeout=20, check=True,
+    ).stdout
+    procs = []
+    for line in out.splitlines():
+        pid, used = (field.strip() for field in line.split(","))
+        if pid.isdigit() and used.isdigit():
+            procs.append((int(used), int(pid)))
+    return procs
+
+
+def cmdline(pid):
+    """The command line for the log, with values of key/token/secret/password flags removed."""
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            line = f.read().replace(b"\0", b" ").decode(errors="replace")
+    except OSError:
+        return "?"
+    return SECRET_ARG.sub(r"\1\3<redacted>", line)[:300]
+
+
+def decide(avail, procs, termed, now):
+    """(signal, pid, used) to send now, or None. termed: {pid: time of its SIGTERM}."""
+    if avail >= TERM_BELOW_MIB or not procs:
+        return None
+    used, pid = max(procs)
+    if avail < KILL_BELOW_MIB:
+        return signal.SIGKILL, pid, used
+    if pid not in termed:
+        return signal.SIGTERM, pid, used
+    if now - termed[pid] >= GRACE_S:
+        return signal.SIGKILL, pid, used
+    return None
+
+
+def protect():
+    """Lower oom_score_adj of the PROTECT processes that are above PROTECT_ADJ; returns what changed."""
+    changed = []
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            with open(f"/proc/{pid}/comm") as f:
+                name = f.read().strip()
+            if name not in PROTECT:
+                continue
+            path = f"/proc/{pid}/oom_score_adj"
+            with open(path) as f:
+                adj = int(f.read())
+            if adj > PROTECT_ADJ:
+                with open(path, "w") as f:
+                    f.write(str(PROTECT_ADJ))
+                changed.append(f"{name}[{pid}] {adj}->{PROTECT_ADJ}")
+        except (OSError, ValueError):
+            continue
+    return changed
+
+
+def set_process_name(name):
+    """Show up as `name` in /proc/self/comm (not python3), so earlyoom's --avoid matches."""
+    try:
+        ctypes.CDLL(None).prctl(15, name.encode()[:15], 0, 0, 0)  # PR_SET_NAME
+    except (OSError, AttributeError):
+        pass
+
+
+def main():
+    set_process_name("gpu-oom-guard")
+    print(f"gpu-oom-guard: SIGTERM the largest GPU user below {TERM_BELOW_MIB} MiB available, "
+          f"SIGKILL below {KILL_BELOW_MIB} MiB or {GRACE_S} s after SIGTERM", flush=True)
+    warned = False
+    termed = {}
+    protected_at = 0.0
+    while True:
+        if time.monotonic() - protected_at >= PROTECT_EVERY_S:
+            protected_at = time.monotonic()
+            changed = protect()
+            if changed:
+                print(f"gpu-oom-guard: oom_score_adj lowered: {', '.join(changed)}", flush=True)
+        avail = mem_available_mib()
+        if avail < TERM_BELOW_MIB:
+            try:
+                procs = gpu_processes()
+            except (subprocess.SubprocessError, OSError) as e:
+                procs = []
+                print(f"gpu-oom-guard: nvidia-smi failed: {e}", flush=True)
+            live = {pid for _, pid in procs}
+            termed = {pid: t for pid, t in termed.items() if pid in live}
+            action = decide(avail, procs, termed, time.monotonic())
+            if action:
+                sig, pid, used = action
+                print(f"gpu-oom-guard: MemAvailable {avail} MiB; {sig.name} to pid {pid} "
+                      f"({used} MiB GPU): {cmdline(pid)}", flush=True)
+                try:
+                    os.kill(pid, sig)
+                except ProcessLookupError:
+                    pass
+                warned = False
+                if sig == signal.SIGTERM:
+                    termed[pid] = time.monotonic()
+                    time.sleep(INTERVAL_S)
+                else:
+                    termed.pop(pid, None)
+                    time.sleep(COOLDOWN_S)
+                continue
+            if not procs and not warned:
+                print(f"gpu-oom-guard: MemAvailable {avail} MiB but no GPU process; "
+                      "leaving it to earlyoom", flush=True)
+                warned = True
+        else:
+            warned = False
+            termed = {}
+        time.sleep(INTERVAL_S)
+
+
+if __name__ == "__main__":
+    main()
