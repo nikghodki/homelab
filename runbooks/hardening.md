@@ -20,7 +20,8 @@ audit on dgx-2: hardening index 72 (68 with 3.0.9), 0 warnings.
 reason). dgx-1: the NFS server (`nfs-server`, `nfs-blkmap`, `fsidd`, `rpcbind`; installed with the Jetson reflash
 tools on 2026-11-12, `/etc/exports` empty, no clients) and `iperf3` (a one-off link test, it never accepted a
 connection). Re-enable `nfs-server` and `rpcbind.socket` for the next Jetson reflash, and run `iperf3 -s` by hand for
-a link test. The Pi: the user unit `dclaw-tunnel` (P1.12).
+a link test. dgx-2: `iperf3` (2026-11-16; enabled since the install, never accepted a connection). The Pi: the user
+unit `dclaw-tunnel` (P1.12).
 
 ## Results (2026-11-15)
 

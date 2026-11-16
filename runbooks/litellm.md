@@ -1,8 +1,8 @@
 # LiteLLM (dgx-1)
 
 The OpenAI-compatible model gateway in front of DGXMM's on-demand models, with the DefenseClaw guardrail and traces to
-Phoenix. Deployed by Ansible since 2026-11-15 (before: hand-run from `~/litellm-setup`, now retired and kept only as a
-backup copy).
+Phoenix. Deployed by Ansible since 2026-11-15 (before: hand-run from `~/litellm-setup`, retired; the folder was deleted on
+2026-11-16).
 
 | | |
 |---|---|
@@ -71,8 +71,8 @@ backstop only; the rate limits are what bound a scanner):
 | `cisco-aibom` | `qwen3.8-27b` | 10 rpm, 100k tpm, 1 in flight, $5/day | Cisco AIBOM agentic stage, every host (`/etc/cisco-aibom/llm.env`) |
 | `hermes`, `claude-code`, `open-webui`, … | all | — | reviewed and kept (P0.17) |
 
-`defenseclaw-jetson` (qwen3.8-27b) is no longer referenced by any config since the judge key replaced it; delete it
-once nothing shows it in Phoenix.
+`defenseclaw-jetson` (qwen3.8-27b), replaced by `defenseclaw-jetson-judge`, was deleted on 2026-11-16 (last used
+2026-11-16 04:01 UTC, during the switch-over; no request after that in `LiteLLM_DailyUserSpend` or the spend log).
 
 ### Rotating the master key
 
@@ -206,7 +206,8 @@ Kept as Redis 7.4 (`redis:7-alpine`, pinned to the digest it ran): RSALv2/SSPL i
 
 - `docker exec -i` inside an `ssh … 'bash -s' <<EOF` script eats the rest of the script; use `-i` only with a
   redirect.
-- Old `~/litellm-setup` files still contain the old (revoked) master key; they're a backup copy, not used.
+- `~/litellm-setup` (the old hand-run project, with the old revoked master key) was deleted on 2026-11-16; the
+  external volumes and network keep its `litellm-setup_` names.
 - Spend logs keep no prompts or replies (`store_prompts_in_spend_logs: false`); Phoenix has those.
 - Skill and plugin scans send many parallel requests: with 2 to 4 in flight the scanners hit 429s and, after 4
   retries, fail closed ("the LLM judge did not run"), which quarantines what they scan.

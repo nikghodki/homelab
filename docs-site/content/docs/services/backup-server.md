@@ -29,7 +29,7 @@ description: The append-only restic REST server on dgx-2 and the per-host backup
 
 | Host | Paths |
 |---|---|
-| dgx-1 | `~/edge-gateway/conf`, `~/edge-gateway/dnsmasq`, `~/voice-assistant/nginx`, `~/litellm-setup`, `~/.defenseclaw`, DGXMM `data`, `config.yaml`, `secrets`, Open WebUI data (minus caches, `gguf`, `hf`) |
+| dgx-1 | `~/edge-gateway/conf`, `~/edge-gateway/dnsmasq`, `~/voice-assistant/nginx`, `/opt/homelab/litellm` (+ a `pg_dump`), `~/.defenseclaw`, DGXMM `data`, `config.yaml`, `secrets`, Open WebUI data (minus caches, `gguf`, `hf`) |
 | dgx-2 | `/opt/homelab` |
 | Jetson | `~/.hermes` (minus checkout, caches, logs), `~/hermes-homes`, Home Assistant config, `~/.defenseclaw`, `~/.config/livekit`, user units, `~/workspace/roboclaw` |
 | Dell | `~/Work`, `~/Documents`, `~/Projects` |
