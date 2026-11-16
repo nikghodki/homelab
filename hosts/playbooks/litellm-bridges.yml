@@ -14,5 +14,5 @@
         host: 10.100.136.1
         port: "{{ item }}"
         timeout: 30
-      loop: [8091, 18970]
+      loop: [8091, 18970, 4000]
       when: not ansible_check_mode

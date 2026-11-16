@@ -1,13 +1,16 @@
 # Who called the model API (runbooks/litellm.md): LiteLLM's spend log and key aliases as metrics, for Grafana.
-# Runs next to LiteLLM's Postgres (dgx-1), reads it over loopback as a read-only role, serves 127.0.0.1 only; the
-# host collector scrapes it (otel_host_collector_extra_scrapes in host_vars/dgx-1.yml).
+# Runs on dgx-1 and reads LiteLLM's database, the CNPG cluster data/litellm-db in k3s (since 2026-11-16), through the
+# primary's fixed ClusterIP as a read-only role; serves 127.0.0.1 only; the host collector scrapes it
+# (otel_host_collector_extra_scrapes in host_vars/dgx-1.yml).
 litellm_usage_exporter_enabled: false
 litellm_usage_exporter_port: 9112
 litellm_usage_exporter_poll_s: 30
 litellm_usage_exporter_prefix: /opt/litellm-usage-exporter
-litellm_usage_exporter_db_container: litellm-postgres
+litellm_usage_exporter_db_host: 10.43.0.151     # data/litellm-db-host (the CNPG primary)
 litellm_usage_exporter_db_name: litellm
-litellm_usage_exporter_db_admin: litellm        # the owner, used only to create/alter the read-only role (docker exec)
+# The role SQL runs as postgres inside the CNPG primary (kubectl exec, local socket): the app owner can't create roles.
+litellm_usage_exporter_db_namespace: data
+litellm_usage_exporter_db_cluster: litellm-db
 litellm_usage_exporter_db_role: litellm_usage_ro
 litellm_usage_exporter_db_password: ""          # secrets/observe.enc.yaml litellm_usage_db_password (playbook)
 # Columns the role may read; nothing else in the database (no prompts, no other tables). The full key hash

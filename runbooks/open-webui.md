@@ -6,19 +6,38 @@ container on dgx-1, `~/open-webui`).
 | | |
 |---|---|
 | Manifests | `cluster/apps/open-webui/` (Argo CD app `open-webui`, project `apps`) |
-| Pod | `open-webui/open-webui`, 1 replica, **pinned to dgx-1** (data on its disk; LiteLLM is there), `Recreate`; root (the image's files are root's) but no capabilities and a read-only root: init container `static` copies the static folder, which Open WebUI rewrites at start, into an emptyDir |
+| Pod | `open-webui/open-webui`, 1 replica, **pinned to dgx-1** (data on its disk), `Recreate`; root (the image's files are root's) but no capabilities and a read-only root: init container `static` copies the static folder, which Open WebUI rewrites at start, into an emptyDir |
 | Image | `ghcr.io/open-webui/open-webui:v0.13.3`, by digest (allowed in `policies/kyverno/restrict-registries.yaml`) |
 | Data | PVC `open-webui-data` (local-path, 20 Gi) on dgx-1: `webui.db` (SQLite: accounts, chats, settings), built-in Chroma, the embedding-model cache. Path: `kubectl get pv $(kubectl -n open-webui get pvc open-webui-data -o jsonpath='{.spec.volumeName}') -o jsonpath='{.spec.local.path}{.spec.hostPath.path}'` |
 | Secrets | KSOPS Secret `open-webui` (`open-webui.enc.yaml`): `WEBUI_SECRET_KEY` (signs sessions: changing it signs everyone out), `OPENAI_API_KEY` (LiteLLM virtual key `open-webui`) |
-| Models | LiteLLM `http://10.100.136.1:4000/v1` (dgx-1's cable address; LiteLLM publishes :4000) |
+| Models | LiteLLM in k3s, `http://10.43.0.150:4000/v1` (fixed ClusterIP), set **in Open WebUI's database** ([below](#model-connection)) |
 | Front door | `webui.nghodki.ai` → fixed ClusterIP `10.43.0.130:8080` (no cluster DNS on the door's path) |
-| Network policy | in: only the edge Caddy pods; out: DNS, LiteLLM (`10.100.136.1:4000` **and** Docker's `gateway` network `172.23.0.0/16:4000`: Docker DNATs the published port to the container before the policy sees it), HTTP/HTTPS to the internet (not the LAN, tailnet or cluster) |
+| Network policy | in: only the edge Caddy pods; out: DNS, the LiteLLM pods (:4000), HTTP/HTTPS to the internet (not the LAN, tailnet or cluster) |
 | Resources | requests 250m / 1 Gi, limits 2 CPU / 3 Gi (it used ~800 MiB in Docker) |
 | Health | Gatus `webui.nghodki.ai` (through the door), `/health` probes |
 
 **It never starts on an empty volume.** The init container `data-present` fails until `webui.db` exists: a fresh
 Open WebUI would create a new database and make its first visitor admin. If the pod sits in `Init:CrashLoopBackOff`,
 the volume lost its data: restore it (below), don't delete the check.
+
+## Model connection
+
+Open WebUI keeps its OpenAI connection in its database (config key `openai.api_base_urls`, with the key in
+`openai.api_keys`); the `OPENAI_API_BASE_URL` env var is only read on the very first start. So the move into k3s left
+it on `http://litellm-proxy:4000/v1` (the Docker name, unresolvable in a pod: no models) until it was set to the
+cable address on 2026-11-16 and to LiteLLM's ClusterIP after LiteLLM's move. Change it in the admin UI (Settings →
+Connections), or without a session (it reads the config from the database on every request, so no restart):
+
+```bash
+kubectl -n open-webui exec -i deploy/open-webui -c open-webui -- python3 - http://10.43.0.150:4000/v1 <<'PY'
+import sqlite3, json, sys, time
+c = sqlite3.connect("/app/backend/data/webui.db", timeout=30)
+c.execute("update config set value=?, updated_at=? where key='openai.api_base_urls'", (json.dumps([sys.argv[1]]), int(time.time())))
+c.commit(); print(c.execute("select value from config where key='openai.api_base_urls'").fetchone()[0])
+PY
+```
+
+Take a `webui.db` copy first (below). Keep the env var the same, for a fresh install.
 
 ## Move or restore the data
 

@@ -53,16 +53,35 @@
       no_log: true
       register: litellm_usage_exporter_role_sql
 
+    - name: Grants the read-only role has (CNPG primary, as postgres)
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail;
+          P=$(k3s kubectl -n {{ litellm_usage_exporter_db_namespace }} get pod
+          -l cnpg.io/cluster={{ litellm_usage_exporter_db_cluster }},cnpg.io/instanceRole=primary -o name);
+          k3s kubectl -n {{ litellm_usage_exporter_db_namespace }} exec $P -c postgres --
+          psql -Atq -U postgres -d {{ litellm_usage_exporter_db_name }} -c
+          "select count(*) from information_schema.column_privileges where grantee = '{{ litellm_usage_exporter_db_role }}'"
+        executable: /bin/bash
+      register: litellm_usage_exporter_grants
+      changed_when: false
+      check_mode: false
+
+    # After a restore (no roles or privileges come with it) or a change of the SQL
     - name: Create or update the read-only role (SQL on stdin, so the password is not in the process list)
       ansible.builtin.shell:
         cmd: >-
           set -o pipefail;
-          docker exec -i {{ litellm_usage_exporter_db_container }}
-          psql -q -U {{ litellm_usage_exporter_db_admin }} -d {{ litellm_usage_exporter_db_name }} -v ON_ERROR_STOP=1
+          P=$(k3s kubectl -n {{ litellm_usage_exporter_db_namespace }} get pod
+          -l cnpg.io/cluster={{ litellm_usage_exporter_db_cluster }},cnpg.io/instanceRole=primary -o name);
+          k3s kubectl -n {{ litellm_usage_exporter_db_namespace }} exec -i $P -c postgres --
+          psql -q -U postgres -d {{ litellm_usage_exporter_db_name }} -v ON_ERROR_STOP=1
           < /etc/litellm-usage-exporter/role.sql
         executable: /bin/bash
       changed_when: true
-      when: litellm_usage_exporter_role_sql is changed and not ansible_check_mode
+      when: >-
+        not ansible_check_mode and (litellm_usage_exporter_role_sql is changed or
+        (litellm_usage_exporter_grants.stdout | int) != (litellm_usage_exporter_db_grants.values() | map('length') | sum))
       notify: Restart litellm-usage-exporter
 
     - name: Service

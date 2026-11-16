@@ -36,6 +36,21 @@ services:
     network_mode: host
     command: ["TCP-LISTEN:18970,bind=10.100.136.1,fork,reuseaddr", "TCP:127.0.0.1:18970"]
 
+  # Transition relays (remove on 2026-11-23 with the stopped Docker copy): callers that still use LiteLLM's old
+  # addresses on dgx-1 (the ops agent's replay harness on 127.0.0.1:4000, the ops agent's default 10.100.136.1:4000)
+  # reach the k3s Service. Not on the LAN or the tailnet. For a rollback to the Docker copy stop these first: they
+  # hold :4000 on those addresses.
+  compat-loopback:
+    <<: *socat
+    container_name: litellm-compat-loopback
+    network_mode: host
+    command: ["TCP-LISTEN:4000,bind=127.0.0.1,fork,reuseaddr", "TCP:10.43.0.150:4000"]
+  compat-cable:
+    <<: *socat
+    container_name: litellm-compat-cable
+    network_mode: host
+    command: ["TCP-LISTEN:4000,bind=10.100.136.1,fork,reuseaddr", "TCP:10.43.0.150:4000"]
+
 networks:
   # DGXMM's network (DGXMM_NETWORK in ~/workspace/dgx-model-manager/.env)
   gateway:
