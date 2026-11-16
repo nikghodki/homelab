@@ -35,7 +35,7 @@ All match Pods; the `ValidatingPolicy` ones also check Deployments, StatefulSets
 **Allowed registries** (`restrict-registries`): `ghcr.io/nikghodki/`, `docker.io/rancher/` (k3s), `quay.io/argoproj/`,
 the Argo CD redis image (`ecr-public.aws.com`/`public.ecr.aws` `docker/library/redis`), `quay.io/viaductoss/ksops`,
 `reg.kyverno.io/kyverno/`, `ghcr.io/kyverno/`, `ghcr.io/cloudnative-pg/`, and for P3.3 `ghcr.io/kube-vip/kube-vip`,
-`docker.io/library/caddy`, `registry.k8s.io/kube-state-metrics/kube-state-metrics`, and `quay.io/oauth2-proxy/oauth2-proxy` (edge-auth, decision 0011). Names without a registry count
+`docker.io/library/caddy`, `registry.k8s.io/kube-state-metrics/kube-state-metrics`, `quay.io/oauth2-proxy/oauth2-proxy` (edge-auth, decision 0011), and for the ops agent (decision 0013) the read-only MCP servers `docker.io/grafana/mcp-grafana`, `quay.io/containers/kubernetes_mcp_server` and `ghcr.io/argoproj-labs/mcp-for-argocd` (exact image names, digests required). Names without a registry count
 as `docker.io/...`.
 
 Add a registry, a namespace exemption or an allowlist entry by editing the policy (a reviewed PR). CI runs the

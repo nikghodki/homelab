@@ -36,7 +36,10 @@ spec:
           'docker.io/library/caddy:',
           'registry.k8s.io/kube-state-metrics/kube-state-metrics:',
           'quay.io/oauth2-proxy/oauth2-proxy:',
-          'ghcr.io/open-webui/open-webui:'
+          'ghcr.io/open-webui/open-webui:',
+          'docker.io/grafana/mcp-grafana:',
+          'quay.io/containers/kubernetes_mcp_server:',
+          'ghcr.io/argoproj-labs/mcp-for-argocd:'
         ]
     - name: images
       expression: >-
