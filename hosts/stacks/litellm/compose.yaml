@@ -5,7 +5,7 @@ name: litellm
 services:
   litellm-redis:
     # Redis 7.4 (RSALv2/SSPL) is kept on purpose: free for private use (docs/reviews/tool-review-2026-11.md item 3).
-    image: redis:7-alpine@sha256:7b1753b4c5ad8458906c272a8132b8c15f5557b000379eb115fb239706a384b7
+    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     container_name: litellm-redis
     restart: unless-stopped
     ports:
