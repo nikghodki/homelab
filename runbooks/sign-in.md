@@ -2,7 +2,7 @@
 
 | Piece | Where |
 |---|---|
-| Pocket ID 2.19.2 | dgx-2, `hosts/stacks/console` (`playbooks/console.yml`), LAN port 1411 |
+| Pocket ID 2.19.3 | dgx-2, `hosts/stacks/console` (`playbooks/console.yml`), LAN port 1411 |
 | `https://id.nghodki.ai` | dgx-1 front door (`~/edge-gateway/conf/Caddyfile`, `@id`); http is redirected because passkeys need HTTPS |
 | Groups, users, OIDC clients | `identity/pocket-id.yaml`, applied by `hosts/files/pocket-id/pocketid_sync.py` |
 | Secrets | `secrets/console.enc.yaml`: encryption key, static API key, `oidc_<client>_secret` |

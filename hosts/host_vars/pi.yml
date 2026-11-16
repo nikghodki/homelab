@@ -35,3 +35,7 @@ lynis_skip_tests:
     reason: >-
       False positive: trixie-security is in deb822 debian.sources (deb.debian.org/debian-security), which
       Lynis 3.1.4 does not parse; roles/hardening asserts a -security suite
+# The SSH tunnel to the Jetson's DefenseClaw gateway, retired by P1.12. Checked 2026-11-15: it never connects (no
+# tag:robot -> Jetson:22 grant; restart counter 232, SYN-SENT), nothing listens on 18970. roles/retired_units
+retired_units_user:
+  - {user: nikghodki-raspberry-1, unit: dclaw-tunnel.service, reason: "retired by P1.12; it never connected"}

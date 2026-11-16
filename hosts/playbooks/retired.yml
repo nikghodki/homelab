@@ -1,0 +1,6 @@
+# Stop and disable units nothing uses (roles/retired_units, lists in host_vars). Always --check --diff first.
+- name: Retired units
+  hosts: all
+  become: true
+  roles:
+    - role: retired_units
