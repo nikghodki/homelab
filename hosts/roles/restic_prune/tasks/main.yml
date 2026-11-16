@@ -29,8 +29,10 @@
       [Service]
       Type=oneshot
       ExecStart=/usr/local/sbin/homelab-backup-prune
-      Nice=10
+      Nice=19
       IOSchedulingClass=idle
+      MemoryMax=1G
+      CPUQuota=100%
       SyslogIdentifier=homelab-backup-prune
 
 - name: Prune timer
@@ -40,9 +42,9 @@
     content: |
       # Managed by homelab Ansible (roles/restic_prune)
       [Unit]
-      Description=Weekly restic prune and check
+      Description=Daily restic prune (3 days kept) and check
       [Timer]
-      OnCalendar=Sun *-*-* 05:00:00
+      OnCalendar={{ restic_prune_time }}
       Persistent=true
       [Install]
       WantedBy=timers.target

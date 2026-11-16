@@ -45,7 +45,7 @@ Pocket ID rows: 2026-11-16, after their move into k3s).
 | 9233 | 192.168.86.36 | Temporal Prometheus metrics |
 | 4181 | 192.168.86.36 | MLflow UI gate (the `api` Caddy; front door token, else 403) |
 | 5000 | 192.168.86.36 | MLflow job API (Caddy, basic auth) |
-| 8000 | all | restic rest-server (TLS) |
+| 8000 | all (Jetson; nftables lets only fleet LAN addresses in) | restic rest-server (TLS) |
 | 9400 | 127.0.0.1 | dcgm-exporter |
 | 9109 | all | fleet-metrics |
 | 6443, 10250, 2379 | as dgx-1 | k3s |

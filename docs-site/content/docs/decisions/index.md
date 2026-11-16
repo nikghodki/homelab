@@ -44,7 +44,7 @@ The design doc's table header says "D1–D23" in places (README, `decisions/READ
 | # | Title | Date | Status | In one line |
 |---|---|---|---|---|
 | 0001 | GitHub Free | 2026-11-15 | decided | No GitHub Pro; merge only when `gh pr checks --watch` passes; long jobs go to the self-hosted runner |
-| 0002 | Backups off for now | 2026-11-15 | decided | restic setup stays merged but not deployed; off-site on hold (**live state differs**: backups run) |
+| 0002 | Backups on, to the Jetson | 2026-11-15, revised 2026-11-16 | decided | every host nightly to one rest-server on the Jetson, 500 GB cap, 3 days kept; all backups on one host (user decision) |
 | 0003 | Cisco AI Defense tools | 2026-11-15 | decided | In use: DefenseClaw, mcp-scanner, skill-scanner, a2a-scanner, AIBOM; planned: model-provenance-kit, pickle-fuzzer, project-quarry, adversarial-hubness-detector; the cloud `ai-defense-*` clients not adopted (no tenant) |
 | 0004 | OpenBot licensing | 2026-11-15 | **proposed, pending (user)** | OpenBot needs closed CopilotKit Intelligence; recommend cua + NVIDIA OpenShell |
 | 0005 | k3s over Wi-Fi | 2026-11-15 | decided | Build now; Spark-to-Spark on the cable, Jetson and Dell over Wi-Fi with /32 routes; risks and wired migration listed |

@@ -1,13 +1,15 @@
 #!/bin/bash
-# Managed by homelab Ansible (roles/restic_prune). Clients are append-only; retention runs here.
+# Managed by homelab Ansible (roles/restic_prune). Clients are append-only; retention runs here, daily:
+# keep 3 days of snapshots (user decision 2026-11-16, decision 0002), prune, then check a sample of the data.
 set -uo pipefail
 rc=0
 {% for h in restic_hosts %}
-if [ -d /srv/homelab-backup/{{ h }} ]; then
-  RESTIC_PASSWORD_FILE=/etc/restic-prune/{{ h }}.pw /usr/local/bin/restic -r /srv/homelab-backup/{{ h }} \
-    forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune --cache-dir /var/cache/restic-prune || rc=1
-  RESTIC_PASSWORD_FILE=/etc/restic-prune/{{ h }}.pw /usr/local/bin/restic -r /srv/homelab-backup/{{ h }} \
-    check --read-data-subset=2% --cache-dir /var/cache/restic-prune || rc=1
+if [ -d {{ restic_prune_root }}/{{ h }} ]; then
+  RESTIC_PASSWORD_FILE=/etc/restic-prune/{{ h }}.pw /usr/local/bin/restic -r {{ restic_prune_root }}/{{ h }} \
+    forget --keep-within {{ restic_prune_keep_within }} --prune --cache-dir /var/cache/restic-prune || rc=1
+  RESTIC_PASSWORD_FILE=/etc/restic-prune/{{ h }}.pw /usr/local/bin/restic -r {{ restic_prune_root }}/{{ h }} \
+    check --read-data-subset=5% --cache-dir /var/cache/restic-prune || rc=1
 fi
 {% endfor %}
+df -h --output=used,size,pcent {{ restic_prune_root }} | tail -1 | sed 's/^/backup filesystem: /'
 exit $rc

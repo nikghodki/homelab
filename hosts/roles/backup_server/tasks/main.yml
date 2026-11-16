@@ -1,0 +1,78 @@
+- name: Image file for the backup filesystem (allocated up front, so the 500 GB are really there)
+  ansible.builtin.command:
+    cmd: fallocate -l {{ backup_server_size }} {{ backup_server_image }}
+    creates: "{{ backup_server_image }}"
+  register: backup_server_image_created
+
+- name: Image file is root-only
+  ansible.builtin.file:
+    path: "{{ backup_server_image }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: not (ansible_check_mode and backup_server_image_created is changed)
+
+- name: Filesystem in the image
+  community.general.filesystem:
+    dev: "{{ backup_server_image }}"
+    fstype: ext4
+    opts: -m 0 -L homelab-backup
+  when: not (ansible_check_mode and backup_server_image_created is changed)
+
+- name: Mounted at boot (nofail, so a broken image never blocks the boot)
+  ansible.posix.mount:
+    path: "{{ backup_server_mount }}"
+    src: "{{ backup_server_image }}"
+    fstype: ext4
+    opts: loop,noatime,nofail
+    state: mounted
+  when: not (ansible_check_mode and backup_server_image_created is changed)
+
+- name: Repository folder on the backup filesystem (rest-server's bind mount; missing when unmounted)
+  ansible.builtin.file:
+    path: "{{ backup_server_mount }}/repos"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: not (ansible_check_mode and backup_server_image_created is changed)
+
+- name: Folder for the firewall rule
+  ansible.builtin.file:
+    path: "{{ backup_server_guard_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Firewall rule (only fleet hosts reach the backup port)
+  ansible.builtin.template:
+    src: backup-server-guard.nft.j2
+    dest: "{{ backup_server_guard_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/nft -c -f %s
+  notify: Reload the backup server guard
+
+- name: Firewall unit
+  ansible.builtin.template:
+    src: backup-server-guard.service.j2
+    dest: /etc/systemd/system/backup-server-guard.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: backup_server_guard_unit
+  notify:
+    - Reload systemd
+    - Reload the backup server guard
+
+- name: Flush handlers (the rule is loaded before rest-server starts)
+  ansible.builtin.meta: flush_handlers
+
+- name: Firewall unit is enabled and started
+  ansible.builtin.systemd_service:
+    name: backup-server-guard.service
+    enabled: true
+    state: started
+  when: not (ansible_check_mode and backup_server_guard_unit is changed)

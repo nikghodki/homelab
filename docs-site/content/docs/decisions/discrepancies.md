@@ -13,7 +13,7 @@ and #26 (the 2026-11-16 status PR).
 
 | # | What the repo says | What is live | Where to look |
 |---|---|---|---|
-| 1 | Decision 0002: backups "stay merged but **not deployed**" | The restic rest-server runs on dgx-2; `homelab-backup.timer` is enabled on dgx-1, dgx-2, the Jetson and the Pi; `homelab-backup-prune.timer` on dgx-2; dgx-1's run at 03:24 on 2026-11-15 saved a snapshot. Not installed on the Dell | [Backups](../operations/backups.md) |
+| 1 | Decision 0002: backups "stay merged but **not deployed**" | The restic rest-server runs on dgx-2; `homelab-backup.timer` is enabled on dgx-1, dgx-2, the Jetson and the Pi; `homelab-backup-prune.timer` on dgx-2; dgx-1's run at 03:24 on 2026-11-15 saved a snapshot. Not installed on the Dell **Resolved 2026-11-16**: decision 0002 revised (backups on, to the Jetson) | [Backups](../operations/backups.md) |
 | 6 | (not in the repo) | `earlyoom` and `gpu-oom-guard.service` run on both Sparks; the unit file says "Managed by homelab Ansible (roles/memory_guard)", but no `memory_guard` role existed on `main` or any remote branch. **Resolved 2026-11-16**: the role is in Git (playbooks/gpu.yml) | [GPU OOM incident](../operations/incident-gpu-oom.md) |
 | 7 | Architecture §3.1: Fleet broker, NATS "in k3s" | They run in Docker; in k3s are Argo CD, Kyverno, CNPG, CoreDNS zone, P3.3's kube-vip, `edge` front door and kube-state-metrics, and since 2026-11-16 Open WebUI, LiteLLM (namespace `litellm`, Postgres on CNPG) and Pocket ID | [Platform](../platform/index.md) |
 | 8 | Decision 0008: GHCR packages `mlflow` and `ros-zenoh` public | Still private: Kyverno refuses both with `UNAUTHORIZED` (P3.5 acceptance case b pending) | [Kyverno](../platform/kyverno.md) |

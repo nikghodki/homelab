@@ -1,10 +1,13 @@
-# Backup server on dgx-2 (plan P1.10): restic REST server, append-only, one private repo per host, TLS.
+# Backup server on the Jetson (plan P1.10; user decision 2026-11-16, decision 0002): restic REST server, append-only,
+# one private repo per host, TLS. Repositories live on the 500 GB backup filesystem (role backup_server); the host
+# network and role backup_server's nftables table keep the port to fleet hosts.
 name: backup
 
 services:
   rest-server:
     image: restic/rest-server:0.14.0@sha256:d2aff06f47eb38637dff580c3e6bce4af98f386c396a25d32eb6727ec96214a5
     restart: unless-stopped
+    network_mode: host
     environment:
       OPTIONS: >-
         --append-only --private-repos
@@ -12,7 +15,14 @@ services:
         --tls --tls-cert /etc/rest-server/backup.crt --tls-key /etc/rest-server/backup.key
         --prometheus --prometheus-no-auth
     volumes:
-      - /srv/homelab-backup:/data
+      # Fails to start (instead of writing to the root filesystem) when the backup filesystem isn't mounted
+      - type: bind
+        source: /srv/homelab-backup/repos
+        target: /data
+        bind: {create_host_path: false}
       - ./rest-server:/etc/rest-server:ro
-    ports:
-      - "8000:8000"
+    # The Jetson has 8 GB and runs Hermes, Home Assistant and etcd: small, low-priority
+    mem_limit: 256m
+    cpus: 1.0
+    cpu_shares: 256
+    pids_limit: 256
