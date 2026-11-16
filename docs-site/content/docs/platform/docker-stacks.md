@@ -13,7 +13,7 @@ SOPS). All images are pinned by digest; Renovate keeps them current.
 |---|---|---|---|---|---|
 | `observe` | dgx-2 | `observe.yml` | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, otel-defenseclaw, otel-fleet, Grafana, Phoenix | `observe`, `console` | `observe` |
 | `alerting` | Dell | `alerting.yml` | Gatus 5.38.0, status-gate (Caddy 2.11.9), ntfy 2.38.0; plus `tailscale serve` | `observe`, `console` | stays on the Dell, outside the cluster |
-| `ops` | Dell | `ops.yml` | Homepage 2.8.0, Caddy (docs site + Homepage gate) | `console` | `console` |
+| `ops` | Dell | `ops.yml` | Homepage 2.8.0, Caddy (docs site + Homepage gate) | `console` | stays on the Dell, outside the cluster (decision 0009) |
 | `console` | dgx-2 | `console.yml` | Pocket ID 2.19.3 | `console` | `console` |
 | `bus` | dgx-1 | `bus.yml` | NATS 2.15.3 | `bus`, `pki` | `bus` (3 replicas) |
 | `fleet` | dgx-1 | `fleet.yml` | Mosquitto 2.1.2, Caddy 2.11.9 (host network) | `fleet`, `pki` | `security` |

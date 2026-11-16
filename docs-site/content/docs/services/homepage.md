@@ -14,6 +14,7 @@ Homepage is the interim "single pane of glass" launcher until the Fleet Console 
 | Secrets | `edge_origin_token` (`secrets/console.enc.yaml`), rendered into the gate |
 | Host overrides | `extra_hosts` send every `*.nghodki.ai` name its siteMonitors use to the in-cluster front door's VIP `192.168.86.11` (until 2026-11-15 they pointed at dgx-1's old door) |
 | Config | `homepage/services.yaml` (tiles), `settings.yaml`, `widgets.yaml` (date and search only), `bookmarks.yaml` (empty) |
+| k3s target | none: stays on the Dell, outside the cluster (decision 0009) |
 | Health | Gatus `ops.nghodki.ai (Homepage)` expects 302 to Pocket ID when signed out; `Homepage gate refuses direct access` expects 403 |
 
 Tiles (with a `siteMonitor` each, mostly through the front door): Observe (Grafana, Status, Phoenix, ntfy), Models (Open

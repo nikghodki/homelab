@@ -95,7 +95,7 @@ Numbers marked "est." are estimates, not measurements.
 | `jobs` | Temporal, batch jobs, ARC runners | dgx-2 |
 | `sim` | Isaac Lab / Isaac Sim and MuJoCo training and evaluation jobs, MLflow | dgx-2 (dgx-1 overnight) |
 | `observe` | VictoriaMetrics, Loki, Tempo, Grafana, Phoenix, Gatus, Alertmanager, ntfy, OTel gateway; **dcgm-exporter** (DaemonSet, `nghodki.ai/role=gpu` nodes only) | dgx-2; dcgm-exporter on both Sparks |
-| `console` | Fleet Console, Homepage (interim), **Pocket ID** (`id.nghodki.ai`) | dgx-2 |
+| `console` | Fleet Console, **Pocket ID** (`id.nghodki.ai`) | dgx-2 |
 | `security` | Tetragon, policy bundles, nightly AIBOM job; **Fleet MQTT broker** (Mosquitto, D24, `fleet.nghodki.ai:8884`, TLS, per-device ACLs); **Fleet API TLS proxy** (Caddy `:8971`) | Fleet broker and proxy pinned to dgx-1 |
 | `argocd` | Argo CD | Sparks |
 | `kyverno` | Kyverno (own namespace: Kyverno skips its own namespace at admission (resourceFilters), so it isn't shared with `security` workloads; decision 0006) | Sparks |
@@ -132,7 +132,7 @@ unless noted. P3.7 moves each into its k3s namespace and removes the Docker copy
 |---|---|---|---|
 | `observe` | dgx-2 | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, two OTel gateways, Grafana, Phoenix | `observe` |
 | `alerting` | Omarchy (the Dell, never sleeps) | Gatus 5.38.0 (UI signed in at the front door, `status-gate`), ntfy 2.38.0 (phone over Tailscale HTTPS). Off the Sparks so alerts still arrive when a Spark or dgx-1's front door is down ([alerting](../runbooks/alerting.md)) | Stays on the Dell, outside the cluster (alerting must not depend on it) |
-| `ops` | Omarchy | Homepage 2.8.0, signed in at the front door (`ops.nghodki.ai`, LAN gate port 4180) | `console` |
+| `ops` | Omarchy | Homepage 2.8.0, signed in at the front door (`ops.nghodki.ai`, LAN gate port 4180) | Stays on the Dell, outside the cluster (decision 0009) |
 | `console` | dgx-2 | Pocket ID 2.19.3 (LAN port 1411; dgx-1 Caddy terminates TLS) | `console` |
 | `bus` | dgx-1 | NATS 2.15.3 (4222 TLS, MQTT 8883 TLS) | `bus` (3 replicas) |
 | `fleet` | dgx-1 | Mosquitto 2.1.2 (8884 TLS), Caddy Fleet API proxy (host network, `:8971`) | `security` |
