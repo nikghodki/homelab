@@ -149,10 +149,16 @@
 		reverse_proxy 192.168.86.36:3000
 	}
 
-	# Gatus and ntfy run on the Dell (hosts/stacks/alerting, runbooks/alerting.md).
+	# Gatus and ntfy run on the Dell (hosts/stacks/alerting, runbooks/alerting.md). Gatus' UI: the status gate on :8081;
+	# /health stays open (Gatus' own check through the door, Homepage's siteMonitor).
 	@status host status.nghodki.ai
 	handle @status {
-		reverse_proxy 192.168.86.49:8081
+		handle /health {
+			reverse_proxy 192.168.86.49:8081
+		}
+		handle {
+			import signed_in 192.168.86.49:8081 admins
+		}
 	}
 
 	@ntfy host ntfy.nghodki.ai

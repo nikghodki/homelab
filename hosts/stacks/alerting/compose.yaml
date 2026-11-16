@@ -7,7 +7,7 @@ x-restart: &restart
   restart: unless-stopped
 
 services:
-  # Uptime checks against LAN addresses (it watches the Sparks from outside). No login of its own (see status-proxy),
+  # Uptime checks against LAN addresses (it watches the Sparks from outside). No login of its own (see status-gate),
   # so only loopback is published: break-glass UI with `ssh -L 8082:127.0.0.1:8082 nikghodki@192.168.86.49`.
   gatus:
     <<: *restart
@@ -20,19 +20,24 @@ services:
       - "127.0.0.1:8082:8080"
     depends_on: [ntfy]
 
-  # Sign-in for status.nghodki.ai through Pocket ID (client `gatus`, admins only). LAN clients: dgx-1 Caddy, and without
-  # a session only /health, /metrics (VictoriaMetrics) and the heartbeat endpoint (Alertmanager).
-  status-proxy:
+  # status.nghodki.ai: people sign in at the front door (edge-auth, decision 0011, admins only). This Caddy passes
+  # requests with the front door's X-Edge-Origin token to Gatus' UI; without it only /health, /metrics
+  # (VictoriaMetrics) and the heartbeat endpoint (Alertmanager). It needs neither Pocket ID nor the Sparks to start.
+  status-gate:
     <<: *restart
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
-    command: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    user: "65532:65532"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      XDG_CONFIG_HOME: /tmp
+      XDG_DATA_HOME: /tmp
+    tmpfs: [/tmp]
     volumes:
-      - ./status-proxy/oauth2-proxy.cfg:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
-      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-    # Reach id.nghodki.ai at the front door and trust the homelab web CA from the host's bundle (role homelab_ca).
-    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+      - ./status-gate/Caddyfile:/etc/caddy/Caddyfile:ro
     ports:
-      - "192.168.86.49:8081:4180"
+      - "192.168.86.49:8081:8081"
     depends_on: [gatus]
 
   # The phone subscribes over Tailscale HTTPS (tailscale serve -> 127.0.0.1:8085), which needs neither Spark.

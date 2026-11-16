@@ -1,0 +1,36 @@
+# The gate in front of Gatus' web UI (stacks/alerting, runbooks/alerting.md), on 192.168.86.49:8081. Rendered 0600
+# for uid 65532 (the container user): it holds the edge origin token. People sign in at the front door (edge-auth,
+# decision 0011), which adds X-Edge-Origin; without it only what machines need answers. Gatus' checks and alerts don't
+# go through here at all.
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+:8081 {
+	# No session needed: health checks (Gatus' own through the door, Homepage), VictoriaMetrics' scrape, and
+	# Alertmanager's heartbeat (Gatus checks its token).
+	@open {
+		method GET
+		path /health /metrics
+	}
+	@heartbeat {
+		method POST
+		path_regexp ^/api/v1/endpoints/[^/]+/external$
+	}
+	@door header X-Edge-Origin "{{ edge_origin_token }}"
+	handle @open {
+		reverse_proxy gatus:8080
+	}
+	handle @heartbeat {
+		reverse_proxy gatus:8080
+	}
+	handle @door {
+		request_header -X-Edge-Origin
+		reverse_proxy gatus:8080
+	}
+	handle {
+		respond "Use https://status.nghodki.ai" 403
+	}
+}
