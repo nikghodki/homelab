@@ -115,6 +115,12 @@ jobs:
       - name: shellcheck (*.sh and shell templates)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         run: .github/scripts/shellcheck.sh "$SHELLCHECK_IMAGE"
+      - name: Ansible collections cache (per day and hosts/requirements.yml, so new collection releases still arrive)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.ansible/collections
+          key: ansible-collections-${{ hashFiles('hosts/requirements.yml', '.github/requirements-ci.txt') }}-${{ steps.scope.outputs.day }}
       - name: ansible-lint
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' && hashFiles('hosts/**/*.yml', 'hosts/**/*.yaml') != '' }}
         working-directory: hosts
@@ -212,16 +218,12 @@ jobs:
       - name: Trivy ignore file (reasons, 30-day expiry)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         run: python3 .github/scripts/check-trivy-ignores.py --no-expiry
-      - name: Trivy DB date
-        id: trivy-day
-        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
-        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
       - name: Trivy DB and checks cache (one per day; a stale DB is refreshed by Trivy itself)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/trivy-cache
-          key: trivy-db-${{ steps.trivy-day.outputs.day }}
+          key: trivy-db-${{ steps.scope.outputs.day }}
           restore-keys: trivy-db-
       - name: Trivy (vulnerabilities, misconfigurations)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}

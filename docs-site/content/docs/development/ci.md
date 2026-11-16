@@ -27,7 +27,8 @@ reports every failure, and any failed step fails the job.
 - **No run on a push to `main`**: a squash merge pushes the tree its PR run passed. The daily run at 08:47 UTC runs the
   full suite on `main` (merge skew shows within a day) and saves the caches. `build-sign.yml` still runs on pushes.
 - **Caches**: `setup-python` `cache: pip` keyed on the hash-locked requirement files (downloads only;
-  `--require-hashes` still checks every file), and the Trivy DB per day. A cache saved on a PR is visible to that PR
+  `--require-hashes` still checks every file), the Trivy DB per day, and the Ansible collections per day and `hosts/requirements.yml` (so new releases within
+  its ranges still arrive within a day). A cache saved on a PR is visible to that PR
   only, which is why the daily run on `main` matters.
 - **Concurrency**: a new push to a PR cancels that PR's older run; the daily and manual runs are never cancelled.
 - **Secret scanning** reads only the PR's commits, so a false positive on another unmerged branch no longer fails

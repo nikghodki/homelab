@@ -3,10 +3,12 @@
 #   code=true|false  false only for a PR that changes nothing but docs (then lint, tests and scans are skipped)
 #   yaml=true|false  the PR changes a *.yml/*.yaml file (a docs-only PR still gets yamllint then)
 #   base, head       the PR's own commits for the secret scanners (base..head); empty outside a PR (full history)
+#   day              UTC date, for caches that are refreshed daily (Trivy DB, Ansible collections)
 # A PR run checks out the merge commit refs/pull/N/merge: HEAD^1 is main, HEAD^2 the PR head (fetch-depth >= 2).
 # Docs: docs/, docs-site/, runbooks/, decisions/ and *.md, except under agents/ and tools/ (SKILL.md is scanned).
 set -euo pipefail
 out=${GITHUB_OUTPUT:-/dev/stdout}
+echo "day=$(date -u +%Y-%m-%d)" >> "$out"
 
 if [ "${GITHUB_EVENT_NAME:-}" != pull_request ]; then
   echo "event ${GITHUB_EVENT_NAME:-none}: full suite, secret scanners on the full history of $(git rev-parse HEAD)"
