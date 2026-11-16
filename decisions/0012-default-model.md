@@ -47,6 +47,8 @@ needs change.
 ## Consequences
 
 - One model to keep warm; its cold start (about 4.5 min) hits whoever calls first after it sleeps.
+- The Jetson scanner/judge key gets `qwen3.8-27b` with thinking off (LiteLLM key alias to the route
+  `qwen3.8-27b-nothink`, 2026-11-16): DefenseClaw's plugin watcher allows its LLM call only 120 s.
 - When the P2.0 aliases exist, only LiteLLM changes (an alias such as `smart` pointing at `qwen3.8-27b`), then the
   consumers move to the alias name.
 - Not changed: three disabled Hermes cron jobs (nikjetson) still name `anthropic`/`claude-sonnet-4`; set them to
