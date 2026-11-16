@@ -1,0 +1,202 @@
+# The *.nghodki.ai front door in k3s (decision 0007, runbooks/edge.md). Same routes as edge-caddy on dgx-1
+# (~/edge-gateway/conf/Caddyfile), with three differences, all because this runs in a pod:
+#   - nginx-gateway (model, dgxmanager, ha, voice-agent, anything else) is only on dgx-1's Docker network `gateway`,
+#     so those routes go through edge-caddy on dgx-1 (192.168.86.44:80), which hands them to nginx-gateway.
+#   - Argo CD by its Service name instead of the fixed ClusterIP 10.43.0.100.
+#   - The wildcard cert is the TLS Secret `web-tls` (KSOPS); the CA page is a ConfigMap of hosts/files/web-ca.
+# Served on :80 and on :443 with the homelab web CA's wildcard (runbooks/web-https.md).
+{
+	grace_period 10s
+}
+
+(nghodki_routes) {
+	# Pocket ID (dgx-2, console stack). Passkeys need HTTPS, so http is redirected.
+	@id host id.nghodki.ai
+	handle @id {
+		@plain protocol http
+		redir @plain https://{host}{uri} 308
+		reverse_proxy 192.168.86.36:1411
+	}
+
+	# Homepage launcher (Dell ops stack) behind oauth2-proxy + Pocket ID. Session cookies are Secure, so http is redirected.
+	@ops host ops.nghodki.ai
+	handle @ops {
+		@plain protocol http
+		redir @plain https://{host}{uri} 308
+		reverse_proxy 192.168.86.49:4180
+	}
+
+	@ca host ca.nghodki.ai
+	handle @ca {
+		root * /etc/caddy/ca
+		header /*.mobileconfig Content-Type application/x-apple-aspen-config
+		header /*.crt Content-Type application/x-x509-ca-cert
+		file_server {
+			# the ConfigMap volume's ..data symlinks
+			hide ..*
+		}
+	}
+
+	@model host model.nghodki.ai
+	handle @model {
+		reverse_proxy 192.168.86.44:80 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			# on-demand models: a cold start or queued request can wait several minutes; stream without buffering
+			flush_interval -1
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+
+	# Observability on dgx-2
+	@grafana host grafana.nghodki.ai
+	handle @grafana {
+		reverse_proxy 192.168.86.36:3000
+	}
+
+	# Gatus and ntfy run on the Dell (hosts/stacks/alerting, runbooks/alerting.md).
+	@status host status.nghodki.ai
+	handle @status {
+		reverse_proxy 192.168.86.49:8081
+	}
+
+	@ntfy host ntfy.nghodki.ai
+	handle @ntfy {
+		reverse_proxy 192.168.86.49:8085 {
+			flush_interval -1
+		}
+	}
+
+	@phoenix host phoenix.nghodki.ai
+	handle @phoenix {
+		reverse_proxy 192.168.86.36:6006
+	}
+
+	# MLflow (dgx-2 ml stack) behind oauth2-proxy. Its session cookies are Secure, so http is redirected.
+	@mlflow host mlflow.nghodki.ai
+	handle @mlflow {
+		@plain protocol http
+		redir @plain https://{host}{uri} 308
+		reverse_proxy 192.168.86.36:4181
+	}
+
+	# Temporal Web UI (dgx-2 jobs stack), Pocket ID sign-in. Its session cookies are Secure, so http is redirected.
+	@temporal host temporal.nghodki.ai
+	handle @temporal {
+		@plain protocol http
+		redir @plain https://{host}{uri} 308
+		reverse_proxy 192.168.86.36:8233
+	}
+
+	# Argo CD (runbooks/argocd.md): the server runs insecure; TLS ends here.
+	@argocd host argocd.nghodki.ai
+	handle @argocd {
+		@plain protocol http
+		redir @plain https://{host}{uri} 308
+		reverse_proxy argocd-server.argocd.svc.cluster.local:80 {
+			flush_interval -1
+		}
+	}
+
+	@admin host litellm-admin.nghodki.ai
+	handle @admin {
+		reverse_proxy 100.65.137.82:4000 {
+			header_up Host {upstream_hostport}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+
+	@control host controlcenter.nghodki.ai
+	handle @control {
+		# RoboClaw Control Center on the Jetson (uvicorn :8200)
+		reverse_proxy 192.168.86.211:8200
+	}
+
+	@dgxmm host dgxmanager.nghodki.ai
+	handle @dgxmm {
+		redir / /dgxmm/ 302
+		reverse_proxy 192.168.86.44:80 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			flush_interval -1
+		}
+	}
+
+	@coolify host coolify.nghodki.ai
+	handle @coolify {
+		# Coolify realtime (soketi) and web terminal websockets
+		handle /app/* {
+			reverse_proxy 100.65.137.82:6001
+		}
+		handle /terminal/ws {
+			reverse_proxy 100.65.137.82:6002
+		}
+		handle {
+			reverse_proxy 100.65.137.82:8000 {
+				flush_interval -1
+			}
+		}
+	}
+
+	@webui host webui.nghodki.ai
+	handle @webui {
+		reverse_proxy 100.65.137.82:3100 {
+			header_up Host {upstream_hostport}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			# chat replies stream; on-demand models can cold-start for minutes
+			flush_interval -1
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+
+	# Anything else (ha.nghodki.ai, or the front door by IP) is nginx-gateway's, through edge-caddy on dgx-1.
+	handle {
+		reverse_proxy 192.168.86.44:80 {
+			flush_interval -1
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+}
+
+:80 {
+	import nghodki_routes
+}
+
+:443 {
+	tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
+	import nghodki_routes
+}
+
+voice-agent.nghodki.ai {
+	tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
+
+	@livekit {
+		path /rtc*
+		path /twirp/*
+	}
+	handle @livekit {
+		reverse_proxy 100.65.137.82:7880
+	}
+
+	handle {
+		reverse_proxy 192.168.86.44:80 {
+			header_up Host voice-agent.nghodki.ai
+		}
+	}
+}
+
+# Probes (pod-internal).
+:8081 {
+	respond /healthz "ok" 200
+}

@@ -1,0 +1,41 @@
+# Every *.nghodki.ai name: the one list (runbooks/edge.md). `.github/scripts/edge-zone.py generate` writes the
+# CoreDNS zones (coredns/lan.db, coredns/tailnet.db) and the edge-dnsmasq lines from it; CI fails if they're stale.
+#
+# Targets (addresses in the [targets] table of edge-zone.py):
+#   edge   the front door (Caddy): LAN -> the edge VIP 192.168.86.11, tailnet -> both Sparks' Tailscale IPs
+#   api    the k3s API:           LAN -> the API VIP 192.168.86.10,  tailnet -> both Sparks' Tailscale IPs
+#   dgx-1, dgx-2   that host directly (not through Caddy): LAN -> its LAN IP, tailnet -> its Tailscale IP + LAN IP
+#   an IPv4 address   that address in both views (LAN-only devices)
+#
+# name             target
+jetson             192.168.86.211
+dgx                192.168.86.44
+raspberrypi        192.168.86.34
+pi                 192.168.86.34
+esp32              192.168.86.50
+
+model              edge
+litellm-admin      edge
+controlcenter      edge
+voice-agent        edge
+dgxmanager         edge
+webui              edge
+coolify            edge
+ha                 edge
+grafana            edge
+status             edge
+ntfy               edge
+ca                 edge
+id                 edge
+ops                edge
+phoenix            edge
+temporal           edge
+mlflow             edge
+argocd             edge
+
+# Not HTTP: NATS (4222/8883) and the DefenseClaw Fleet broker/API (8884/8971) on dgx-1, restic on dgx-2.
+nats               dgx-1
+fleet              dgx-1
+backup             dgx-2
+
+k8s                api

@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>nghodki.ai HTTPS setup</title>
+<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:2rem auto;padding:0 1rem;line-height:1.5}a.b{display:inline-block;padding:.6rem 1rem;margin:.3rem 0;border-radius:.5rem;background:#2563eb;color:#fff;text-decoration:none}code{word-break:break-all}</style></head><body>
+<h1>HTTPS for *.nghodki.ai</h1>
+<p>Install this once per device. It only lets your device trust <b>nghodki.ai</b> sites; it can't vouch for any other website.</p>
+<h2>iPhone / iPad</h2>
+<p><a class="b" href="nghodki-web-ca.mobileconfig">Download profile</a></p>
+<ol><li>Open it in <b>Safari</b> and tap <b>Allow</b>.</li><li>Settings &rarr; <b>Profile Downloaded</b> &rarr; Install.</li>
+<li>Settings &rarr; General &rarr; About &rarr; <b>Certificate Trust Settings</b> &rarr; turn on <b>nghodki homelab web CA</b>.</li></ol>
+<h2>Mac</h2>
+<p><a class="b" href="nghodki-web-ca.crt">Download certificate</a></p>
+<ol><li>Open the file; it goes into Keychain Access (System).</li><li>Double-click <b>nghodki homelab web CA</b> &rarr; Trust &rarr; <b>Always Trust</b>.</li></ol>
+<h2>Android</h2>
+<p><a class="b" href="nghodki-web-ca.crt">Download certificate</a></p>
+<p>Settings &rarr; Security &rarr; More security settings &rarr; Encryption &amp; credentials &rarr; Install a certificate &rarr; <b>CA certificate</b>. (Menu names vary by phone.)</p>
+<h2>Windows</h2>
+<p><a class="b" href="nghodki-web-ca.crt">Download certificate</a> &rarr; Install Certificate &rarr; Local Machine &rarr; <b>Trusted Root Certification Authorities</b>.</p>
+<p>Then open <a href="https://webui.nghodki.ai">https://webui.nghodki.ai</a>. No warning means it worked.</p>
+<p><small>SHA-256 fingerprint: <code>D0:5A:E2:93:51:C5:01:01:CF:BC:EE:C7:27:0E:E4:2B:80:AA:D4:DC:37:EA:73:B9:B6:54:8D:5D:07:7F:32:C5</code></small></p>
+</body></html>

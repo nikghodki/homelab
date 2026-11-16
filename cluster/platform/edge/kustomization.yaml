@@ -1,0 +1,26 @@
+# The edge namespace: CoreDNS for *.nghodki.ai and Caddy, the front door (decision 0007, runbooks/edge.md).
+# names.txt is the source of the zones and caddy/ca is a copy of hosts/files/web-ca: both written by
+# .github/scripts/edge-zone.py generate (CI checks them). A change to any of them rolls the pods (hashed names).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: edge
+resources:
+  - namespace.yaml
+  - coredns.yaml
+  - caddy.yaml
+generators:
+  - secret-generator.yaml
+configMapGenerator:
+  - name: edge-dns
+    files:
+      - coredns/Corefile
+      - coredns/lan.db
+      - coredns/tailnet.db
+  - name: edge-caddy
+    files:
+      - caddy/Caddyfile
+  - name: edge-ca-page
+    files:
+      - caddy/ca/index.html
+      - caddy/ca/nghodki-web-ca.crt
+      - caddy/ca/nghodki-web-ca.mobileconfig
