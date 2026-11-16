@@ -1,0 +1,42 @@
+# Host-side relays on dgx-1 for LiteLLM in k3s (cluster/apps/litellm, runbooks/litellm.md "In k3s"). Deployed by
+# playbooks/litellm-bridges.yml. Both listen only on dgx-1's direct-cable address 10.100.136.1, which only the two
+# Sparks reach (the LiteLLM pods run one per Spark). Each still needs its own credential; neither is on the LAN.
+name: litellm-bridges
+
+x-socat: &socat
+  image: alpine/socat:1.8.0.3@sha256:beb4a68d9e4fe6b0f21ea774a0fde6c31f580dde6368939ed70100c5385b015e
+  restart: unless-stopped
+  user: "65534:65534"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  mem_limit: 128m
+  pids_limit: 512
+
+services:
+  # DGXMM's on-demand gateway answers only peers on its own Docker networks, never a network gateway address or a
+  # trusted proxy (dgxmm/ondemand/gateway.py). Pods arrive as 172.23.0.1 (dgx-1, masqueraded onto `gateway`) or
+  # 10.100.136.2 (dgx-2), both refused. This relay sits on `gateway`, so DGXMM sees its container address; LiteLLM's
+  # on-demand routes point here through DGXMM's `dgxmm_internal_url` (http://10.100.136.1:8091/dgxmm). The on-demand
+  # bearer key is still required, and the front door still answers 404 for /dgxmm/ondemand/*.
+  dgxmm-ondemand:
+    <<: *socat
+    container_name: litellm-dgxmm-bridge
+    ports:
+      - "10.100.136.1:8091:8091"
+    networks: [gateway]
+    command: ["TCP-LISTEN:8091,fork,reuseaddr", "TCP:dgxmm:8090"]
+
+  # dgx-1's DefenseClaw gateway listens on 127.0.0.1:18970 only. The Docker LiteLLM reached it through
+  # litellm-defenseclaw-bridge on docker0 (172.17.0.1); pods on both Sparks reach this one on the cable address.
+  # The gateway token is still required.
+  defenseclaw-cable:
+    <<: *socat
+    container_name: litellm-defenseclaw-cable
+    network_mode: host
+    command: ["TCP-LISTEN:18970,bind=10.100.136.1,fork,reuseaddr", "TCP:127.0.0.1:18970"]
+
+networks:
+  # DGXMM's network (DGXMM_NETWORK in ~/workspace/dgx-model-manager/.env)
+  gateway:
+    external: true

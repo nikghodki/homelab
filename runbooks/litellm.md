@@ -19,6 +19,20 @@ Phoenix. Deployed by Ansible since 2026-11-15 (before: hand-run from `~/litellm-
 Deploy: `cd ~/homelab/hosts && ansible-playbook playbooks/litellm.yml --check --diff`, then without `--check`. A
 changed `config.yaml`, env file or plugin restarts `litellm-proxy` (about 25 s of 502s/connection errors).
 
+## Host-side relays for the move into k3s
+
+LiteLLM moves into k3s (P3.7; two pods, one per Spark). Two things it calls stay on dgx-1 and are reachable only
+from there, so `hosts/stacks/litellm-bridges` (`playbooks/litellm-bridges.yml`) relays them on dgx-1's direct-cable
+address `10.100.136.1`, which only the two Sparks reach:
+
+| Relay | Listens | To | Why |
+|---|---|---|---|
+| `litellm-dgxmm-bridge` (socat, Docker network `gateway`) | `10.100.136.1:8091` | `dgxmm:8090` | DGXMM's on-demand gateway serves only peers on its Docker networks (not a network gateway, not a trusted proxy); a pod arrives as `172.23.0.1` (dgx-1) or `10.100.136.2` (dgx-2) and gets 404. Through the relay DGXMM sees the relay's container address. DGXMM's `dgxmm_internal_url` points the on-demand routes here |
+| `litellm-defenseclaw-cable` (socat, host network) | `10.100.136.1:18970` | `127.0.0.1:18970` | the DefenseClaw gateway listens on loopback; the Docker LiteLLM used `litellm-defenseclaw-bridge` on docker0, which pods on dgx-2 can't reach |
+
+Both are unauthenticated TCP relays: the on-demand bearer key and the DefenseClaw gateway token are still required,
+and the front door keeps answering 404 for `/dgxmm/ondemand/*`. Check: `ss -ltn 'sport = :8091 or sport = :18970'`.
+
 ## Admin UI sign-in
 
 `https://litellm-admin.nghodki.ai`: the front door asks for the edge-auth session (group `admins`), then LiteLLM's
