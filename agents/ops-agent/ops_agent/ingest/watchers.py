@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import logging
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -73,9 +74,11 @@ def sync_repo() -> str | None:
     if not Path(s.deploy_key_file).exists():
         return None
     repo = Path(s.repo_dir)
+    if (repo / "HEAD").exists() and "promisor" in (repo / "config").read_text():
+        shutil.rmtree(repo)   # an old partial clone: the docs index reads blobs offline, so clone in full (~30 MB)
     if not (repo / "HEAD").exists():
         repo.parent.mkdir(parents=True, exist_ok=True)
-        _git("clone", "--bare", "--filter=blob:none", "--single-branch", "--branch", "main", s.repo_url, str(repo))
+        _git("clone", "--bare", "--single-branch", "--branch", "main", s.repo_url, str(repo))
     _git("-C", str(repo), "fetch", "--prune", "origin", "+refs/heads/main:refs/heads/main")
     return _git("-C", str(repo), "rev-parse", "main").strip()
 
