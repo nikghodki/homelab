@@ -7,7 +7,7 @@ secrets. Decision: decisions/0003-cisco-ai-defense-tools.md.
 | Piece | Where | Managed by |
 |---|---|---|
 | Version pin (hash-locked, universal: x86_64 CI and aarch64 hosts, Python 3.12/3.13) | `.github/requirements-aibom.in` / `.txt` | Renovate (pip-compile) |
-| CI scan of this repo, JSON as the `aibom` artifact (30 days) | `pr-checks.yml` job `aibom` (~1.5 min) | — |
+| CI scan of this repo, JSON as the `aibom` artifact (30 days) | `pr-checks.yml` job `scans` (~50 s) | — |
 | Nightly fleet scan | systemd `cisco-aibom.timer` (system unit, ~04:20; Jetson 01:30) on dgx-1, dgx-2, Jetson, Pi | role `cisco_aibom`, `playbooks/aibom.yml`, `host_vars/*` |
 | Full reports | `/var/lib/cisco-aibom/<host>-<date>.json` on each host, root only, 30 days | the job |
 | Summary and diff | journal (`SyslogIdentifier=cisco-aibom`) → host collector → Loki on dgx-2 | — |

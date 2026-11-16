@@ -10,6 +10,7 @@ permissions:
 
 env:
   GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  TRUFFLEHOG_IMAGE: trufflesecurity/trufflehog:3.99.9@sha256:2ec535840f860aa27f11fee20222fb790326ecd66325c96bd49d02ec6af46eca
   OSV_IMAGE: ghcr.io/google/osv-scanner:v2.7.1@sha256:a70ffffc2bfd33482953e5d6b64c6fcdb30239717a07b0f0d3ab2859ce3e4cde
   TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
 
@@ -23,8 +24,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: gitleaks (full history)
+      # PRs scan only their own commits (pr-checks.yml); this is the full history of every branch
+      - name: gitleaks (full history, all branches)
         run: docker run --rm -v "$PWD:/repo:ro" "$GITLEAKS_IMAGE" git /repo --redact --exit-code 1
+      - name: TruffleHog (verified secrets, full history, all branches)
+        if: always()
+        run: docker run --rm -v "$PWD:/repo:ro" "$TRUFFLEHOG_IMAGE" git file:///repo --only-verified --fail --no-update
       - name: OSV-Scanner (new advisories for existing dependencies)
         run: |
           set +e

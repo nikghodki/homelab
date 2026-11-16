@@ -9,7 +9,7 @@ internet.
 |---|---|
 | Source | `docs-site/content/docs/*.md`, navigation in `docs-site/mkdocs.yml` (`nav:`), Mermaid hook `docs-site/hooks/mermaid.py` |
 | Build tools | `docs-site/requirements-docs.txt` (MkDocs 1.6.1, Material 9.7.7, pymdown-extensions 12.3; pinned with hashes, same as DGXMM) |
-| CI | `pr-checks.yml` job `docs`: `mkdocs build --strict` (broken links, anchors or nav entries fail the PR) |
+| CI | `pr-checks.yml` job `checks`: `mkdocs build --strict` (broken links, anchors or nav entries fail the PR) |
 | Build on the Dell | role `docs_site` (`playbooks/ops.yml`): `docs-build.timer` (every 15 min and 2 min after boot) → `/usr/local/sbin/docs-build` |
 | Served files | `/srv/docs/current` → `releases/<docs tree hash>/` (the newest 5 are kept) |
 | Web server | `docs` (Caddy, read-only) in the ops stack (`hosts/stacks/ops`): `192.168.86.49:4181` (LAN only) answers only with the front door's `X-Edge-Origin` token (else 403; `/healthz` open), `:8080` on the stack network for Homepage. The same Caddy gates Homepage on `:4180` |
