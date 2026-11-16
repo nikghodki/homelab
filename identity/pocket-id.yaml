@@ -31,6 +31,11 @@ clients:
     groups: [admins]      # Argo CD RBAC also maps admins -> role:admin; PKCE S256 (enablePKCEAuthentication)
   # The one sign-in proxy (decision 0011): edge-auth in k3s, called by the front door for every app without its own
   # login. One callback for all of them; each Caddy route also checks its group (allowed_groups). PKCE S256.
+  - id: litellm
+    name: LiteLLM admin UI
+    callbackURLs: [https://litellm-admin.nghodki.ai/sso/callback]
+    launchURL: https://litellm-admin.nghodki.ai
+    groups: [admins]      # LiteLLM maps the groups claim admins -> proxy_admin (GENERIC_ROLE_MAPPINGS_*); PKCE S256
   - id: edge-auth
     name: Sign-in (front door)
     callbackURLs: [https://auth.nghodki.ai/oauth2/callback]

@@ -9,6 +9,11 @@
         file: "{{ playbook_dir }}/../../secrets/litellm.enc.yaml"
         name: litellm_secrets
       no_log: true
+    - name: Load sign-in client secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
+        name: console_secrets
+      no_log: true
   vars:
     # Extra vars override these only during a key rotation (runbooks/litellm.md).
     litellm_master_key: "{{ litellm_secrets.litellm_master_key }}"
@@ -18,6 +23,8 @@
     # dgx-1's DefenseClaw gateway token (DEFENSECLAW_GATEWAY_TOKEN in ~/.defenseclaw/.env; update both together)
     litellm_defenseclaw_token: "{{ litellm_secrets.defenseclaw_dgx1_gateway_token }}"
     litellm_phoenix_api_key: "{{ litellm_secrets.phoenix_api_key }}"   # Phoenix system key "litellm-dgx-1"
+    # Pocket ID client `litellm` (admin UI sign-in); pocketid_sync.py creates it and stores the secret in console.enc.yaml
+    litellm_oidc_client_secret: "{{ console_secrets.oidc_litellm_secret }}"
   roles:
     - role: compose_stack
       vars:

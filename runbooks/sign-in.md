@@ -5,7 +5,7 @@
 | Pocket ID 2.19.3 | dgx-2, `hosts/stacks/console` (`playbooks/console.yml`), LAN port 1411 |
 | `https://id.nghodki.ai` | the front door (`cluster/platform/edge/caddy/Caddyfile`, `@id`); http is redirected because passkeys need HTTPS |
 | Sign-in for apps without their own login | `edge/edge-auth` (oauth2-proxy, client `edge-auth`, callback `https://auth.nghodki.ai`), called by the front door: [below](#apps-without-their-own-login-one-block-in-the-caddyfile), [decision 0011](../decisions/0011-one-sign-in-proxy.md) |
-| Groups, users, OIDC clients | `identity/pocket-id.yaml`, applied by `hosts/files/pocket-id/pocketid_sync.py` |
+| Groups, users, OIDC clients | `identity/pocket-id.yaml`, applied by `hosts/files/pocket-id/pocketid_sync.py`. A client with `groups` gets `isGroupRestricted` (Pocket ID 2.x ignores the allowed groups without it; set on every client on 2026-11-16) |
 | Secrets | `secrets/console.enc.yaml`: encryption key, static API key, `oidc_<client>_secret`, `edge_origin_token`; `cluster/platform/edge/edge-auth.enc.yaml` (KSOPS): edge-auth's client secret, cookie secret, origin token |
 
 ## Change users or clients
@@ -42,7 +42,7 @@ homelab web CA (`http://ca.nghodki.ai`) and add a passkey. Ask for a second pass
 | Gatus status page (`https://status.nghodki.ai`) | front door sign-in (`/health` open); backend: `status-gate` `192.168.86.49:8081` (Dell, `hosts/stacks/alerting`). Not Gatus' own `security.oidc`: it panics at start when Pocket ID is unreachable, which would stop the checks during a Spark outage. The checks never go through the gate | admins |
 | MLflow (`https://mlflow.nghodki.ai`) | front door sign-in; backend: the ml stack's Caddy `192.168.86.36:4181` (dgx-2, `hosts/stacks/ml`); jobs use the basic-auth API on :5000 ([mlflow.md](mlflow.md)) | admins |
 | DGXMM (`https://dgxmanager.nghodki.ai`) | front door sign-in (`import session_check admins` in a `route`, since DGXMM's proxy needs SSE and its 1 MB limit); DGXMM has no login of its own. `/dgxmm/healthz` is open for the checks. Its backend is on dgx-1's cable address, which only the Caddy pods reach, so it needs no origin token | admins |
-| LiteLLM admin UI (`https://litellm-admin.nghodki.ai`) | front door sign-in (`session_check`), then LiteLLM's own UI login. The API on `model.nghodki.ai` stays key-only (no sign-in) | admins |
+| LiteLLM admin UI (`https://litellm-admin.nghodki.ai`) | front door sign-in (`session_check`), then LiteLLM's generic OIDC SSO (client `litellm`, PKCE S256, scope `groups`; `GENERIC_ROLE_MAPPINGS_*`: `admins` → `proxy_admin`). The Pocket ID user is tied to LiteLLM's existing admin user `default_user_id` by email, so no new LiteLLM user is created (SSO stays free below 5 users). Break-glass: `/fallback/login` ([litellm.md](litellm.md#admin-ui-sign-in)). The API on `model.nghodki.ai` stays key-only | admins |
 
 Containers that talk to Pocket ID get `extra_hosts: id.nghodki.ai:<front door>` and the host's CA bundle, which includes
 the web CA (`edge-auth` resolves it through kube-dns → edge-dns, like Argo CD, and trusts only the web CA).
@@ -127,8 +127,7 @@ is in `/srv/docs/current` on the Dell. MLflow: the job API (basic auth, runbooks
 
 - **Home Assistant:** its phone app can't sign in through a forward-auth proxy. HA keeps its own login (and needs its
   trusted proxies set, P0.16).
-- **LiteLLM UI, DGXMM UI, Open WebUI:** wait for the DGXMM session (LiteLLM and DGXMM are being changed there).
-  Open WebUI has family accounts to migrate.
+- **Open WebUI:** has family accounts to migrate.
 - **ntfy, voice-agent:** their own logins or phone apps; a sign-in redirect would break the phone apps and
   API clients (ntfy topics, LiveKit). Use the `signed_in` pattern above only for browser-only apps.
 - **Fleet API:** token auth for machines, not people; it stays as is (Homepage only links to it).

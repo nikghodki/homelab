@@ -105,7 +105,8 @@ def sync(api, spec, log=print):
                 "logoutCallbackURLs": c.get("logoutCallbackURLs", []), "launchURL": c.get("launchURL"),
                 "isPublic": False, "pkceEnabled": c.get("pkce", True), "skipConsent": True,
                 "requiresReauthentication": False, "requiresPushedAuthorizationRequests": False,
-                "credentials": {}}
+                # Pocket ID 2.x only enforces allowedUserGroups when isGroupRestricted is set
+                "isGroupRestricted": bool(c.get("groups")), "credentials": {}}
         if c["id"] not in clients:
             api.send("POST", "/oidc/clients", body)
             log(f"client {c['id']}: created")
@@ -114,7 +115,8 @@ def sync(api, spec, log=print):
             if (sorted(cur.get("callbackURLs") or []) != sorted(c["callbackURLs"])
                     or sorted(cur.get("logoutCallbackURLs") or []) != sorted(body["logoutCallbackURLs"])
                     or cur.get("name") != c["name"]
-                    or cur.get("pkceEnabled") != body["pkceEnabled"] or cur.get("launchURL") != body["launchURL"]):
+                    or cur.get("pkceEnabled") != body["pkceEnabled"] or cur.get("launchURL") != body["launchURL"]
+                    or bool(cur.get("isGroupRestricted")) != body["isGroupRestricted"]):
                 update = {k: v for k, v in body.items() if k != "id"}
                 api.send("PUT", f"/oidc/clients/{c['id']}", update)
                 log(f"client {c['id']}: updated")
