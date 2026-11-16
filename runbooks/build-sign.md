@@ -9,7 +9,8 @@ The fleet's own images are built by GitHub Actions from the Dockerfiles in this 
 |---|---|
 | Workflow | `.github/workflows/build-sign.yml`; build spec per image in `.github/scripts/image-spec.sh` |
 | Runs | on a push to `main` that touches an image's files (or the workflow), and by hand (`workflow_dispatch`, `main` only). Never on pull requests |
-| Runner | GitHub-hosted `ubuntu-24.04` (amd64); arm64 is built under QEMU (`docker/setup-qemu-action`) |
+| Runner | GitHub-hosted `ubuntu-24.04` (amd64); arm64 is built under QEMU (`tonistiigi/binfmt`) |
+| Tools | the repo allows only GitHub-owned actions, so no docker/sigstore actions: buildx and cosign binaries are downloaded and checked against a SHA-256 in the workflow, binfmt and BuildKit run as images pinned by digest. Bump them together with their hash |
 | Platforms | `linux/amd64`, `linux/arm64` |
 | Tags | the tag the host build already uses (from `compose.yaml` / role defaults) and `sha-<12 hex of the commit>`. Deploy by digest; tags are for people |
 | Signature | cosign v3 keyless: a Fulcio certificate for the workflow's GitHub OIDC token, logged in Rekor; no key to keep |
@@ -17,7 +18,7 @@ The fleet's own images are built by GitHub Actions from the Dockerfiles in this 
 | Issuer | `https://token.actions.githubusercontent.com` |
 | SBOM | BuildKit SPDX + provenance per platform inside the image index (covered by the signature), and the arm64 SPDX as a signed cosign attestation (`--type spdxjson`) |
 | Permissions | workflow default `{}`; the build job gets `contents: read`, `packages: write`, `id-token: write` |
-| Cache | BuildKit layer cache in the Actions cache (`type=gha`, one scope per image) |
+| Cache | BuildKit layer cache in the registry, tag `ghcr.io/nikghodki/<name>:buildcache` (written only by this job; not a runnable image) |
 
 ## Images
 
