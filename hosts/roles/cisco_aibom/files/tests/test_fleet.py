@@ -237,3 +237,14 @@ def test_images_no_longer_configured_are_removed(run, tmp_path, monkeypatch):
     go()
     assert ("image", "rm", old) in docker_calls
     assert json.loads((state / "remote-images.json").read_text()) == [HA]
+
+def test_llm_args_off_without_key():
+    assert fleet.llm_args({}) == fleet.NO_LLM
+    assert fleet.llm_args({"AIBOM_LLM_API_BASE": "http://x/v1"}) == fleet.NO_LLM
+
+
+def test_llm_args_on_with_key_never_put_the_key_on_the_command_line():
+    env = {"AIBOM_LLM_API_BASE": "http://x/v1", "AIBOM_LLM_API_KEY": "sk-secret", "AIBOM_AGENTIC_TIMEOUT": "600"}
+    args = fleet.llm_args(env)
+    assert "sk-secret" not in args and "--llm-api-key" not in args
+    assert args[args.index("--agentic-timeout") + 1] == "600"

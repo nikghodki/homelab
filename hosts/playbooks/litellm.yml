@@ -15,6 +15,9 @@
     litellm_salt_key: "{{ litellm_secrets.litellm_salt_key }}"
     litellm_postgres_password: "{{ litellm_secrets.litellm_postgres_password }}"
     litellm_ui_password: "{{ litellm_secrets.litellm_ui_password }}"
+    # dgx-1's DefenseClaw gateway token (DEFENSECLAW_GATEWAY_TOKEN in ~/.defenseclaw/.env; update both together)
+    litellm_defenseclaw_token: "{{ litellm_secrets.defenseclaw_dgx1_gateway_token }}"
+    litellm_phoenix_api_key: "{{ litellm_secrets.phoenix_api_key }}"   # Phoenix system key "litellm-dgx-1"
   roles:
     - role: compose_stack
       vars:
@@ -22,6 +25,8 @@
         compose_stack_src: "{{ playbook_dir }}/../stacks/litellm"
         compose_stack_private_templates:
           litellm-proxy: 0   # litellm.env: root 0600, read by docker compose
+        compose_stack_extra_files:
+          - {src: "{{ playbook_dir }}/../files/litellm/defenseclaw_guardrail.py", dest: litellm-proxy/defenseclaw_guardrail.py}
         compose_stack_env:
           POSTGRES_PASSWORD: "{{ litellm_postgres_password }}"
   tasks:

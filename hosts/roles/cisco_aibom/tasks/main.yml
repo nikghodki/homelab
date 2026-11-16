@@ -68,6 +68,29 @@
         group: root
         mode: "0644"
 
+    - name: LLM settings for the agentic stage (root only)
+      ansible.builtin.copy:
+        dest: /etc/cisco-aibom/llm.env
+        content: |
+          AIBOM_LLM_PROVIDER=openai
+          AIBOM_LLM_MODEL={{ cisco_aibom_llm_model }}
+          AIBOM_LLM_API_BASE={{ cisco_aibom_llm_api_base }}
+          AIBOM_LLM_API_KEY={{ cisco_aibom_llm_api_key }}
+          AIBOM_LLM_REASONING=off
+          AIBOM_AGENTIC_RATE_LIMIT={{ cisco_aibom_llm_rate_limit }}
+          AIBOM_AGENTIC_TIMEOUT={{ cisco_aibom_llm_timeout_s }}
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      when: cisco_aibom_llm_api_key | length > 0
+
+    - name: No LLM settings when there is no key
+      ansible.builtin.file:
+        path: /etc/cisco-aibom/llm.env
+        state: absent
+      when: cisco_aibom_llm_api_key | length == 0
+
     - name: Service and timer
       ansible.builtin.template:
         src: "{{ item }}.j2"

@@ -42,9 +42,16 @@ services:
       STORE_MODEL_IN_DB: "True"
       LITELLM_LOG: INFO
       PYTHONPATH: /app
+      # DefenseClaw guardrail (P2.4): dgx-1's gateway listens on 127.0.0.1 only; defenseclaw-bridge relays it to
+      # docker0 (172.17.0.1 = host-gateway = host.docker.internal), not to the LAN.
+      DEFENSECLAW_URL: http://host.docker.internal:18970
+      # Traces to Phoenix on dgx-2 over the LAN (P2.6); PHOENIX_API_KEY is in litellm.env
+      PHOENIX_COLLECTOR_HTTP_ENDPOINT: http://192.168.86.36:6006/v1/traces
+      PHOENIX_PROJECT_NAME: litellm
     volumes:
       - ./litellm-proxy/config.yaml:/app/config.yaml:ro
       - ./litellm-proxy/qwen_system_merge.py:/app/qwen_system_merge.py:ro
+      - ./litellm-proxy/defenseclaw_guardrail.py:/app/defenseclaw_guardrail.py:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
     depends_on:
       - litellm-redis
@@ -52,6 +59,19 @@ services:
     networks:
       - default
       - gateway
+
+  # Relays DefenseClaw's loopback-only API (127.0.0.1:18970) to the docker0 address, so containers reach it as
+  # host.docker.internal:18970 while it stays off the LAN. The gateway token is still required.
+  defenseclaw-bridge:
+    image: alpine/socat:1.8.0.3@sha256:beb4a68d9e4fe6b0f21ea774a0fde6c31f580dde6368939ed70100c5385b015e
+    container_name: litellm-defenseclaw-bridge
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["TCP-LISTEN:18970,bind=172.17.0.1,fork,reuseaddr", "TCP:127.0.0.1:18970"]
 
 volumes:
   # The volumes of the old hand-run project (litellm-setup), kept as they are.
