@@ -12,7 +12,7 @@ container on dgx-1, `~/open-webui`).
 | Secrets | KSOPS Secret `open-webui` (`open-webui.enc.yaml`): `WEBUI_SECRET_KEY` (signs sessions: changing it signs everyone out), `OPENAI_API_KEY` (LiteLLM virtual key `open-webui`) |
 | Models | LiteLLM `http://10.100.136.1:4000/v1` (dgx-1's cable address; LiteLLM publishes :4000) |
 | Front door | `webui.nghodki.ai` → fixed ClusterIP `10.43.0.130:8080` (no cluster DNS on the door's path) |
-| Network policy | in: only the edge Caddy pods; out: DNS, LiteLLM, HTTP/HTTPS to the internet (not the LAN, tailnet or cluster) |
+| Network policy | in: only the edge Caddy pods; out: DNS, LiteLLM (`10.100.136.1:4000` **and** Docker's `gateway` network `172.23.0.0/16:4000`: Docker DNATs the published port to the container before the policy sees it), HTTP/HTTPS to the internet (not the LAN, tailnet or cluster) |
 | Resources | requests 250m / 1 Gi, limits 2 CPU / 3 Gi (it used ~800 MiB in Docker) |
 | Health | Gatus `webui.nghodki.ai` (through the door), `/health` probes |
 
