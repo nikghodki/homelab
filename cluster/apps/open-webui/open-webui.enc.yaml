@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: open-webui
+    namespace: open-webui
+type: Opaque
+stringData:
+    WEBUI_SECRET_KEY: ENC[AES256_GCM,data:evmhqkMdwaFmqaVJGaKAvCtT77i5d6iD1FcBobDGX/V95Phpv9YsB9CkmEb6ZFixjfZ792txCN213vc6hVD6Mg==,iv:fkFjq05Ggydx3gqcoD6hPW1PwDu503wTzgixDfa0whY=,tag:2xHGMY68FTy3WHJ6HOF0aA==,type:str]
+    OPENAI_API_KEY: ENC[AES256_GCM,data:eKJzpdRiZ9HUEp81fJlTSTT+ZvM2krYwPw==,iv:wx8y9wsVJIzfgj+Y5fW7J4w6FpnLDcS/EP/lKeecdzU=,tag:/Lbl6TOCDG8qIudsy5KDbQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzaGFiZzZHYVlVczBwSjdl
+            cnpkN0FSOE9CZTlYMWtsNlZPZUpvcXY1Z3c4Cjg0VEd1U0NySUc5aEdsK3BFYmF2
+            UnloVGhQTWNlVExOYlFMazJmUGhHNEkKLS0tIGdsZGppQUNwT1dtKzRRNmN5WlY1
+            cnFld3hqMlhjbTJ5NnpjMk9ycUZPeGMKioCHHjUn7wxkIkuN0Oewf3qp4j8F5hGi
+            e7nDv8TOqjgYr28oWukzboWeo0UiBvqNYvPiojUDsz3EwlBZrlOLfQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T20:24:34Z"
+    mac: ENC[AES256_GCM,data:H9MvNrtwRh8CK7sM+LSOcN3kzSzntLQ+gBLcVXTZS+gXvPb3dvlsbPd2gjFc5NJThnuBUKqPyRh0GGZm9gVaM7sGk9QxZ+yoOFI5L3TIqTlCdG1hmEgXXkf6+k7r1wjzyWc7DY1DDeclOi2NZYXlxYXHt0r/gI0CyUpeHStRfWQ=,iv:wz3loXeLz2iDpjQ+zV1eOd5z4qZWNooa1HYxIHeiyKo=,tag:sROVLaKI4pfWcNfyZ91F9g==,type:str]
+    version: 3.13.3

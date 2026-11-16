@@ -28,6 +28,7 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [ci-scanners.md](ci-scanners.md) (what CI scans, accepted vulnerabilities with expiring ignores, shellcheck),
 [jetson-services.md](jetson-services.md) (Home Assistant and LiveKit on the Jetson: deploy, check, upgrade),
 [aibom.md](aibom.md) (Cisco AIBOM nightly inventory; the Jetson's images are scanned on dgx-2),
+[open-webui.md](open-webui.md) (the chat UI in k3s: data, the move from Docker, rollback),
 [litellm.md](litellm.md) (the model gateway: keys and their rotation, routes, the DefenseClaw guardrail, Phoenix traces),
 [age-key.md](age-key.md) (the fleet SOPS age key: where it lives, restore, rotation),
 [build-sign.md](build-sign.md) (`build-sign.yml`: GHCR images, cosign keyless signatures, SBOM attestations),

@@ -58,6 +58,7 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 | 10.43.0.110:8000 | `kyverno/kyverno-admission-host` | VictoriaMetrics |
 | 10.43.0.111:8000 | `kyverno/kyverno-reports-host` | VictoriaMetrics |
 | 10.43.0.120:8080 | `kube-system/kube-state-metrics-host` | VictoriaMetrics |
+| 10.43.0.130:8080 | `open-webui/open-webui` | edge-caddy (`webui.nghodki.ai`) |
 
 Pick the next free address here and add a row. If the pods behind one have a NetworkPolicy, allow the hosts
 (`argocd/extras/host-scrape-netpol.yaml`). The in-cluster Caddy uses these addresses too (Argo CD, edge-auth), never Service names: the front door must keep
