@@ -148,14 +148,79 @@ Straight from a pod: `kubectl -n edge logs deploy/edge-caddy | grep http.log.acc
 
 ## Failover
 
-- **kube-vip holder fails**: the other Spark takes the lease after ≤10 s and announces the VIP (measured 14.2 s gap
-  from a LAN client). A graceful stop (pod deleted, rollout) hands over with no gap.
-- **A Spark dies**: until the node is NotReady (~40 s) its Caddy/CoreDNS pods stay in the Services, so some
-  connections through the surviving Spark still fail; the replica isn't rescheduled (one per Spark, anti-affinity).
+- **kube-vip holder fails**: the other Spark takes the lease and announces the VIP after 12–16 s (measured from the
+  Pi, 2026-11-16). A graceful stop (pod deleted, rollout) hands over with no gap. The VIPs don't move back when the
+  Spark returns.
+- **A Spark dies**: until the node is `Unknown` its Caddy/CoreDNS/edge-auth pods stay in the Services, so part of the
+  connections through the *surviving* Spark still go to dead pods (5 s connect timeouts). Since 2026-11-16 that is
+  **~18 s** (`node-monitor-grace-period=20s`, runbooks/k3s.md) or **~40 s** when the dead Spark also held the
+  controller-manager lease (it fails over first); Kubernetes' default gave ~72 s. The replica isn't rescheduled (one
+  per Spark, anti-affinity).
 - **Tailnet**: clients that resolved to the dead Spark's Tailscale IP hang until their DNS answer expires (TTL 30 s)
-  and Tailscale asks the other nameserver.
-- Drill: `kubectl -n kube-system delete pod -l app.kubernetes.io/name=kube-vip --field-selector spec.nodeName=<holder>`
-  while probing the VIP from the Air (decision 0007 has the probe loop's results).
+  and Tailscale asks the other nameserver; MagicDNS on the Pi switched within the same ~20–40 s.
+- **No cluster DNS on the path**: the door works with kube-dns down (Caddy's upstreams are IPs); kube-dns itself has
+  a replica per Spark.
+
+## Failover drill
+
+Run it after any change to kube-vip, the edge Services, k3s's node or etcd settings, and before retiring a fallback.
+It **never reboots anything**: it takes one Spark's front-door path away as if the Spark had died, then restores it.
+Never on both Sparks at once (etcd quorum is then the other Spark plus the Jetson); check that the etcd leader is a
+Spark ([k3s.md](k3s.md#etcd-leader)), every node is `Ready` and Gatus is green between steps. Each outage is ~150 s; keep it short (family devices use the door).
+
+1. **Probe** from the Pi (`.github/scripts/edge-drill-probe.py`, copied to `/tmp/drill/` on the Pi): DNS from the
+   VIP, MagicDNS and each Spark's Tailscale IP, and HTTPS for model, ha, webui, ops, dgxmanager and auth (sign-in
+   redirect) through the VIP and over the tailnet, ~2 Hz each.
+2. **Watch** from dgx-1: `.github/scripts/edge-drill.sh monitor SECS LOG` (VIP holders on both Sparks, leases, node
+   readiness, ready endpoints of every edge Service and kube-dns), and the etcd leader every 2 s.
+3. **Fail** one Spark: `.github/scripts/edge-drill.sh fail <spark>` drops the VIPs and its Tailscale IP's
+   :53/:80/:443 in the raw table (a dead peer blackholes), stops k3s and runs `k3s-killall.sh` (kube-vip, Caddy,
+   CoreDNS, edge-auth and every other pod there die without handing over), and removes the VIPs from `wlP9s9` (no
+   ARP answers). Docker on that Spark keeps running, so its own services (LiteLLM and Open WebUI on dgx-1, Pocket ID,
+   Grafana and MLflow on dgx-2) stay up; a real crash would take them too.
+4. **Restore** after ~150 s: `edge-drill.sh restore <spark>` (starts k3s, removes the drops). Wait until every pod
+   is back and Gatus is green.
+5. **Report**: `.github/scripts/edge-drill-report.py DIR` (VIP/lease/endpoint changes and every probe's failed
+   windows relative to the failure), Gatus results and the ntfy messages since the start (what the user saw).
+6. Repeat for the other Spark. Leave the VIPs on the Spark with the healthier Wi-Fi (`ping 192.168.86.1` on both):
+   `kubectl -n kube-system delete pod -l app.kubernetes.io/name=kube-vip --field-selector spec.nodeName=<other>`.
+
+### Results, 2026-11-16
+
+Times are from the failure (`fail`), seen from the Pi. "Clients OK" is when the last probe failure of the outage
+ended; before then 1–3 of ~10 attempts per route failed, the rest answered.
+
+| Run | VIP .10 / .11 moved | Dead pods out of Services | Clients OK (LAN / tailnet) | What else happened | ntfy |
+|---|---|---|---|---|---|
+| dgx-1, before fixes | +11.8 s / +15.7 s | +74 s | +77 s / +76 s | **Restore:** the Jetson was etcd leader; dgx-1 catching up stalled the API >5 s, k3s on dgx-2 and the Jetson exited (`leaderelection lost`), kube-vip on dgx-2 dropped both VIPs (~10 s gap) | `k3s/API dgx-1` fired and resolved |
+| dgx-2, before fixes | held by dgx-1 (no move) | +50 s | +56 s; **ops, docs, status, mlflow, litellm-admin 502 for the whole outage** | kube-dns (1 replica, on dgx-2) had no endpoints; Caddy dialled edge-auth by name | none (Gatus' 1-min checks caught 1–2 failures each) |
+| dgx-1, after fixes | +14.0 s / +15.9 s | +18 s | **+20 s / +21 s** | etcd leader went to dgx-2 directly; restore clean, no k3s exits. From +115 s dgx-2's Wi-Fi degraded (100–800 ms to the router, Tailscale UDP failing; not the drill), which hurt the LAN VIP on dgx-2 and its tailnet path until the VIPs were moved back | `dgxmanager.nghodki.ai` fired and resolved (during the Wi-Fi episode) |
+| dgx-2, after fixes | +11.9 s (.10; .11 on dgx-1) | +39 s (the controller-manager lease was on dgx-2) | **+42 s / +42 s**; sign-in routes fine | etcd leader went to the Jetson on the graceful stop; `etcd-leader-pin` moved it to dgx-1 within ~4 s; restore clean | `argocd.nghodki.ai` fired and resolved (Argo CD's one server replica was on dgx-2) |
+
+Fixes from the drill: #116 and #119 (Caddy upstreams by fixed ClusterIP, kube-dns on both Sparks), #117 (etcd
+leader stays on a Spark, 20 s node grace). Rolling the k3s config out (one node at a time, leader moved off each
+first) caused no probe failures.
+
+What a user notices when a Spark dies: for ~20–40 s about one request in five hangs for 5 s, then everything on the
+surviving Spark works. ntfy only fires for checks that fail 3 minutes in a row: the dead Spark's own services
+(`k3s/API <spark>`, and for dgx-2 Argo CD, Pocket ID, Grafana, MLflow; for dgx-1 LiteLLM, Open WebUI, DGXMM).
+
+Known, not fixed:
+- **Tailscale advertises the VIPs as dgx-1's/dgx-2's endpoints** (the Pi reached dgx-1's Tailscale over
+  `192.168.86.10:41641`). After the VIP moves, that endpoint is the other Spark; Tailscale's disco notices and picks
+  another path, so expect a few slow seconds on the tailnet right after a VIP move.
+- **The Sparks' Wi-Fi is the weak link**: dgx-2 at -71 dBm on 6 GHz had two episodes of 100–800 ms RTT to the router
+  during the drill. Wired Ethernet (P0.11) fixes it; until then move the VIPs to the better Spark (step 6).
+- Argo CD's server is one replica (decision 0006): `argocd.nghodki.ai` is down while its Spark is.
+
+### The old door's rollback copy
+
+The in-cluster door survives losing either Spark (above); the old door ran on dgx-1 only, so it never covered a
+dgx-1 failure. **Decision (2026-11-16): the stopped edge-caddy, edge-dnsmasq and nginx-gateway containers,
+`~/edge-gateway`, `~/voice-assistant/nginx` and `~/backups/edge-gateway-2026-11-15.tgz` can be deleted on
+2026-11-22** if no rollback was needed by then (check `git log -- cluster/platform/edge` for reverts and Gatus
+history). Delete them that day, not before; after that the rollback is Git only ([Rollback](#rollback) steps 1, 2
+and 4).
 
 ## Renew the wildcard cert (before December 2027)
 
@@ -272,4 +337,4 @@ IP from the Services, with dnsmasq and edge-caddy still listening) are gone. In 
    Tailscale admin console.
 
 After 2026-11-22 (a week without a rollback) the containers and `~/edge-gateway` can be deleted; the tarball stays in
-`~/backups` until then and goes with them.
+`~/backups` until then and goes with them. The failover drill passed on 2026-11-16, so they can go on 2026-11-22 ([The old door's rollback copy](#the-old-doors-rollback-copy)).

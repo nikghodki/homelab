@@ -112,6 +112,13 @@ whether it was pasted into the console is unverified), dgx-2 as a second split-D
 Services, k3s DNS → edge-dns, Gatus via the VIP, front-door alerts critical, `verify-cutover.sh`). Left in the runbook's
 plan: the user's check from a family device, and a failover drill on the tailnet path a day later.
 
+**Failover drill, 2026-11-16** (`runbooks/edge.md`, "Failover drill"): each Spark's front-door path taken away in
+turn (k3s stopped and killed, VIPs and Tailscale IP blackholed; nothing rebooted), probed from the Pi over the LAN and
+the tailnet. After three fixes (#116, #117, #119) the VIPs move in 12–16 s and every route answers again within
+~20 s of losing dgx-1 and ~40 s of losing dgx-2 (it also held the controller-manager lease); before them, sign-in
+routes failed for the whole dgx-2 outage and returning dgx-1 restarted k3s on dgx-2 and the Jetson. The stopped old
+door can be deleted on 2026-11-22.
+
 | | |
 |---|---|
 | Caddy | `edge/edge-caddy` (Caddy 2.11.9, 2 replicas, one per Spark), Git-managed `cluster/platform/edge/caddy/Caddyfile`, wildcard cert from the KSOPS Secret `edge/web-tls`; non-root, no capabilities |
