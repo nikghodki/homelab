@@ -173,12 +173,10 @@
 		reverse_proxy 192.168.86.36:6006
 	}
 
-	# MLflow (dgx-2 ml stack) behind oauth2-proxy. Its session cookies are Secure, so http is redirected.
+	# MLflow (dgx-2 ml stack): its Caddy's gate on :4181. Jobs use the basic-auth API on :5000 directly.
 	@mlflow host mlflow.nghodki.ai
 	handle @mlflow {
-		@plain protocol http
-		redir @plain https://{host}{uri} 308
-		reverse_proxy 192.168.86.36:4181
+		import signed_in 192.168.86.36:4181 admins
 	}
 
 	# Temporal Web UI (dgx-2 jobs stack), Pocket ID sign-in. Its session cookies are Secure, so http is redirected.
