@@ -1,6 +1,6 @@
 # CI scanners: what runs, accepted findings, expiring ignores
 
-`pr-checks.yml` runs on every PR and push to main; `nightly-scan.yml` runs at 01:17 PST. Everything runs on
+`pr-checks.yml` runs on every PR and daily on main (no push run; docs-only PRs skip lint, tests and scans); `nightly-scan.yml` runs at 01:17 PST. Everything runs on
 GitHub-hosted runners (no home memory). Every tool image is pinned by digest and run with `docker run`; the lint job
 fails if a `*_IMAGE:` in a workflow has no `@sha256:` (tags can be moved: in March 2026 a malicious Trivy v0.69.4,
 Docker Hub tags 0.69.5/0.69.6 and 76 of 77 `trivy-action` tags were published; tool review 2026-11 §2.6).
@@ -8,7 +8,7 @@ Renovate bumps the digests.
 
 | Concern | Tool | Where |
 |---|---|---|
-| Secrets in Git | gitleaks (full history), TruffleHog (verified only) | PR; gitleaks nightly too |
+| Secrets in Git | gitleaks, TruffleHog (verified only) | PR (its own commits); nightly (full history, all branches) |
 | Dependencies | OSV-Scanner (lockfiles), Trivy `fs` vulnerabilities | PR, nightly |
 | Misconfigurations (Dockerfiles, Kubernetes, Compose) | Trivy `fs` misconfig, kubeconform + Kyverno CLI | PR |
 | Images that run (CI tools, cluster, hosts) | Trivy `image`, vulnerabilities, CRITICAL | nightly |

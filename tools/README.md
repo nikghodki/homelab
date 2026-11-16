@@ -14,7 +14,7 @@ tools/<server>/
 | `picoclaw_only` | jetson | stdio (Node) | 20 (Hermes includes 2) |
 | `homeassistant` | jetson | streamable HTTP, HA token | 24 |
 
-CI (`ai-scanners` job):
+CI (`pr-checks.yml` job `scans`):
 
 - `.github/scripts/mcp-tool-hashes.py check` fails if any tool in a `tools.json` was added, removed or changed
   without `tools.sha256` being updated in the same PR. The hash file is the review record: a changed description

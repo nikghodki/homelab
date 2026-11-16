@@ -8,23 +8,38 @@ Three workflows in `.github/workflows/`. Runners are GitHub-hosted `ubuntu-24.04
 digest; Python tools from hash-locked files (`pip install --require-hashes`). Only GitHub-owned actions are allowed in
 the repo settings (which is why build-sign uses plain buildx/cosign binaries, PR #63).
 
-## `pr-checks.yml` (pull requests, pushes to `main`, manual)
+## `pr-checks.yml` (pull requests, daily on `main`, manual)
 
-| Job | Steps | Fails on |
+Two jobs, so two checks on every PR. GitHub bills each job rounded up to a whole minute, so the steps run in sequence
+inside a job instead of as 8 parallel jobs (12-14 billable minutes a run before; infra-optimization review 2026-11 §4).
+Each tool is still its own step with its own log. A step after a failed one still runs (`!cancelled()`), so one run
+reports every failure, and any failed step fails the job.
+
+| Check (job) | Steps | Fails on |
 |---|---|---|
-| `lint` | actionlint 1.7.12; yamllint 1.38.0 with `.yamllint.yaml` (line length 160 as a warning, no document-start, octal values forbidden); ansible-lint 26.11.0 on `playbooks/site.yml` and `roles` | any error |
-| `secrets` | gitleaks 8.30.1 on the full history (redacted); TruffleHog 3.99.9 `--only-verified`; `check-sops.sh` | any finding |
-| `code` | Semgrep 1.185.0 `p/default`; OSV-Scanner 2.7.1 (exit 128 = no manifests is OK); Trivy 0.76.2 `fs` vuln and misconfig (no secret scanner) at HIGH/CRITICAL; `.trivyignore.yaml` format and 30-day limit | any finding |
-| `kubernetes` | `check-kubernetes.sh`: kubeconform 0.8.0 `-strict` on `cluster/` (values files and `*.enc.yaml` skipped); Kyverno CLI 1.20.0 with a bad-pod fixture that must fail every policy; then `cluster/` against the policies | invalid manifests, unparsed or non-failing policies |
-| `ai-scanners` | `mcp-tool-hashes.py check tools`; `scan-mcp-tools.py tools` (mcp-scanner 4.8.7); `scan-skills.sh` (skill-scanner 2.3.2); `scan-agents.py --self-test` then `scan-agents.py` (a2a-scanner 1.0.1); Agentic Radar 0.14.2 in its own venv (report artifact) | hash drift, HIGH/CRITICAL findings |
-| `aibom` | Cisco AIBOM 1.10.1 in its own venv on the repo, deterministic (LLM at a closed port); summary in the job summary; artifact `aibom` (30 days) | tool errors |
-| `unit-tests` | pytest: fleet-metrics, LiteLLM guardrail, DefenseClaw fleet policy (and the MCP registry vs `server.yaml`), Pocket ID sync, safety governor, robot motion bridge, Cisco AIBOM fleet job, MCP drift check, CI scripts; `defenseclaw-bundle.py check` (vendored dashboards and rules match the release) | any failure |
+| `Checks (lint, docs, secrets, Kubernetes, unit tests)` (`checks`) | gitleaks 8.30.1 and TruffleHog 3.99.9 `--only-verified` on **the PR's own commits** (`base..head` of the merge commit; full history of `main` outside a PR); `check-sops.sh`; images pinned by digest; `edge-zone.py check`; `mkdocs build --strict`; yamllint 1.38.0 (`.yamllint.yaml`); actionlint 1.7.12; shellcheck; ansible-lint 26.11.0 on `playbooks/site.yml` and `roles`; kubeconform 0.8.0 + Kyverno CLI 1.20.0 (`check-kubernetes.sh`); pytest: fleet-metrics, LiteLLM guardrail and request hook, DefenseClaw fleet policy, Pocket ID sync, safety governor, motion bridge, Cisco AIBOM fleet job, MCP drift, DefenseClaw AIBOM diff, sim sampler, usage exporter, ops-agent host access, CI scripts; `defenseclaw-bundle.py check`; the ops agent (its own hash-locked deps in a directory on `PYTHONPATH`) | any finding or error |
+| `Scans (code, dependencies, AI scanners, AIBOM)` (`scans`) | Semgrep 1.185.0 `p/default`; OSV-Scanner 2.7.1 (exit 128 = no manifests is OK); `.trivyignore.yaml` format and 30-day limit; Trivy 0.76.2 `fs` vuln and misconfig at HIGH/CRITICAL (no secret scanner); `mcp-tool-hashes.py check tools`; mcp-scanner 4.8.7; skill-scanner 2.3.2; a2a-scanner 1.0.1 (self-test, then the cards); Agentic Radar 0.14.2 in its own venv (artifact `agentic-radar`); Cisco AIBOM 1.10.1 in its own venv, deterministic (LLM at a closed port, run through `aibom-ci.py`), summary in the job summary, artifact `aibom` (30 days) | any finding (Radar never fails; AIBOM on errors only) |
 
-`concurrency` cancels older runs of the same ref.
+- **Docs-only PRs** (every changed file under `docs/`, `docs-site/`, `runbooks/`, `decisions/`, or a `*.md` outside
+  `agents/` and `tools/`; `.github/scripts/ci-scope.sh` decides and prints the file list) run only the secret scanners,
+  SOPS, the digest-pin and edge-zone checks and the docs build, plus yamllint if they touch YAML. Both checks still
+  report, and pass, so the check set is the same on every PR.
+- **No run on a push to `main`**: a squash merge pushes the tree its PR run passed. The daily run at 08:47 UTC runs the
+  full suite on `main` (merge skew shows within a day) and saves the caches. `build-sign.yml` still runs on pushes.
+- **Caches**: the tool venvs, built by `.github/scripts/ci-venv.sh` from the hash-locked files with `--require-hashes`
+  and keyed on the Python version and the lock files' hashes (a hit skips 20-25 s of installing per venv; a restored
+  venv that fails `pip check` is rebuilt); `setup-python` `cache: pip` for the downloads when a venv is rebuilt; the Trivy DB per day, and the Ansible collections per day and `hosts/requirements.yml` (so new releases within
+  its ranges still arrive within a day). A cache saved on a PR is visible to that PR
+  only, which is why the daily run on `main` matters.
+- **Concurrency**: a new push to a PR cancels that PR's older run; the daily and manual runs are never cancelled.
+- **Secret scanning** reads only the PR's commits, so a false positive on another unmerged branch no longer fails
+  unrelated PRs. `nightly-scan.yml` scans the full history of every branch with both gitleaks and TruffleHog.
+- **AIBOM**: `aibom-ci.py` is `cisco-aibom` with its fixed 2 x 30 s retry cool-down set to 0: with no LLM a retry
+  cannot succeed, and the report is identical.
 
 ## `nightly-scan.yml` (09:17 UTC daily, manual)
 
-gitleaks over full history; OSV-Scanner for new advisories; Trivy (CRITICAL) on every `image:tag@sha256` in `.github/`,
+gitleaks and TruffleHog (verified) over the full history of every branch; OSV-Scanner for new advisories; Trivy (CRITICAL) on every `image:tag@sha256` in `.github/`,
 `cluster/` and `hosts/` (compose stacks, role defaults; since #74), with one Trivy DB download for all images; the job
 summary lists scan errors separately from CRITICAL findings (both fail the job); a CycloneDX SBOM of the repo. Not
 `robots/` (the Isaac Lab base is too big for a hosted runner). Artifact `nightly-reports` (30 days).
@@ -38,17 +53,20 @@ See [Image signing](../platform/image-signing.md).
 
 | Script | Used by | Does |
 |---|---|---|
-| `check-sops.sh` | `secrets` job | plaintext checks for `secrets/` and `cluster/` |
-| `check-kubernetes.sh` | `kubernetes` job | kubeconform + Kyverno CLI with the bad-pod fixture |
-| `mcp-tool-hashes.py` | `ai-scanners` | `check` / `update` per-tool sha256 pins in `tools/*/tools.sha256` |
-| `scan-mcp-tools.py` | `ai-scanners` | mcp-scanner on `tools/*/tools.json`, exit code from its JSON, accepted findings |
-| `scan-skills.sh` | `ai-scanners` | skill-scanner on every `SKILL.md` folder in `agents/` and `tools/` |
-| `scan-agents.py` | `ai-scanners` | a2a-scanner on `agents/*/card.yaml`; `--self-test` with `fixtures/unsafe-agent-card.json` |
-| `scan-agent-code.sh` | `ai-scanners` | Agentic Radar for agents with `radar.yaml` |
+| `ci-scope.sh` | both pr-checks jobs | the PR's commits for the secret scanners; docs-only or code |
+| `check-sops.sh` | `checks` | plaintext checks for `secrets/` and `cluster/` |
+| `check-kubernetes.sh` | `checks` | kubeconform + Kyverno CLI with the bad-pod fixture |
+| `mcp-tool-hashes.py` | `scans` | `check` / `update` per-tool sha256 pins in `tools/*/tools.sha256` |
+| `scan-mcp-tools.py` | `scans` | mcp-scanner on `tools/*/tools.json`, exit code from its JSON, accepted findings |
+| `scan-skills.sh` | `scans` | skill-scanner on every `SKILL.md` folder in `agents/` and `tools/` |
+| `scan-agents.py` | `scans` | a2a-scanner on `agents/*/card.yaml`; `--self-test` with `fixtures/unsafe-agent-card.json` |
+| `scan-agent-code.sh` | `scans` | Agentic Radar for agents with `radar.yaml` |
 | `export-mcp-tools.py` | people, on the host running a server | dump an MCP server's `tools/list` (stdio or HTTP), stdlib only |
-| `defenseclaw-bundle.py` | `unit-tests` (`check`), people (`sync`) | keep vendored DefenseClaw dashboards, rules and adapted configs in step with the pinned release |
+| `defenseclaw-bundle.py` | `checks` (`check`), people (`sync`) | keep vendored DefenseClaw dashboards, rules and adapted configs in step with the pinned release |
+| `ci-venv.sh` | both pr-checks jobs | a tool venv from a hash-locked file, or the cached one |
+| `aibom-ci.py` | `scans` | cisco-aibom without the retry cool-down (no LLM in CI) |
 | `image-spec.sh` | `build-sign.yml` | context, Dockerfile and tags per image |
-| `tests/` | `unit-tests` | tests for `defenseclaw-bundle.py` and the MCP scripts |
+| `tests/` | `checks` | tests for `defenseclaw-bundle.py` and the MCP scripts |
 
 ## Pinned tool locks
 

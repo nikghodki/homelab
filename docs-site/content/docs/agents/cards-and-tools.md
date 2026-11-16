@@ -33,7 +33,7 @@ tools/<server>/
 | `picoclaw_only` | Jetson | stdio (Node, `picoclaw-hardware-mcp.js`) | 20 | `hermes-nikhil`, includes `send_to_picoclaw_agent`, `check_picoclaw_agent_connection` |
 | `homeassistant` | Jetson | streamable HTTP, `http://localhost:8123/api/mcp/assist`, HA token | 24 | `hermes-nikhil`, all |
 
-CI (`ai-scanners` job):
+CI (`pr-checks.yml` job `scans`):
 
 1. `mcp-tool-hashes.py check tools` fails if a tool was added, removed or changed without `tools.sha256` being updated
    in the same PR, and (since #74) if a pinned server's `tools.json` is missing. A changed description or schema (tool

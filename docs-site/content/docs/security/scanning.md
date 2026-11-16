@@ -3,14 +3,14 @@ title: Scanning (CI and Cisco AIBOM)
 description: What is scanned before a merge and nightly, the AI scanners and their quirks, and the Cisco AIBOM fleet inventory.
 ---
 
-## In CI (every PR and every push to `main`)
+## In CI (every PR, and daily on `main`)
 
 Workflow `.github/workflows/pr-checks.yml`. All third-party tools run as containers pinned by digest; Python tools are
 installed from hash-locked files. Full job list: [CI](../development/ci.md).
 
 | Check | Tool (version) | Fails on |
 |---|---|---|
-| Secrets in Git history | gitleaks 8.30.1 (full history, redacted) | any finding |
+| Secrets in Git history | gitleaks 8.30.1 (the PR's commits, redacted; full history nightly) | any finding |
 | Verified secrets | TruffleHog 3.99.9 (`--only-verified`) | a verified secret |
 | SOPS | `.github/scripts/check-sops.sh` | plaintext in `secrets/`, plaintext `*.enc.yaml`, a Secret outside `*.enc.yaml` in `cluster/` |
 | Code | Semgrep 1.185.0 (`p/default`) | any finding |
