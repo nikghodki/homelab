@@ -84,28 +84,38 @@ jobs:
 
       # --- docs site (docs-site/, runbooks/docs-site.md) as the Dell builds it, without publishing anything
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        id: py
         if: ${{ !cancelled() }}
         with:
           python-version: "3.12"
-          cache: pip  # downloads only; --require-hashes still checks every file
+          cache: pip  # downloads, for a venv cache miss; --require-hashes still checks every file
           cache-dependency-path: |
             .github/requirements-ci.txt
             docs-site/requirements-docs.txt
+      - name: Tool venvs cache (built from the hash-locked files; key = Python version + lock hashes)
+        if: ${{ !cancelled() }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/venvs/ci
+            ~/venvs/docs
+          key: venvs-checks-${{ steps.py.outputs.python-version }}-${{ hashFiles('.github/requirements-ci.txt', 'docs-site/requirements-docs.txt') }}
       - name: Install MkDocs (pinned with hashes)
         id: mkdocs
         if: ${{ !cancelled() }}
         run: |
-          python -m venv /tmp/docs
-          /tmp/docs/bin/pip install -q --require-hashes --only-binary=:all: -r docs-site/requirements-docs.txt
+          .github/scripts/ci-venv.sh "$HOME/venvs/docs" docs-site/requirements-docs.txt --only-binary=:all:
       - name: Docs site (mkdocs build --strict; fails on any warning, broken link or anchor)
         if: ${{ !cancelled() && steps.mkdocs.outcome == 'success' }}
-        run: /tmp/docs/bin/mkdocs build --strict -f docs-site/mkdocs.yml -d /tmp/docs-site
+        run: ~/venvs/docs/bin/mkdocs build --strict -f docs-site/mkdocs.yml -d /tmp/docs-site
 
       # --- lint (yamllint also on a docs-only PR that touches YAML)
       - name: Install Python tools
         id: pyci
         if: ${{ !cancelled() && (steps.scope.outputs.code == 'true' || steps.scope.outputs.yaml == 'true') }}
-        run: pip install -q --require-hashes -r .github/requirements-ci.txt
+        run: |
+          .github/scripts/ci-venv.sh "$HOME/venvs/ci" .github/requirements-ci.txt
+          echo "$HOME/venvs/ci/bin" >> "$GITHUB_PATH"
       - name: yamllint
         if: ${{ !cancelled() && steps.pyci.outcome == 'success' }}
         run: yamllint -c .yamllint.yaml .
@@ -236,18 +246,30 @@ jobs:
 
       # --- AI scanners (MCP tools, skills, agent cards, agent code)
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        id: py
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         with:
           python-version: "3.12"
-          cache: pip  # downloads only; --require-hashes still checks every file
+          cache: pip  # downloads, for a venv cache miss; --require-hashes still checks every file
           cache-dependency-path: |
             .github/requirements-ci.txt
             .github/requirements-aibom.txt
             .github/requirements-radar.txt
+      - name: Tool venvs cache (built from the hash-locked files; key = Python version + lock hashes)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/venvs/ci
+            ~/venvs/aibom
+            ~/venvs/radar
+          key: venvs-scans-${{ steps.py.outputs.python-version }}-${{ hashFiles('.github/requirements-ci.txt', '.github/requirements-aibom.txt', '.github/requirements-radar.txt') }}
       - name: Install scanners
         id: pyci
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
-        run: pip install -q --require-hashes -r .github/requirements-ci.txt
+        run: |
+          .github/scripts/ci-venv.sh "$HOME/venvs/ci" .github/requirements-ci.txt
+          echo "$HOME/venvs/ci/bin" >> "$GITHUB_PATH"
       - name: MCP tool definitions match their reviewed hashes
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python3 .github/scripts/mcp-tool-hashes.py check tools
@@ -266,9 +288,8 @@ jobs:
       - name: Agentic Radar (own venv; it pins rich<14)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: |
-          python3 -m venv /tmp/radar
-          /tmp/radar/bin/pip install -q --require-hashes -r .github/requirements-radar.txt
-          PATH=/tmp/radar/bin:$PATH .github/scripts/scan-agent-code.sh
+          .github/scripts/ci-venv.sh "$HOME/venvs/radar" .github/requirements-radar.txt
+          PATH=$HOME/venvs/radar/bin:$PATH .github/scripts/scan-agent-code.sh
       - name: Agentic Radar reports
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -281,9 +302,7 @@ jobs:
       - name: Install cisco-aibom (own venv)
         id: aibom-install
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
-        run: |
-          python3 -m venv /tmp/aibom
-          /tmp/aibom/bin/pip install -q --require-hashes -r .github/requirements-aibom.txt
+        run: .github/scripts/ci-venv.sh "$HOME/venvs/aibom" .github/requirements-aibom.txt
       - name: AI BOM of the repo
         # `analyze` requires an LLM; CI has none, so it points at a closed port and the BOM is deterministic-only
         # (agentic_status "degraded" in the report). The fleet job (runbooks/aibom.md) works the same way.
@@ -291,7 +310,7 @@ jobs:
         if: ${{ !cancelled() && steps.aibom-install.outcome == 'success' }}
         run: |
           mkdir -p reports
-          /tmp/aibom/bin/python .github/scripts/aibom-ci.py --log-level WARNING analyze . -o json -O reports/aibom.json \
+          ~/venvs/aibom/bin/python .github/scripts/aibom-ci.py --log-level WARNING analyze . -o json -O reports/aibom.json \
             --llm-model none --llm-provider openai --llm-api-base http://127.0.0.1:9 --llm-api-key unused \
             --agentic-max-retry-seconds 0 --agentic-timeout 5 --no-progress --no-show-summary
           python3 -c 'import json; s = json.load(open("reports/aibom.json"))["aibom_analysis"]["summary"]; print(json.dumps(s))' \

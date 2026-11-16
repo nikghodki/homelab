@@ -26,8 +26,9 @@ reports every failure, and any failed step fails the job.
   report, and pass, so the check set is the same on every PR.
 - **No run on a push to `main`**: a squash merge pushes the tree its PR run passed. The daily run at 08:47 UTC runs the
   full suite on `main` (merge skew shows within a day) and saves the caches. `build-sign.yml` still runs on pushes.
-- **Caches**: `setup-python` `cache: pip` keyed on the hash-locked requirement files (downloads only;
-  `--require-hashes` still checks every file), the Trivy DB per day, and the Ansible collections per day and `hosts/requirements.yml` (so new releases within
+- **Caches**: the tool venvs, built by `.github/scripts/ci-venv.sh` from the hash-locked files with `--require-hashes`
+  and keyed on the Python version and the lock files' hashes (a hit skips 20-25 s of installing per venv; a restored
+  venv that fails `pip check` is rebuilt); `setup-python` `cache: pip` for the downloads when a venv is rebuilt; the Trivy DB per day, and the Ansible collections per day and `hosts/requirements.yml` (so new releases within
   its ranges still arrive within a day). A cache saved on a PR is visible to that PR
   only, which is why the daily run on `main` matters.
 - **Concurrency**: a new push to a PR cancels that PR's older run; the daily and manual runs are never cancelled.
@@ -62,6 +63,7 @@ See [Image signing](../platform/image-signing.md).
 | `scan-agent-code.sh` | `scans` | Agentic Radar for agents with `radar.yaml` |
 | `export-mcp-tools.py` | people, on the host running a server | dump an MCP server's `tools/list` (stdio or HTTP), stdlib only |
 | `defenseclaw-bundle.py` | `checks` (`check`), people (`sync`) | keep vendored DefenseClaw dashboards, rules and adapted configs in step with the pinned release |
+| `ci-venv.sh` | both pr-checks jobs | a tool venv from a hash-locked file, or the cached one |
 | `aibom-ci.py` | `scans` | cisco-aibom without the retry cool-down (no LLM in CI) |
 | `image-spec.sh` | `build-sign.yml` | context, Dockerfile and tags per image |
 | `tests/` | `checks` | tests for `defenseclaw-bundle.py` and the MCP scripts |
