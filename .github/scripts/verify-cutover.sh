@@ -25,12 +25,14 @@ q()   { bash "$cmp" -Q "$@"; }   # SERVER TYPE NAME -> "RCODE COUNT addr..."
 
 echo "## dgx-1's Tailscale IP answers DNS from the cluster (tailnet view), not edge-dnsmasq"
 for ts in $DGX1_TS $DGX2_TS; do
-  a=$(q $ts A grafana.nghodki.ai)
+  a=$(q "$ts" A grafana.nghodki.ai)
   case "$a" in "NOERROR 1 $DGX1_TS"|"NOERROR 1 $DGX2_TS") ok "@$ts grafana A: ${a#NOERROR 1 }" ;;
     *) bad "@$ts grafana A: '$a' (want one Spark Tailscale IP; dnsmasq answers two addresses)" ;; esac
-  a=$(q $ts AAAA grafana.nghodki.ai); [ "$a" = "NOERROR 0" ] && ok "@$ts grafana AAAA: NOERROR, empty" || bad "@$ts AAAA: '$a'"
+  a=$(q "$ts" AAAA grafana.nghodki.ai)
+  if [ "$a" = "NOERROR 0" ]; then ok "@$ts grafana AAAA: NOERROR, empty"; else bad "@$ts AAAA: '$a'"; fi
   # The tailnet view refuses other zones; edge-dnsmasq would forward them.
-  a=$(q $ts A example.com); [ "${a%% *}" = REFUSED ] && ok "@$ts example.com: REFUSED" || bad "@$ts example.com: '$a' (dnsmasq still answering?)"
+  a=$(q "$ts" A example.com)
+  if [ "${a%% *}" = REFUSED ]; then ok "@$ts example.com: REFUSED"; else bad "@$ts example.com: '$a' (dnsmasq still answering?)"; fi
 done
 
 echo; echo "## Every route on dgx-1's Tailscale IP vs the LAN VIP (the old door on dgx-1 is retired)"
@@ -51,35 +53,37 @@ a=$(q $DGX1_LAN A grafana.nghodki.ai); case "$a" in NOERROR*) bad "@$DGX1_LAN DN
 
 if [ -n "${REPO##"$(cd "$here/../.." && pwd)"}" ] || ! command -v kubectl >/dev/null; then
   echo; echo "## This client's own resolver (MagicDNS split DNS), end to end"
-  for name in $(awk '!/^#/ && NF == 2 && $2 == "edge" {print $1}' "$names"); do
+  while read -r name <&3; do
     r=$(curl -s -o /dev/null -m 20 --cacert "$CA" -w '%{http_code} %{remote_ip}' "https://$name.nghodki.ai/" 2>/dev/null)
     case "$r" in
       [1-4][0-9][0-9]" $DGX1_TS"|[1-4][0-9][0-9]" $DGX2_TS"|[1-4][0-9][0-9]" $VIP") ok "$name: $r" ;;
       *) bad "$name: '${r:-no answer}' (want a status < 500 from a Spark's Tailscale IP or the VIP)" ;;
     esac
-  done
+  done 3< <(awk '!/^#/ && NF == 2 && $2 == "edge" {print $1}' "$names")
 fi
 
 if command -v kubectl >/dev/null; then
   export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/config}
   echo; echo "## Cluster side (dgx-1)"
-  a=$(q 10.43.0.10 A grafana.nghodki.ai); [ "$a" = "NOERROR 1 $VIP" ] && ok "kube-dns grafana A: $VIP (LAN view via 10.43.0.53)" || bad "kube-dns grafana: '$a'"
-  a=$(q 10.43.0.10 AAAA id.nghodki.ai); [ "$a" = "NOERROR 0" ] && ok "kube-dns id AAAA: NOERROR, empty" || bad "kube-dns id AAAA: '$a'"
+  a=$(q 10.43.0.10 A grafana.nghodki.ai)
+  if [ "$a" = "NOERROR 1 $VIP" ]; then ok "kube-dns grafana A: $VIP (LAN view via 10.43.0.53)"; else bad "kube-dns grafana: '$a'"; fi
+  a=$(q 10.43.0.10 AAAA id.nghodki.ai)
+  if [ "$a" = "NOERROR 0" ]; then ok "kube-dns id AAAA: NOERROR, empty"; else bad "kube-dns id AAAA: '$a'"; fi
   for s in edge-dns-tailnet edge-caddy-tailnet; do
     ips=$(kubectl -n edge get svc $s -o jsonpath='{.spec.externalIPs}')
     case "$ips" in *$DGX1_TS*$DGX2_TS*) ok "$s externalIPs $ips" ;; *) bad "$s externalIPs $ips" ;; esac
   done
   for app in edge cluster-dns kube-vip; do
     st=$(kubectl -n argocd get app $app -o jsonpath='{.status.sync.status}/{.status.health.status}')
-    [ "$st" = Synced/Healthy ] && ok "app $app $st" || bad "app $app $st"
+    if [ "$st" = Synced/Healthy ]; then ok "app $app $st"; else bad "app $app $st"; fi
   done
   # Argo CD's server resolves id.nghodki.ai through kube-dns -> edge-dns -> the VIP; /auth/login must redirect there.
   r=$(curl -s -o /dev/null -m 20 --cacert "$CA" --resolve argocd.nghodki.ai:443:$VIP -w '%{http_code} %{redirect_url}' \
       https://argocd.nghodki.ai/auth/login | sed 's/?.*//')
-  [ "$r" = "303 https://id.nghodki.ai/authorize" ] && ok "Argo CD sign-in redirects to Pocket ID" || bad "Argo CD /auth/login: '$r'"
+  if [ "$r" = "303 https://id.nghodki.ai/authorize" ]; then ok "Argo CD sign-in redirects to Pocket ID"; else bad "Argo CD /auth/login: '$r'"; fi
   m=$(curl -s -m 10 http://192.168.86.49:8081/metrics | grep '^gatus_results_endpoint_success{' | grep -E 'group="(edge|web|observe|jobs|ml)"')
   down=$(printf '%s\n' "$m" | awk '$NF != 1' | sed 's/.*name="\([^"]*\)".*/\1/' | tr '\n' ',')
-  [ -n "$m" ] && [ -z "$down" ] && ok "Gatus edge/web/observe/jobs/ml: all up" || bad "Gatus down: ${down:-no metrics}"
+  if [ -n "$m" ] && [ -z "$down" ]; then ok "Gatus edge/web/observe/jobs/ml: all up"; else bad "Gatus down: ${down:-no metrics}"; fi
 fi
 
 echo; [ $fail = 0 ] && echo "CUTOVER VERIFIED" || echo "CUTOVER CHECKS FAILED"
