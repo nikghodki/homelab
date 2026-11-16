@@ -86,8 +86,9 @@ So a build of both images costs about 4 billed minutes (jobs round up to the min
 From the `workflow_dispatch` run 43788337169 (both jobs ~2 min). Each signature was checked in the run with
 `cosign verify --certificate-identity https://github.com/nikghodki/homelab/.github/workflows/build-sign.yml@refs/heads/main
 --certificate-oidc-issuer https://token.actions.githubusercontent.com` (exit 0), and the SBOM attestation with
-`cosign verify-attestation --type spdxjson` and the same identity. The run now also prints the certificate's subject
-and issuer, and checks that a wrong identity (`...@refs/heads/not-main`) is refused.
+`cosign verify-attestation --type spdxjson` and the same identity. Every run also checks that a wrong identity
+(`...@refs/heads/not-main`) is refused. cosign v3 stores a Sigstore bundle, whose `cosign verify` output has no
+certificate fields; the exit status with `--certificate-identity` is the check.
 
 Later builds move the tags; the run summary lists each build's digest and the verified certificate identity.
 

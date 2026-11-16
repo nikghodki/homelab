@@ -119,13 +119,11 @@ jobs:
           TAGS: ${{ steps.spec.outputs.tags }}
           IMAGE: ${{ matrix.image }}
         run: |
+          # cosign v3 stores a Sigstore bundle; its JSON/text output carries no certificate fields, so the proof is
+          # the exit status with the exact identity, and a refusal for a different one.
           cosign verify "$REF" --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" \
-            --output text > verify.txt 2> verify.err
-          # The certificate's own fields (not our inputs). If cosign's text format changes, show what it printed.
-          grep -E "Certificate (subject|issuer URL)|GitHub Workflow (Ref|SHA|Trigger|Repository)" verify.txt | sort -u > identity.txt \
-            || { cat verify.err; head -c 3000 verify.txt; echo; }
-          cat identity.txt
-          # The identity check is real: the same signature with another branch's identity must fail.
+            > /dev/null 2> verify.err
+          cat verify.err
           if cosign verify "$REF" --certificate-identity "${CERT_IDENTITY%main}not-main" \
                --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null 2>&1; then
             echo "::error::cosign verify accepted a wrong certificate identity"; exit 1
@@ -136,8 +134,9 @@ jobs:
             echo "### $IMAGE"
             echo "- \`$REF\` ($PLATFORMS)"
             echo "- tags: \`$TAGS\`"
-            echo "- signed and SBOM-attested; \`cosign verify\` says:"
-            echo '```'; cat identity.txt; echo '```'
+            echo "- \`cosign verify\`: ok for identity \`$CERT_IDENTITY\`, issuer \`$CERT_ISSUER\`"
+            echo "- \`cosign verify\` with \`...@refs/heads/not-main\`: refused"
+            echo "- \`cosign verify-attestation --type spdxjson\`: ok (same identity)"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Log out
         if: always()
