@@ -126,7 +126,7 @@ This review reports facts only. Patterns are not presented as mandatory.
 |---|---|---|---|---|---|---|---|
 | 13 | `.github/workflows/nightly-scan.yml:42-49` | Each image scan was a fresh `docker run` with no cache, so it downloaded the Trivy DB about 20 times. Every non-zero exit was reported as "CRITICAL findings". | A DB or registry error (rate limit) looked like a vulnerability. | - | defect | Download the DB once into `$RUNNER_TEMP`, scan with `--skip-db-update`, use `--exit-code 5` for findings, and list errors separately. | fixed |
 | 14 | `.github/workflows/nightly-scan.yml:39` | The image list was grepped from `.github cluster` only, so none of the images that run on the hosts were scanned. | Advisories for Grafana, Loki, Pocket ID, NATS, Temporal and others went unseen. | - | defect | Add `hosts` (not `robots`: the Isaac Lab base is too big for a hosted runner). | fixed |
-| 15 | nightly-scan run 43735155611 | The nightly has been red because of real CRITICAL findings in CI tool images: gitleaks v8.30.1 (5) and actionlint 1.7.12 (2). | The red is real, so an additional failure would not stand out. | - | defect | Bump when upstream fixes, or `.trivyignore` with an expiry. These images only run in CI, read-only. | decision |
+| 15 | nightly-scan runs 43735155611 and 43790789073 | The nightly has been red because of real CRITICAL findings in CI tool images: gitleaks v8.30.1 (5) and actionlint 1.7.12 (2). With #14 it also shows runtime images: Phoenix 9, ros-base 5, rest-server 4, ksops 3, dcgm-exporter 2, postgres 1. | The red is real, so an additional failure would not stand out. | - | defect | Bump when upstream fixes, or `.trivyignore` with an expiry. These images only run in CI, read-only. | decision |
 | 16 | `robots/safety/governor/safety_governor/nats_bridge.py:63-65` | The credentials and CA were read before the retry loop, in a task nobody awaits. | With a missing or late file, the bridge task died: no governor log line, no retry, and no NATS e-stop until a restart (only `safety_governor_nats_connected 0` showed it). | NATS e-stop path | defect | Read the files inside the retry loop. | fixed (takes effect on the next `robot.yml` deploy, which **restarts the governor and clears a latched e-stop**, see #1) |
 | 17 | `hosts/files/pocket-id/pocketid_sync.py:34` | `sops set FILE KEY VALUE` put each new OIDC client secret on the command line. | The secret was visible in `ps` and `/proc/<pid>/cmdline` while sops ran. | SOPS | defect | `sops set --value-stdin` (sops 3.13.3 on dgx-1; checked with a throwaway age key). | fixed |
 | 18 | `hosts/roles/restic_install/tasks/main.yml:24-29` | bz2 was unpacked straight to the final path, guarded by `creates:`. | An interrupted run left a truncated binary that `creates:` and the "installed" stat accept for ever, so backups would fail every night. | - | defect | Unpack to `restic.tmp`, then `os.replace`. | fixed |
@@ -266,7 +266,21 @@ Each fix is a separate commit. "Old code" means the test was run against the pre
 
 15. **nightly-scan** (two commits).
     - The DB is downloaded once into `$RUNNER_TEMP/trivy-cache`, scans use `--skip-db-update --exit-code 5`, and the summary separates "CRITICAL findings" from "scan error". The step was run locally (see the tool table).
-    - Second commit: the image list includes `hosts/` (24 more images). Whether that fits the 30-minute timeout is checked by a `workflow_dispatch` run on this branch (result in the PR).
+    - Second commit: the image list includes `hosts/` (24 more images).
+    - `workflow_dispatch` run 43790789073 on this branch: 35 images in about 3.5 min (timeout 30), no scan errors. It failed, as expected, on CRITICAL findings:
+
+      | Image | CRITICAL | Where it runs |
+      |---|---|---|
+      | arizephoenix/phoenix version-21.1.0 | 9 | host |
+      | ros:kilted-ros-base | 5 | host |
+      | gitleaks v8.30.1 | 5 | CI |
+      | restic/rest-server 0.14.0 | 4 | host |
+      | ksops v4.5.1 | 3 | cluster |
+      | dcgm-exporter 4.4.2-4.7.1 | 2 | host |
+      | actionlint 1.7.12 | 2 | CI |
+      | postgres 17.12-alpine | 1 | host |
+
+      The other 27 images were clean.
 
 16. **mcp-tool-hashes.** `check` also fails on `*/tools.sha256` without `tools.json`.
     - Tests: `test_check_fails_when_tools_json_is_missing` (fails on the old code) and `test_check_passes_for_pinned_servers`. 15/15 pass; the real `tools/` still passes.
@@ -276,7 +290,7 @@ Each fix is a separate commit. "Old code" means the test was run against the pre
 ## Needs the owner's decision
 
 - **#1 e-stop latch across restarts** (persist it, or start latched), together with **#12** (restarting `user@` also restarts the governor). These two are linked. #35 was resolved by #73.
-- **#15**: CRITICAL findings in the gitleaks/actionlint CI images keep the nightly red.
+- **#15**: CRITICAL findings keep the nightly red: gitleaks and actionlint (CI), plus the runtime images Phoenix, ros-base, rest-server, dcgm-exporter and postgres. Bump them, or accept with an expiring `.trivyignore`.
 - **#21**: whether Debian point releases should auto-install.
 - **#28, #33, #34, #36, #37**: log rotation and network exposure (OTLP, Grafana, Phoenix, rest-server, Temporal, Zenoh, fleet-metrics, OTLP without TLS).
 - **#23**: rebuild policy for locally built images.
