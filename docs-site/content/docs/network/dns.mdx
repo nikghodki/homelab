@@ -20,7 +20,7 @@ CA (D25), and why the name could in theory be registered by someone else (risk n
 
 | Name | Answers | Serves |
 |---|---|---|
-| `model`, `litellm-admin`, `controlcenter`, `voice-agent`, `dgxmanager`, `webui`, `coolify`, `ha` | 192.168.86.44, 100.65.137.82 | front door on dgx-1 |
+| `model`, `litellm-admin`, `controlcenter`, `voice-agent`, `dgxmanager`, `webui`, `ha` | 192.168.86.44, 100.65.137.82 | front door on dgx-1 |
 | `grafana`, `status`, `ntfy`, `phoenix`, `temporal`, `mlflow`, `id`, `ops`, `ca`, `argocd` | 192.168.86.44, 100.65.137.82 | front door on dgx-1 (backends on dgx-2, the Dell, k3s) |
 | `nats`, `fleet` | 192.168.86.44, 100.65.137.82 | NATS 4222/8883, Fleet 8884/8971 on dgx-1 (TLS, homelab CA) |
 | `backup` | 192.168.86.36, 100.124.175.23 | restic rest-server on dgx-2 (TLS on 8000) |

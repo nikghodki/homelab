@@ -1,4 +1,4 @@
 {
   "title": "Services",
-  "pages": ["index", "litellm", "open-webui", "nats", "fleet-broker", "pocket-id", "homepage", "observe-stack", "phoenix", "gatus-ntfy", "temporal", "mlflow", "home-assistant", "voice", "coolify", "backup-server"]
+  "pages": ["index", "litellm", "open-webui", "nats", "fleet-broker", "pocket-id", "homepage", "observe-stack", "phoenix", "gatus-ntfy", "temporal", "mlflow", "home-assistant", "voice", "backup-server"]
 }

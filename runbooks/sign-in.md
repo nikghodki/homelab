@@ -73,6 +73,6 @@ launcher, so if Pocket ID is down open the apps directly (URLs in `hosts/stacks/
   trusted proxies set, P0.16).
 - **LiteLLM UI, DGXMM UI, Open WebUI:** wait for the DGXMM session (LiteLLM and DGXMM are being changed there).
   Open WebUI has family accounts to migrate.
-- **ntfy, Coolify, voice-agent:** their own logins or phone apps; oauth2-proxy would break the phone apps and
+- **ntfy, voice-agent:** their own logins or phone apps; oauth2-proxy would break the phone apps and
   API clients (ntfy topics, LiveKit). Use the oauth2-proxy pattern above only for browser-only apps.
 - **Fleet API:** token auth for machines, not people; it stays as is (Homepage only links to it).

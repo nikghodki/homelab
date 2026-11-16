@@ -126,22 +126,6 @@
 		}
 	}
 
-	@coolify host coolify.nghodki.ai
-	handle @coolify {
-		# Coolify realtime (soketi) and web terminal websockets
-		handle /app/* {
-			reverse_proxy 100.65.137.82:6001
-		}
-		handle /terminal/ws {
-			reverse_proxy 100.65.137.82:6002
-		}
-		handle {
-			reverse_proxy 100.65.137.82:8000 {
-				flush_interval -1
-			}
-		}
-	}
-
 	@webui host webui.nghodki.ai
 	handle @webui {
 		reverse_proxy 100.65.137.82:3100 {

@@ -146,7 +146,7 @@ All are listed with their hosts and roles in [operations/deploy](content/docs/op
 | `sim` | [robotics/simulation](content/docs/robotics/simulation.mdx) |
 
 Outside the repo: edge-gateway → [network/front-door](content/docs/network/front-door.mdx), LiteLLM →
-[services/litellm](content/docs/services/litellm.mdx), Open WebUI, Coolify, Home Assistant, LiveKit/control center →
+[services/litellm](content/docs/services/litellm.mdx), Open WebUI, Home Assistant, LiveKit/control center →
 their service pages.
 
 ### Runbooks (`runbooks/`, 18 + README)

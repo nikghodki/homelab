@@ -19,7 +19,7 @@ roles (§7) and the Jetson capacity line (§9) follow.
 
 Six home devices already run useful pieces independently:
 
-- **DGXMM, LiteLLM, Open WebUI and Coolify** on dgx-1
+- **DGXMM, LiteLLM, Open WebUI and Coolify** on dgx-1 (Coolify retired 2026-11-15, decision 0010)
 - **Hermes** on the Jetson
 - **picoclaw** on the Raspberry Pi
 - **Omarchy** on the Linux laptop
@@ -47,7 +47,7 @@ survive any single machine rebooting, and easy to grow.
 
 | Device | Hardware | Runs today |
 |---|---|---|
-| dgx-1 `spark-83dc` (.44) | GB10, 20 cores, 121 GiB unified memory, 3.7 TB NVMe | DGXMM, LiteLLM (+ Postgres, Redis), Open WebUI, Coolify, edge DNS + proxy, DefenseClaw (managed, 1.0.2), fleet-metrics |
+| dgx-1 `spark-83dc` (.44) | GB10, 20 cores, 121 GiB unified memory, 3.7 TB NVMe | DGXMM, LiteLLM (+ Postgres, Redis), Open WebUI, Coolify (retired 2026-11-15, decision 0010), edge DNS + proxy, DefenseClaw (managed, 1.0.2), fleet-metrics |
 | dgx-2 (.36) | GB10, 20 cores, 121 GiB, 3.7 TB NVMe | Nothing (idle) at inventory time (2026-11-14); since then observe, console, jobs, gpu stacks, sim jobs, and a DGXMM engine |
 | Spark ↔ Spark | 2 × 200 Gb/s RDMA, 10.100.136/137.x | Only used for manual tests that split a model across both |
 | Jetson `nikhil-jetson` (.211) | Orin, 6 cores, 7.4 GiB, 3.6 TB NVMe, JetPack 7.2.1 | Hermes (2 profiles), Home Assistant, roboclaw control center, vision-service, LiveKit |
@@ -140,6 +140,7 @@ Every device except the direct Spark link is on Wi-Fi.
 | D24 | DefenseClaw Fleet transport | **A dedicated Mosquitto broker** (`fleet.nghodki.ai:8884`, TLS, per-device ACLs) for Edge Connector Fleet traffic, not NATS: the Fleet gateway's Go client speaks only MQTT 5, and NATS MQTT is 3.1.1. NATS stays the general fleet bus. The Fleet API is served over TLS by a host-network Caddy on dgx-1 (`:8971`) that forwards only `/api/v1/fleet/*` to the loopback gateway |
 | D25 | HTTPS for `*.nghodki.ai` | **A name-constrained homelab web CA** (only `nghodki.ai` names) plus a wildcard certificate on the dgx-1 front door; each device installs the CA once from `ca.nghodki.ai`. Chosen over registering the domain (Let's Encrypt) and over Tailscale `ts.net` names (2026-11-15). Kept separate from the internal homelab CA, which is never installed on phones. Risk: `nghodki.ai` is unregistered, so someone else could register it; registering it later moves us to Let's Encrypt |
 | D26 | Voice and vision | **Retired for now** (2026-11-15). `voice-agent.nghodki.ai` (LiveKit route, broken: LiveKit listens on the Jetson's loopback) removed from the front door and DNS; `vision-service` on the Jetson disabled. LiveKit server and the control-center stay on the Jetson for now. Bring back with a new decision |
+| D27 | PaaS | **Coolify retired** (2026-11-15, [decision 0010](../decisions/0010-retire-coolify.md)): it hosted no apps; containers, data, its SSH key, the `coolify.nghodki.ai` route and DNS removed, nothing kept. Argo CD Applications replace it if needed |
 | D19 | Vision | **Not deployed** for now | Move it to the Jetson | Not needed now | Decided |
 
 ## 7. Device roles

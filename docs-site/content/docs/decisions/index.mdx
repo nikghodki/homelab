@@ -1,6 +1,6 @@
 ---
 title: Decisions
-description: One line for every design decision (D1–D25) and every decision record (0001–0009), with its status.
+description: One line for every design decision (D1–D25) and every decision record (0001–0010), with its status.
 ---
 
 Design decisions are in `docs/design.md` §6; later decisions are files in `decisions/` (template `0000-template.md`).
@@ -50,6 +50,7 @@ The design doc's table header says "D1–D23" in places (README, `decisions/READ
 | 0007 | — | — | — | no such file (numbering skips it) |
 | 0008 | Image signing and Enforce | 2026-11-15 | decided | cosign keyless from `build-sign.yml` on `main`; mlflow and ros-zenoh for amd64+arm64, packages public; MuJoCo stays local; Kyverno Enforce everything with failurePolicy Fail except kube-system, kyverno, argocd (and edge until P3.3); `verify-images` with `mutateDigest`; new `require-image-digest`; 2 admission replicas |
 | 0009 | No services box | 2026-11-15 | decided | Services stay on the Sparks (alerting on the Dell); hard reserves and job caps instead; revisit after another crash |
+| 0010 | Retire Coolify | 2026-11-15 | decided; done | Coolify (0 apps) removed from dgx-1 with its data, SSH key, route and DNS name; nothing kept |
 
 ## Open questions (design §11)
 
