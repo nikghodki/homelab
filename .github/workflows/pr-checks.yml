@@ -126,11 +126,16 @@ jobs:
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         run: .github/scripts/shellcheck.sh "$SHELLCHECK_IMAGE"
       - name: Ansible collections cache (per day and hosts/requirements.yml, so new collection releases still arrive)
+        # PRs may fall back to an earlier day's copy; the daily run on main never does, so it installs the current
+        # releases and saves them for the day (ansible-galaxy keeps whatever satisfies requirements.yml)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.ansible/collections
           key: ansible-collections-${{ hashFiles('hosts/requirements.yml', '.github/requirements-ci.txt') }}-${{ steps.scope.outputs.day }}
+          restore-keys: >-
+            ${{ github.event_name == 'pull_request'
+            && format('ansible-collections-{0}-', hashFiles('hosts/requirements.yml', '.github/requirements-ci.txt')) || '' }}
       - name: ansible-lint
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' && hashFiles('hosts/**/*.yml', 'hosts/**/*.yaml') != '' }}
         working-directory: hosts
