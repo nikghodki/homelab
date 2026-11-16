@@ -18,6 +18,9 @@ and Tailscale. Never GitHub Pages. Full procedure: `runbooks/docs-site.md`.
 | Sign-in | Pocket ID client `docs`, PKCE S256, `allowed_groups = ["admins"]`, cookie `_docs_oauth2_proxy`; `secrets/console.enc.yaml` → `oidc_docs_secret`, `oauth2_proxy_docs_cookie_secret` |
 | Health | Gatus `docs.nghodki.ai` (302 to Pocket ID) and `docs build` (external endpoint: build result, 1 h heartbeat); journal tag `docs-build` in Loki |
 
+Measured on 2026-11-15: PR #82 merged at 03:08:54Z and was live at 03:15:55Z (7 min: the wait for the next
+quarter-hour timer run, then about 50 s to clone, install and build). Worst case is about 16 min.
+
 A failed build leaves the last good site up. Nothing on the site loads from other hosts (system fonts, local search,
 Mermaid served from the site).
 
