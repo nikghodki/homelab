@@ -73,7 +73,7 @@ prompts, datasets, endpoints, AI dependencies, secrets). Decision 0003; runbooks
 
 | Host | Code dirs | Container images |
 |---|---|---|
-| dgx-1 | `~/workspace/dgx-model-manager`, `~/litellm-setup` | `litellm-proxy`, `open-webui` |
+| dgx-1 | `~/workspace/dgx-model-manager`, `/opt/homelab/litellm` | `litellm-proxy`, `open-webui` (both stopped since their move into k3s, 2026-11-16) |
 | dgx-2 | — | `observe-phoenix-1` |
 | Jetson | both Hermes checkouts, `~/workspace/roboclaw` | — |
 | Pi | `/var/lib/picoclaw/.picoclaw`, `/var/lib/picoclaw/roboclaw`, `~/workspace/roboclaw` | — |

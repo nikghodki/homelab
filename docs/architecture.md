@@ -86,16 +86,17 @@ Numbers marked "est." are estimates, not measurements.
 |---|---|---|
 | `edge` | DNS (CoreDNS for `*.nghodki.ai`), HTTPS proxy (Caddy, wildcard cert from a Secret, §4.5), `ca.nghodki.ai` install page, CrowdSec | Sparks (2 replicas) |
 | `bus` | NATS JetStream (3 replicas: dgx-1, dgx-2 and, as a small replica, the Jetson) | Sparks + Jetson (tolerates the taint) |
-| `models` | LiteLLM (model, MCP and A2A gateway), DGXMM (one per Spark), DefenseClaw guardrail plugin | Sparks |
+| `models` | LiteLLM (model, MCP and A2A gateway; as built, in its own namespace `litellm`, below), DGXMM (one per Spark), DefenseClaw guardrail plugin | Sparks |
 | `open-webui` | Open WebUI (moved 2026-11-16; one namespace per app, `cluster/apps/README.md`) | dgx-1 (its volume) |
-| `data` | CloudNativePG Postgres, SeaweedFS | Sparks |
+| `litellm` | LiteLLM proxy (2 replicas, one per Spark, fixed ClusterIP 10.43.0.150:4000) and Redis 7.4 (moved 2026-11-16; one namespace per app). Its database is the CNPG cluster `data/litellm-db` | Sparks |
+| `data` | CloudNativePG Postgres (since 2026-11-16 `litellm-db`: Postgres 17, primary dgx-2, standby dgx-1), SeaweedFS | Sparks |
 | `agents` | Hermes (after P4.5), OpenBot, workers; MCP servers that run in the cluster | Omarchy, Sparks; Hermes on the Jetson |
 | `home` | Home Assistant, LiveKit | Jetson (tolerates the taint) |
 | `robot` | Nav2 bridge, Zenoh router (host network) | Jetson (tolerates the taint) |
 | `jobs` | Temporal, batch jobs, ARC runners | dgx-2 |
 | `sim` | Isaac Lab / Isaac Sim and MuJoCo training and evaluation jobs, MLflow | dgx-2 (dgx-1 overnight) |
 | `observe` | VictoriaMetrics, Loki, Tempo, Grafana, Phoenix, Gatus, Alertmanager, ntfy, OTel gateway; **dcgm-exporter** (DaemonSet, `nghodki.ai/role=gpu` nodes only) | dgx-2; dcgm-exporter on both Sparks |
-| `console` | Fleet Console, **Pocket ID** (`id.nghodki.ai`) | dgx-2 |
+| `console` | Fleet Console, **Pocket ID** (`id.nghodki.ai`; moved 2026-11-16, fixed ClusterIP 10.43.0.155:1411) | dgx-2 (Pocket ID pinned there by its volume) |
 | `security` | Tetragon, policy bundles, nightly AIBOM job; **Fleet MQTT broker** (Mosquitto, D24, `fleet.nghodki.ai:8884`, TLS, per-device ACLs); **Fleet API TLS proxy** (Caddy `:8971`) | Fleet broker and proxy pinned to dgx-1 |
 | `argocd` | Argo CD | Sparks |
 | `kyverno` | Kyverno (own namespace: Kyverno skips its own namespace at admission (resourceFilters), so it isn't shared with `security` workloads; decision 0006) | Sparks |
@@ -133,13 +134,13 @@ unless noted. P3.7 moves each into its k3s namespace and removes the Docker copy
 | `observe` | dgx-2 | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, two OTel gateways, Grafana, Phoenix | `observe` |
 | `alerting` | Omarchy (the Dell, never sleeps) | Gatus 5.38.0 (UI signed in at the front door, `status-gate`), ntfy 2.38.0 (phone over Tailscale HTTPS). Off the Sparks so alerts still arrive when a Spark or dgx-1's front door is down ([alerting](../runbooks/alerting.md)) | Stays on the Dell, outside the cluster (alerting must not depend on it) |
 | `ops` | Omarchy | Homepage 2.8.0, signed in at the front door (`ops.nghodki.ai`, LAN gate port 4180) | Stays on the Dell, outside the cluster (decision 0009) |
-| `console` | dgx-2 | Pocket ID 2.19.3 (LAN port 1411; dgx-1 Caddy terminates TLS) | `console` |
+| `console` | dgx-2 | Pocket ID 2.19.3 (LAN port 1411): moved 2026-11-16; the stopped container is the rollback until 2026-11-23 | `console`, pinned to dgx-2: done |
 | `bus` | dgx-1 | NATS 2.15.3 (4222 TLS, MQTT 8883 TLS) | `bus` (3 replicas) |
 | `fleet` | dgx-1 | Mosquitto 2.1.2 (8884 TLS), Caddy Fleet API proxy (host network, `:8971`) | `security` |
 | `gpu` | dgx-1, dgx-2 | dcgm-exporter (loopback 9400) | `observe` (DaemonSet) |
 | `backup` | dgx-2 | restic rest-server (8000) | Stays on the host (restores must not need the cluster) |
 | edge-gateway | dgx-1 | `edge-caddy` + `edge-dnsmasq` in `~/edge-gateway`, and `nginx-gateway`: **stopped 2026-11-15** (moved; kept a week for rollback) | `edge` (CoreDNS + Caddy, 2 replicas, behind kube-vip): done |
-| LiteLLM | dgx-1 | `litellm-proxy` v1.109.1 + Postgres + Redis (hand-run, not in the repo) | `models` (2 replicas); Postgres → `data` (CNPG); Redis → `models` |
+| LiteLLM | dgx-1 | `litellm-proxy` v1.109.1 + Postgres + Redis (`hosts/stacks/litellm`): moved 2026-11-16; the stopped stack is the rollback until 2026-11-23 | its own namespace `litellm` (2 replicas, one per Spark; Redis there too); Postgres → CNPG `data/litellm-db`: done |
 | Open WebUI | dgx-1 | moved 2026-11-16; the stopped container is the rollback until 2026-11-23 | its own namespace `open-webui` (cluster/apps convention, not `agents`/`models`), pinned to dgx-1: done |
 
 Not moved: DGXMM and its engines (§3.2). Coolify was retired on 2026-11-15 (decision 0010), not moved.
@@ -152,7 +153,8 @@ Not moved: DGXMM and its engines (§3.2). Coolify was retired on 2026-11-15 (dec
 - `*.nghodki.ai` resolves, on the LAN, to the **kube-vip floating IP** `192.168.86.11`, which lives on whichever
   Spark is up; on the tailnet, to the Tailscale IP of a Spark that is up (Tailscale split DNS lists both Sparks;
   each CoreDNS replica answers with its own Spark). Decision 0007, runbooks/edge.md. Caddy reaches every
-  backend directly (LiteLLM and DGXMM over dgx-1's direct-cable address); the old door on dgx-1 is stopped.
+  backend directly (LiteLLM and Pocket ID by their fixed ClusterIPs, DGXMM over dgx-1's direct-cable address); the old
+  door on dgx-1 is stopped.
 
 | Name | Service |
 |---|---|
@@ -470,7 +472,7 @@ Every agent has:
 | Git (`nikghodki/homelab`) | GitHub + mirror on dgx-2 | Inherent |
 | age key | Offline + password manager | Manual copy |
 | etcd | servers | Snapshot every 6 h → SeaweedFS (7 days) |
-| Postgres (LiteLLM, agent memory, Temporal, audit) | CNPG, primary dgx-2, standby dgx-1 | Continuous WAL archiving → SeaweedFS (30 days) |
+| Postgres (LiteLLM, agent memory, Temporal, audit) | CNPG, primary dgx-2, standby dgx-1 | Continuous WAL archiving → SeaweedFS (30 days). As built (LiteLLM, 2026-11-16): a `pg_dump` from the primary before dgx-1's restic run; WAL archiving waits for SeaweedFS (P3.8) |
 | Home Assistant config, Hermes state, picoclaw, OpenBot workspaces | their hosts | restic daily → dgx-2 (30 days) |
 | DefenseClaw audit | each host → Loki | restic daily (90 days) |
 | Phoenix | dgx-2 | restic daily (30 days) |

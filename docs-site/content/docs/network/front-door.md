@@ -21,12 +21,12 @@ All in `cluster/platform/edge/caddy/Caddyfile`, on :80 and :443 (wildcard from t
 
 | Hostname | Backend | Sign-in | http → https | Notes |
 |---|---|---|---|---|
-| `id.nghodki.ai` | Pocket ID, 192.168.86.36:1411 (dgx-2) | passkeys | yes (308) | passkeys need HTTPS |
+| `id.nghodki.ai` | Pocket ID `console/pocket-id`, fixed ClusterIP 10.43.0.155:1411 (pinned to dgx-2); fallback the stopped Docker copy 192.168.86.36:1411 (`lb_policy first`, until 2026-11-23) | passkeys | yes (308) | passkeys need HTTPS |
 | `ops.nghodki.ai` | ops stack Caddy gate → Homepage, 192.168.86.49:4180 (Dell) | `signed_in` (edge-auth, admins) | yes | |
 | `ca.nghodki.ai` | static files in `/etc/caddy/ca` | none | no | `.mobileconfig` and `.crt` get the right content types; in k3s a ConfigMap copy of `hosts/files/web-ca` (checked by CI) |
 | `docs.nghodki.ai` | docs Caddy → this site, 192.168.86.49:4181 (Dell) | `signed_in` (edge-auth, admins) | yes | `runbooks/docs-site.md` |
 | `auth.nghodki.ai` | `edge/edge-auth` (oauth2-proxy in k3s, by the fixed ClusterIP of `edge-auth-ip`, 10.43.0.54:4180): `/oauth2/*`, `/ping`; anything else → Homepage | it *is* the sign-in (callback for every `signed_in` route) | yes | decision 0011 |
-| `model.nghodki.ai` | the `(model_plane)` snippet: `/v1/*`, `/health*` → LiteLLM 10.100.136.1:4000; `/dgxmm*` → 308 to `dgxmanager.nghodki.ai` (DGXMM is only there, behind sign-in, since 2026-11-16); `/v1` → 301 with a slash; else a JSON 404 | LiteLLM keys | no | LiteLLM: 30 min read/write timeouts, no buffering (cold starts). (nginx-gateway until 2026-11-15; `/tts/` dropped, D26) |
+| `model.nghodki.ai` | the `(model_plane)` snippet: `/v1/*`, `/health*` → LiteLLM `litellm/litellm`, fixed ClusterIP 10.43.0.150:4000; fallback the stopped Docker copy 10.100.136.1:4000 (`lb_policy first`, until 2026-11-23; with both down a request waits up to 90 s); `/dgxmm*` → 308 to `dgxmanager.nghodki.ai` (DGXMM is only there, behind sign-in, since 2026-11-16); `/v1` → 301 with a slash; else a JSON 404 | LiteLLM keys | no | LiteLLM: 30 min read/write timeouts, no buffering (cold starts). (nginx-gateway until 2026-11-15; `/tts/` dropped, D26) |
 | `grafana.nghodki.ai` | 192.168.86.36:3000 | Pocket ID (Grafana's own OAuth) | no | |
 | `status.nghodki.ai` | status-gate → Gatus, 192.168.86.49:8081 (Dell) | `signed_in` (edge-auth, admins) | yes | `/health` passes without a session (and `/metrics`, the heartbeat POST on the gate itself) |
 | `ntfy.nghodki.ai` | 192.168.86.49:8085 (Dell) | ntfy users | no | `flush_interval -1` so streams aren't buffered. The phone does **not** use this name |
@@ -34,7 +34,7 @@ All in `cluster/platform/edge/caddy/Caddyfile`, on :80 and :443 (wildcard from t
 | `mlflow.nghodki.ai` | ml stack Caddy gate, 192.168.86.36:4181 → MLflow | `signed_in` (edge-auth, admins) | yes | |
 | `temporal.nghodki.ai` | Temporal UI, 192.168.86.36:8233 | Pocket ID (Temporal UI OIDC) | yes | |
 | `argocd.nghodki.ai` | `argocd/argocd-server-host`, fixed ClusterIP 10.43.0.100:80 | Pocket ID (Argo CD OIDC) | yes | Argo CD runs in insecure mode; TLS ends here |
-| `litellm-admin.nghodki.ai` | 100.65.137.82:4000 (LiteLLM on dgx-1, by its Tailscale IP) | `session_check` (edge-auth, admins), then the LiteLLM UI login | yes | Host header rewritten to the upstream |
+| `litellm-admin.nghodki.ai` | LiteLLM, 10.43.0.150:4000; fallback the stopped Docker copy 10.100.136.1:4000 (until 2026-11-23) | `session_check` (edge-auth, admins), then the LiteLLM UI login | yes | Host header rewritten to the upstream |
 | `controlcenter.nghodki.ai` | 192.168.86.211:8200 (Jetson, RoboClaw control center) | none in Caddy (unverified in the app) | no | old :9119 route was dead |
 | `dgxmanager.nghodki.ai` | the `(dgxmm_ui)` snippet: `/dgxmm/*` → DGXMM 10.100.136.1:8090, `/dgxmm/ondemand/*` 404; `/` → 302 `/dgxmm/`; else a JSON 404 pointing at model.nghodki.ai | `session_check` (edge-auth, admins); DGXMM has no login of its own | yes | `/dgxmm/healthz` (the SPA shell) is open for Gatus and Homepage. SSE unbuffered, 1 h reads, 1 MB request limit |
 | `webui.nghodki.ai` | `open-webui/open-webui`, fixed ClusterIP 10.43.0.130:8080; fallback the stopped Docker copy 100.65.137.82:3100 (`lb_policy first`, until 2026-11-23) | Open WebUI accounts | no | 30 min timeouts for streaming |
@@ -125,7 +125,7 @@ door can be deleted on 2026-11-22.
 | DNS | `edge/edge-dns` (CoreDNS, 2 replicas), zones from `cluster/platform/edge/names.txt` ([DNS](dns.md)) |
 | Floating IPs | kube-vip DaemonSet on the Sparks (`kube-system`, ARP on `wlP9s9`): 192.168.86.10 (k3s API), 192.168.86.11 (edge: `edge-dns-lan` :53, `edge-caddy-lan` :80/:443) |
 | Tailnet | Services `edge-dns-tailnet`, `edge-caddy-tailnet` with both Sparks' Tailscale IPs (100.65.137.82, 100.124.175.23) as `externalIPs`; kube-proxy DNATs them ahead of Docker |
-| Model plane | model, dgxmanager, ha and the default go straight to LiteLLM, DGXMM (10.100.136.1) and HA; the relay through edge-caddy and nginx-gateway was retired on 2026-11-15 (PR #88) |
+| Model plane | model, dgxmanager, ha and the default go straight to LiteLLM (ClusterIP 10.43.0.150 since 2026-11-16), DGXMM (10.100.136.1) and HA; the relay through edge-caddy and nginx-gateway was retired on 2026-11-15 (PR #88) |
 | Argo CD apps | `kube-vip`, `edge`, `kube-state-metrics` (project `platform`, from `main`) |
 | Monitoring | Gatus group `web` via the VIP; group `edge` (DNS on the VIP and both Tailscale IPs over TCP, Caddy on the VIP with cert expiry, DGXMM's UI through the VIP, the API VIP); vmalert `front-door` rules ([Alert rules](../observability/alert-rules.md#front-door-front-dooryml)) |
 | Verify | `.github/scripts/verify-cutover.sh` (must end `CUTOVER VERIFIED`; also checks the old door stays stopped); `.github/scripts/compare-front-doors.sh` (every route, the model plane's paths and every name, on two addresses of the door) |

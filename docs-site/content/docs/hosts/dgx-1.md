@@ -6,8 +6,8 @@ description: "The first DGX Spark: interactive models, a front-door replica, NAT
 dgx-1 is the busiest host. It serves the interactive models and runs one of the two front-door replicas. It is also
 where people and agents work: the repo clone, the age key, Ansible and kubectl all live here. Since the P3.3 cutover
 (2026-11-15) the web front door and DNS run in k3s on both Sparks
-([Front door](../network/front-door.md#in-cluster-front-door-p33)), but LiteLLM and DGXMM (model,
-dgxmanager), NATS and Fleet still go down with dgx-1 (see
+([Front door](../network/front-door.md#in-cluster-front-door-p33)) and LiteLLM runs on both Sparks (since 2026-11-16),
+but DGXMM (the models behind LiteLLM, and dgxmanager), NATS and Fleet still go down with dgx-1 (see
 [Failure scenarios](../observability/failure-scenarios.md)).
 
 ## Hardware and OS
@@ -33,10 +33,13 @@ dgxmanager), NATS and Fleet still go down with dgx-1 (see
 | `edge-caddy` | `caddy:2.11` | **stopped 2026-11-15** (`restart: no`), kept until 2026-11-22 for a rollback | hand, `~/edge-gateway` |
 | `edge-dnsmasq` | `edge-dnsmasq:local` | **stopped 2026-11-15** (`restart: no`), kept until 2026-11-22 | hand, `~/edge-gateway` |
 | `nginx-gateway` | `nginx:alpine` | **stopped 2026-11-15** (`restart: no`; its routes are in the k3s Caddyfile) | hand, `~/voice-assistant/nginx` |
-| `litellm-proxy` | `ghcr.io/berriai/litellm:v1.109.1` (digest-pinned, P0.13) | 0.0.0.0:4000 | Ansible, `hosts/stacks/litellm` |
-| `litellm-postgres` | `postgres:16-alpine` (by digest) | 127.0.0.1:5432 | Ansible |
-| `litellm-redis` | `redis:7-alpine` (by digest) | 127.0.0.1:6379 | Ansible |
-| `litellm-defenseclaw-bridge` | `alpine/socat:1.8.0.3` (by digest) | 172.17.0.1:18970 (host network) | Ansible |
+| `litellm-proxy` | `ghcr.io/berriai/litellm:v1.109.1` (digest-pinned, P0.13) | was 0.0.0.0:4000; **stopped 2026-11-16** (moved into k3s, `restart: no`, kept until 2026-11-23 as the rollback) | Ansible, `hosts/stacks/litellm` (rollback only) |
+| `litellm-postgres` | `postgres:16-alpine` (by digest) | was 127.0.0.1:5432; **stopped 2026-11-16** (data kept, as of the cutover) | Ansible |
+| `litellm-redis` | `redis:7-alpine` (by digest) | was 127.0.0.1:6379; **stopped 2026-11-16** | Ansible |
+| `litellm-defenseclaw-bridge` | `alpine/socat:1.8.0.3` (by digest) | was 172.17.0.1:18970 (host network); **stopped 2026-11-16** | Ansible |
+| `litellm-dgxmm-bridge` | `alpine/socat:1.8.0.3` (by digest) | 10.100.136.1:8091 → `dgxmm:8090` (DGXMM's on-demand gateway, for the LiteLLM pods) | Ansible, `hosts/stacks/litellm-bridges` |
+| `litellm-defenseclaw-cable` | `alpine/socat:1.8.0.3` (by digest) | 10.100.136.1:18970 → 127.0.0.1:18970 (host network; DefenseClaw for the LiteLLM pods) | Ansible, `hosts/stacks/litellm-bridges` |
+| `litellm-compat-loopback`, `litellm-compat-cable` | `alpine/socat:1.8.0.3` (by digest) | 127.0.0.1:4000, 10.100.136.1:4000 → 10.43.0.150:4000 (host network); **transition only, removed 2026-11-23** | Ansible, `hosts/stacks/litellm-bridges` |
 | `open-webui` | `ghcr.io/open-webui/open-webui:v0.13.3` | 0.0.0.0:3100 | hand; **stopped 2026-11-16** (moved into k3s, kept until 2026-11-23) |
 | `dgxmm` | `dgxmm:latest` | 127.0.0.1:8090 | DGXMM project |
 | `bus-nats-1` | `nats:2.15.3-alpine` | 0.0.0.0:4222, :8883; 127.0.0.1:8222 | `playbooks/bus.yml` |
@@ -53,6 +56,7 @@ DGXMM starts model engines (vLLM, llama.cpp) as more containers when models load
 | `k3s.service` | k3s server + etcd (node IP 10.100.136.1) |
 | `otelcol-contrib.service` | host collector; also scrapes dcgm-exporter and the Fleet API metrics |
 | `fleet-metrics.service` | `:9109` |
+| `litellm-usage-exporter.service` | who called the model API: reads LiteLLM's CNPG primary (`10.43.0.151:5432`, read-only role), serves `127.0.0.1:9112/metrics` (`playbooks/litellm-usage.yml`) |
 | `tailscaled.service` | Tailscale |
 | `earlyoom.service`, `gpu-oom-guard.service` | Memory guards added after the 2026-11-15 OOM, `roles/memory_guard` (playbooks/gpu.yml, `runbooks/memory-guard.md`) |
 | `nvidia-persistenced`, `dgx-dashboard`, `dgx-dashboard-admin` | DGX OS |
@@ -66,7 +70,8 @@ Timers: `cisco-aibom.timer` (~04:20), `lynis-audit.timer` (Sunday ~03:30), `home
 
 Argo CD controller and redis, CNPG operator, Kyverno admission and reports controllers, kube-state-metrics (where the
 scheduler put them; any Spark is fine); one replica each of `edge/edge-caddy` and `edge/edge-dns` and a kube-vip pod
-(one per Spark). See [k3s](../platform/k3s.md).
+(one per Spark); one of the two LiteLLM proxy pods (`litellm/litellm`) and the standby of LiteLLM's CNPG cluster
+`data/litellm-db` (since 2026-11-16). See [k3s](../platform/k3s.md).
 
 ## Files that matter
 
@@ -85,7 +90,7 @@ scheduler put them; any Spark is fine); one replica each of `edge/edge-caddy` an
 ## Operate
 
 - Shell setup: `export PATH=$HOME/.local/bin:$PATH KUBECONFIG=$HOME/.kube/config`.
-- Health: `docker ps`, `curl -s http://127.0.0.1:4000/health/liveliness` (LiteLLM), `kubectl get nodes`.
+- Health: `docker ps`, `curl -s http://10.43.0.150:4000/health/liveliness` (LiteLLM in k3s), `kubectl get nodes`.
 - Restart edge-caddy after a config change: `docker restart edge-caddy` (a `caddy reload` hasn't always taken
   effect). The in-cluster front door: `kubectl -n edge rollout restart deploy/edge-caddy`.
 
@@ -94,5 +99,6 @@ scheduler put them; any Spark is fine); one replica each of `edge/edge-caddy` an
 - dgx-1's umask is 002. uv's Python tree inherits it, and the DefenseClaw policy compiler refuses a group-writable
   interpreter (see [Troubleshooting](../operations/troubleshooting.md)).
 - Its LAN link is Wi-Fi. After a reboot, containers that publish on a LAN IP can fail if Wi-Fi comes up late.
-- LiteLLM (:4000) listens on all interfaces, so it is reachable on the LAN directly, not only through the front door.
-  Open WebUI (:3100) did too until it moved into k3s (2026-11-16); its pod is only reachable through the door.
+- LiteLLM (:4000) and Open WebUI (:3100) listened on all interfaces until they moved into k3s (2026-11-16); their pods
+  are only reachable through the door (and, for LiteLLM, from the Sparks). Until 2026-11-23 only the transition relays
+  listen on :4000, on loopback and the cable address.

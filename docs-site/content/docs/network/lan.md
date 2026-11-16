@@ -39,14 +39,12 @@ Services that publish on all interfaces or on a LAN address (full list in [Ports
 | Host | Port | Service | Auth |
 |---|---|---|---|
 | dgx-1 | 80, 443 | front door | per route |
-| dgx-1 | 4000 | LiteLLM | API keys |
 | dgx-1 | 4222, 8883 | NATS, MQTT (TLS) | users, deny by default |
 | dgx-1 | 8884 | Fleet MQTT (TLS) | per-device users and ACLs |
 | dgx-1 | 8971 | Fleet API (TLS) | bearer token |
 | dgx-2 | 3000 | Grafana | Pocket ID or break-glass admin |
 | dgx-2 | 6006 | Phoenix | Pocket ID or break-glass admin |
 | dgx-2 | 4317–4320 | OTLP receivers | none |
-| dgx-2 | 1411 | Pocket ID | passkeys |
 | dgx-2 | 7233 | Temporal gRPC | mTLS, client certificate from the Temporal CA; roles per namespace |
 | dgx-2 | 8233, 9233 | Temporal UI, metrics | UI: Pocket ID |
 | dgx-2 | 4181, 5000 | MLflow (UI gate, job API) | front door token (sign-in at the door); basic auth |
@@ -58,6 +56,9 @@ Services that publish on all interfaces or on a LAN address (full list in [Ports
 | Dell | 8081 | Gatus via status-gate | front door token (sign-in at the door); `/health`, `/metrics`, heartbeat open |
 | Dell | 8085 | ntfy | ntfy users |
 | Dell | 4180, 4181 | Homepage, docs site (ops stack Caddy) | front door token (sign-in at the door) |
+
+LiteLLM (dgx-1:4000) and Pocket ID (dgx-2:1411) left this list when they moved into k3s on 2026-11-16; their
+stopped Docker copies would publish there again only in a rollback (until 2026-11-23).
 | all | 9109 | fleet-metrics | none (read-only metrics) |
 
 The design goal (§4.3) is "nothing listens on the LAN that doesn't need to". The **none** rows are known gaps.

@@ -9,11 +9,11 @@ without a login share one sign-in at the front door (`edge-auth`).
 | | |
 |---|---|
 | Version | Pocket ID 2.19.3 (`ghcr.io/pocket-id/pocket-id`, digest-pinned) |
-| Host | dgx-2, stack `console` (`hosts/stacks/console`, `playbooks/console.yml`), `/opt/homelab/console` |
-| Port | 192.168.86.36:1411 (LAN only; dgx-1's Caddy is the only client) |
+| Host | k3s since 2026-11-16: `console/pocket-id` (Argo CD app `pocket-id`, `cluster/apps/pocket-id`), pinned to dgx-2. The Docker stack `console` (`hosts/stacks/console`, `playbooks/console.yml`) is stopped, the rollback until 2026-11-23 |
+| Address | fixed ClusterIP `10.43.0.155:1411`; only the front door's Caddy pods may connect |
 | URL | `https://id.nghodki.ai` (http redirects: passkeys need HTTPS) |
-| Data | Docker volume `pocket-id-data` (SQLite). Not backed up by decision 0002 |
-| Secrets | `secrets/console.enc.yaml` → `pocketid_encryption_key`, `pocketid_static_api_key` (rendered as files, 0600, uid 1000) |
+| Data | PVC `pocket-id-data` (local-path on dgx-2, SQLite). In restic on dgx-2 since 2026-11-16 (a SQLite snapshot of `pocket-id.db`) |
+| Secrets | `secrets/console.enc.yaml` → `pocketid_encryption_key`, `pocketid_static_api_key`, copied byte for byte into the KSOPS Secret `cluster/apps/pocket-id/pocket-id.enc.yaml` (mounted as files, uid 1000) |
 | Settings | `APP_URL=https://id.nghodki.ai`, `TRUST_PROXY=true`, analytics and version check off |
 | Health | `https://id.nghodki.ai/healthz` (Homepage monitor) |
 | Contents in Git | `identity/pocket-id.yaml`, applied by `hosts/files/pocket-id/pocketid_sync.py` |
@@ -106,13 +106,13 @@ Full recipe, rotation and troubleshooting: `runbooks/sign-in.md`.
 | Argo CD | `argocd --core --kube-context argocd ...` on dgx-1 needs no login; for the UI, temporarily enable local admin (runbooks/argocd.md) |
 | Temporal UI | the CLI: `sudo docker compose exec admin-tools temporal ...` on dgx-2. The UI exits and restarts until Pocket ID is back |
 | MLflow | job API on 192.168.86.36:5000 with basic auth (`mlflow_api_password`) |
-| LiteLLM admin UI | `ssh -L 4000:127.0.0.1:4000 nikghodki-dgx@<dgx-1>`, open `http://localhost:4000/fallback/login`, user `nikghodki`, password `litellm_ui_password` in `secrets/litellm.enc.yaml` (the master key works too) |
+| LiteLLM admin UI | on dgx-1 `kubectl -n litellm port-forward svc/litellm 4000:4000`, plus `ssh -L 4000:127.0.0.1:4000 nikghodki-dgx@<dgx-1>`, open `http://localhost:4000/fallback/login`, user `nikghodki`, password `litellm_ui_password` in `secrets/litellm.enc.yaml` (the master key works too) |
 
 ## Gotchas
 
 - Gatus' own `security.oidc` panics at start when Pocket ID is unreachable, which would stop all checks exactly when
   the Sparks are down. That's why Gatus' UI is signed in at the front door instead (its checks don't go through it).
 - Phoenix answers "authentication failed" unless the client requests the `groups` scope (PR #36).
-- Pocket ID runs on dgx-2 and is reached through the front door (either Spark): dgx-2 down breaks sign-in.
+- Pocket ID is pinned to dgx-2 (its volume) and is reached through the front door (either Spark): dgx-2 down breaks sign-in.
 - Retired clients (`ops`, `docs`, `gatus`, `mlflow`, replaced by `edge-auth`) are listed under `removedClients`; the
   sync deletes them in Pocket ID and drops their secrets.

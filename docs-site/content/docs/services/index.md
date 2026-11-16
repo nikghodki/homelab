@@ -5,12 +5,12 @@ description: "Every service in the fleet in one table: URL, host, port, how it i
 
 | Service | URL | Host | Port(s) | Deployed by | Health check | Page |
 |---|---|---|---|---|---|---|
-| LiteLLM | `model.nghodki.ai`, `litellm-admin.nghodki.ai` | dgx-1 | 4000 | hand (`~/litellm-setup`) | Gatus `model.nghodki.ai (LiteLLM)` | [LiteLLM](litellm.md) |
+| LiteLLM | `model.nghodki.ai`, `litellm-admin.nghodki.ai` | k3s, both Sparks | ClusterIP 10.43.0.150:4000 | Argo CD (`litellm`, database `data`) | Gatus `model.nghodki.ai (LiteLLM)` | [LiteLLM](litellm.md) |
 | DGXMM | `dgxmanager.nghodki.ai` | dgx-1 | 127.0.0.1:8090 | DGXMM project | Gatus `dgxmanager.nghodki.ai` | [Model plane](../agents/model-plane.md) |
 | Open WebUI | `webui.nghodki.ai` | dgx-1 (k3s) | ClusterIP 10.43.0.130:8080 | Argo CD | Gatus `webui.nghodki.ai` | [Open WebUI](open-webui.md) |
 | NATS | `nats.nghodki.ai` | dgx-1 | 4222, 8883 | `bus.yml` | Gatus `NATS (TLS)`, `NATS MQTT` | [NATS](nats.md) |
 | Fleet broker and API | `fleet.nghodki.ai` | dgx-1 | 8884, 8971 | `fleet.yml` | Gatus `Fleet MQTT`, `Fleet API` | [Fleet broker](fleet-broker.md) |
-| Pocket ID | `id.nghodki.ai` | dgx-2 | 1411 | `console.yml` | Homepage monitor `/healthz` | [Pocket ID](pocket-id.md) |
+| Pocket ID | `id.nghodki.ai` | dgx-2 (k3s) | ClusterIP 10.43.0.155:1411 | Argo CD (`pocket-id`) | Gatus `id.nghodki.ai (Pocket ID)`, Homepage monitor `/healthz` | [Pocket ID](pocket-id.md) |
 | Homepage | `ops.nghodki.ai` | Dell | 4180 | `ops.yml` | Gatus `ops.nghodki.ai` (302) | [Homepage](homepage.md) |
 | Docs site | `docs.nghodki.ai` | Dell | 4181 | `ops.yml` (role `docs_site` + stack `ops`) | Gatus `docs.nghodki.ai` (302), `docs build` | [Docs site](docs-site.md) |
 | Grafana, VictoriaMetrics, Loki, Tempo, vmalert, Alertmanager | `grafana.nghodki.ai` | dgx-2 | 3000 (+ internal) | `observe.yml` | Gatus `Grafana`, heartbeat | [Observe stack](observe-stack.md) |

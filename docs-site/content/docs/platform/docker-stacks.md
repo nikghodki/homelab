@@ -14,14 +14,15 @@ SOPS). All images are pinned by digest; Renovate keeps them current.
 | `observe` | dgx-2 | `observe.yml` | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, otel-defenseclaw, otel-fleet, Grafana, Phoenix | `observe`, `console` | `observe` |
 | `alerting` | Dell | `alerting.yml` | Gatus 5.38.0, status-gate (Caddy 2.11.9), ntfy 2.38.0; plus `tailscale serve` | `observe`, `console` | stays on the Dell, outside the cluster |
 | `ops` | Dell | `ops.yml` | Homepage 2.8.0, Caddy (docs site + Homepage gate) | `console` | stays on the Dell, outside the cluster (decision 0009) |
-| `console` | dgx-2 | `console.yml` | Pocket ID 2.19.3 | `console` | `console` |
+| `console` | dgx-2 | `console.yml` (rollback only: refuses without `-e pocketid_docker_rollback=true`) | Pocket ID 2.19.3: **stopped 2026-11-16**, kept until 2026-11-23 as the rollback | `console` | `console`: done (2026-11-16, pinned to dgx-2) |
 | `bus` | dgx-1 | `bus.yml` | NATS 2.15.3 | `bus`, `pki` | `bus` (3 replicas) |
 | `fleet` | dgx-1 | `fleet.yml` | Mosquitto 2.1.2, Caddy 2.11.9 (host network) | `fleet`, `pki` | `security` |
 | `gpu` | dgx-1, dgx-2 | `gpu.yml` | dcgm-exporter 4.8.4 | — | `observe` (DaemonSet) |
 | `jobs` | dgx-2 | `jobs.yml` | Temporal 1.32.2, PostgreSQL 17, admin-tools, UI 2.58.1 | `jobs`, `console` | `jobs` |
 | `ml` | dgx-2 | `ml.yml` | MLflow 3.18.0 (built locally), PostgreSQL 17, Caddy (job API + UI gate) | `ml`, `console` | `sim` |
 | `backup` | dgx-2 | `backups.yml` | restic rest-server 0.14.0 | `backup`, `pki` | stays on the host |
-| `litellm` | dgx-1 | `litellm.yml` | LiteLLM 1.109.1, PostgreSQL 16, Redis 7.4, DefenseClaw relay (socat) | `litellm` | `models` and `data` |
+| `litellm` | dgx-1 | `litellm.yml` (rollback only: refuses without `-e litellm_docker_rollback=true`) | LiteLLM 1.109.1, PostgreSQL 16, Redis 7.4, DefenseClaw relay (socat): **stopped 2026-11-16**, kept until 2026-11-23 as the rollback | `litellm` | `litellm` and CNPG `data/litellm-db`: done (2026-11-16) |
+| `litellm-bridges` | dgx-1 | `litellm-bridges.yml` | socat relays for the LiteLLM pods: DGXMM's on-demand gateway (10.100.136.1:8091), DefenseClaw (10.100.136.1:18970); transition relays 127.0.0.1:4000 and 10.100.136.1:4000 → 10.43.0.150:4000 until 2026-11-23 | — | stays on the host (DGXMM and DefenseClaw stay outside k3s) |
 | `home-assistant` | Jetson | `home.yml` | Home Assistant 2026.11.1 (host network; config dir on the host) | — | `home` |
 | `sim` | dgx-2 | none (run by hand) | isaaclab (local image on NVIDIA's + MLflow client), mujoco (local image) (profile `jobs`) | — | `sim` |
 
@@ -38,7 +39,7 @@ Used by every stack playbook with `compose_stack_name` and `compose_stack_src`.
    `compose_stack_private_templates` (`{service: uid}`) render 0600 owned by that uid (for example `status-gate: 65532`,
    `pocket-id: 1000`, `mosquitto: 1883`); others render 0644 root. Rendering is `no_log`.
    `compose_stack_extra_files` (`[{src, dest}]`) copies files kept elsewhere in the repo into the stack (0644; the
-   first folder of `dest` names the service restarted on change), e.g. LiteLLM's guardrail plugin from `hosts/files/litellm`.
+   first folder of `dest` names the service restarted on change), e.g. LiteLLM's guardrail plugin from `hosts/files/litellm` (until LiteLLM moved into k3s, 2026-11-16).
 4. Writes `.env` (0600) only when `compose_stack_env` has variables (an empty `.env` failed the bus deploy, PR #16).
 5. `docker_compose_v2` with `state: present`, `pull: missing`, **`remove_orphans: true`**.
 6. Restarts every service whose sub-folder (named after the service) had a changed file, because single-file bind

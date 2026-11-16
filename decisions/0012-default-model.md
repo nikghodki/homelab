@@ -17,6 +17,10 @@ Every fleet LLM consumer uses `qwen3.8-27b` through LiteLLM (`http://model.nghod
 `http://127.0.0.1:4000/v1` on dgx-1). Dedicated keys for judges and scanners are scoped to `qwen3.8-27b` only, with
 rate limits (runbooks/litellm.md).
 
+> Note (2026-11-16): LiteLLM moved into k3s. `127.0.0.1:4000` on dgx-1 is now only a transition relay, removed on
+> 2026-11-23; in-cluster callers and DGXMM use the ClusterIP `http://10.43.0.150:4000/v1`, everything else the front
+> door (runbooks/litellm.md, "Callers"). The decision itself is unchanged.
+
 Set on 2026-11-15:
 
 | Consumer | Setting | Before → after |

@@ -12,7 +12,7 @@ description: The append-only restic REST server on dgx-2 and the per-host backup
 | Data | `/srv/homelab-backup/<host>/` on dgx-2 (root 0700) |
 | Prune | `homelab-backup-prune.timer` on dgx-2, Sunday 05:00: `forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune`, then `check --read-data-subset=2%` |
 | Clients | `homelab-backup.timer` on each host, 02:30 + up to 30 min: `restic backup --files-from /etc/restic/paths --exclude-file /etc/restic/excludes --one-file-system` |
-| Pre-backup | `/etc/restic/pre-backup.sh`: database dumps (dgx-1: LiteLLM `pg_dump`), SQLite online-backup snapshots into `/var/backups/homelab/sqlite/` (DGXMM, Open WebUI, Home Assistant) |
+| Pre-backup | `/etc/restic/pre-backup.sh`: database dumps (dgx-1: LiteLLM `pg_dump` from the CNPG primary), SQLite online-backup snapshots into `/var/backups/homelab/sqlite/` (DGXMM, Open WebUI, Pocket ID, Home Assistant) |
 | Secrets | `secrets/backup.enc.yaml` → per host `restic_password_<host>`, `rest_password_<host>`, `rest_password_hash_<host>`; `pki_backup_key` |
 | Deploy | `playbooks/backups.yml` (server play on `observe`, client play on all hosts) |
 | Tailscale | every fleet tag may reach dgx-2:8000 |
@@ -29,14 +29,14 @@ description: The append-only restic REST server on dgx-2 and the per-host backup
 
 | Host | Paths |
 |---|---|
-| dgx-1 | `~/edge-gateway/conf`, `~/edge-gateway/dnsmasq`, `~/voice-assistant/nginx`, `/opt/homelab/litellm` (+ a `pg_dump`), `~/.defenseclaw`, DGXMM `data`, `config.yaml`, `secrets`, Open WebUI data (minus caches, `gguf`, `hf`) |
-| dgx-2 | `/opt/homelab` |
+| dgx-1 | `~/edge-gateway/conf`, `~/edge-gateway/dnsmasq`, `~/voice-assistant/nginx`, `/opt/homelab/litellm` (the stopped Docker copy), a `pg_dump` of CNPG `data/litellm-db`, `~/.defenseclaw`, DGXMM `data`, `config.yaml`, `secrets`, Open WebUI data (minus caches, `gguf`, `hf`) |
+| dgx-2 | `/opt/homelab`, Pocket ID's PV (k3s; `pocket-id.db` as a SQLite snapshot) |
 | Jetson | `~/.hermes` (minus checkout, caches, logs), `~/hermes-homes`, Home Assistant config, `~/.defenseclaw`, `~/.config/livekit`, user units, `~/workspace/roboclaw` |
 | Dell | `~/Work`, `~/Documents`, `~/Projects` |
 | Pi | `/var/lib/picoclaw`, `/etc/picoclaw`, `~/.picoclaw` (old copy), `~/.defenseclaw`, `~/maps`, `~/workspace`, the Oradar driver source, user units, picoclaw and Edge configs |
 
 Not covered by design: model weights, metrics/logs/traces, Docker volumes on dgx-2 other than `/opt/homelab` (so
-Postgres data in Docker volumes, Grafana, Pocket ID are **not** included), the age key (offline copies only).
+Postgres data in Docker volumes and Grafana are **not** included), the age key (offline copies only).
 
 ## The status conflict
 

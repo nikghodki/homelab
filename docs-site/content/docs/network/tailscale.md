@@ -41,7 +41,7 @@ The policy names two hosts by IP: `dgx-1` = 100.65.137.82 and `dgx-2` = 100.124.
 | 3 | `tag:gpu`, `tag:control` | `tag:gpu`, `tag:control` | all | Sparks and the Jetson talk freely (k3s, etcd, NATS, model sync) |
 | 4 | every fleet tag | dgx-1, dgx-2 | tcp/udp 53, tcp 80, 443 | DNS and the front door for fleet devices (dgx-2 added in #78) |
 | 5 | every fleet tag | dgx-2 | tcp 4317–4320, 8000 | OTLP telemetry and backups |
-| 6 | `tag:agent`, `tag:home` | dgx-1 | tcp 4000, 4222, 8883 | LiteLLM, NATS, MQTT |
+| 6 | `tag:agent`, `tag:home` | dgx-1 | tcp 4000, 4222, 8883 | NATS, MQTT. LiteLLM (4000) is unused since 2026-11-16: nothing listens on dgx-1's tailnet address (LiteLLM is in k3s, reached through the front door). Removing 4000 from the grant is a pending cleanup for you |
 | 7 | `tag:robot` | dgx-1 | tcp 8883, 4222, 8884 | MQTT/NATS and the DefenseClaw Fleet broker (D24) |
 | 8 | dgx-1 | every fleet tag | tcp 22 | Ansible and admin automation from dgx-1 |
 | 9 | dgx-1 | `tag:agent` | tcp 443 | dgx-1 checks the Dell's ntfy over Tailscale HTTPS (PR #56) |
@@ -67,6 +67,9 @@ Tailscale runs these on every save and refuses a policy that breaks one:
 | `tag:robot` | dgx-1:8883, dgx-1:8884, dgx-2:4319 | dgx-1:4000, dgx-1:22, dgx-1:8971, dgx-2:3000 |
 | `tag:agent` | dgx-1:4000, dgx-1:8883 | dgx-2:22 |
 | dgx-1 | `tag:agent`:443, `tag:robot`:22 | `tag:robot`:443 |
+
+The `dgx-1:4000` tests only check the policy: nothing listens there since LiteLLM moved into k3s (2026-11-16). When
+port 4000 leaves grant 6, the `tag:agent` accept for it has to go too (a test that fails blocks the save).
 
 Checked live from the Pi (P1.4): bus and Fleet broker open; LiteLLM, SSH and the Fleet API blocked.
 

@@ -32,7 +32,7 @@ cluster/
 │   ├── kube-vip.yaml, edge.yaml, kube-state-metrics.yaml   the front door (P3.3)
 │   └── smoke.yaml       SOPS canary
 ├── platform/<component>/  Helm values + extras/ (kustomize: Services, NetworkPolicies, SOPS secrets)
-└── apps/<name>/         workloads (empty until P3.7); _smoke is the canary
+└── apps/<name>/         workloads (P3.7: open-webui, litellm, data, pocket-id, …); _smoke is the canary
 ```
 
 ## Applications (on `main`)
@@ -49,6 +49,9 @@ cluster/
 | `edge` | platform | `cluster/platform/edge` | edge | the `*.nghodki.ai` front door: CoreDNS + Caddy, KSOPS Secret `web-tls` (P3.3) |
 | `kube-state-metrics` | platform | `cluster/platform/kube-state-metrics` | kube-system | readiness metrics for vmalert |
 | `smoke` | apps | `cluster/apps/_smoke` | smoke | SOPS canary; the only app with the resources finalizer |
+| `data` | apps | `cluster/apps/data` | data | CNPG cluster `litellm-db` (LiteLLM's Postgres, 2026-11-16) |
+| `litellm` | apps | `cluster/apps/litellm` | litellm | LiteLLM proxy (2 replicas) and Redis (2026-11-16) |
+| `pocket-id` | apps | `cluster/apps/pocket-id` | console | Pocket ID, pinned to dgx-2 (2026-11-16) |
 
 All have automated sync with prune and selfHeal, and retries (5×, 30 s backoff, up to 5 min). Deleting the `argocd`,
 `kyverno` or `cnpg-operator` Application leaves the components and CRDs in place (no finalizer), so no Postgres cluster

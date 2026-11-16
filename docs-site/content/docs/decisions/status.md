@@ -12,7 +12,7 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 
 | Milestone | Meaning | State |
 |---|---|---|
-| M0 | No known critical/high finding open; every agent behind DefenseClaw 1.0.9 | mostly: F1–F5, F7, F8, F10 closed; F6 (dgx-1 single point of failure) narrowed: web and DNS run on both Sparks since the P3.3 cutover; NATS, Fleet, LiteLLM and DGXMM still need dgx-1 (P3.7) |
+| M0 | No known critical/high finding open; every agent behind DefenseClaw 1.0.9 | mostly: F1–F5, F7, F8, F10 closed; F6 (dgx-1 single point of failure) narrowed: web and DNS run on both Sparks since the P3.3 cutover, LiteLLM since 2026-11-16 (P3.7); DGXMM (the models), NATS and Fleet still need dgx-1 |
 | M1 | Repo, CI, Ansible, bus and observability live | ✅ |
 | M2 | Aliases, always-on robot and guard models, guardrail, Phoenix | guardrail ✅, Phoenix 🟡 (LiteLLM traces); aliases and models wait on P2.0 (you) |
 | M3 | k3s with quorum, Argo CD deploys from Git, dgx-1 no longer a SPOF | k3s, Argo CD, Kyverno Enforce ✅; front door ✅; the rest is P3.7 (in progress) |
@@ -76,7 +76,7 @@ guards wait on **you**).
 | P3.4 | ✅ | Argo CD + KSOPS (#57–#59) |
 | P3.5 | ✅ (one user step) | Kyverno Enforce (#65, #68); `build-sign.yml` (#62–#64). The signed-image case waits for the GHCR packages to be **public** (you) |
 | P3.6 | ⬜ | Tetragon |
-| P3.7 | 🔄 | workloads into k3s (platform session) |
+| P3.7 | 🔄 | workloads into k3s (platform session). Moved 2026-11-16: Open WebUI, LiteLLM (2 replicas, Postgres on CNPG `data/litellm-db`) and Pocket ID (pinned to dgx-2); their Docker copies stay stopped as the rollback until 2026-11-23. NATS, Fleet and the rest to come |
 | P3.8 | ⬜ | etcd/CNPG backups to SeaweedFS |
 | P3.9 | ⬜ | incident runbooks (see [Incident playbooks](../operations/incidents.md) for interim notes) |
 

@@ -4,7 +4,8 @@ description: Every port that matters, per host, with what binds it and who may r
 ---
 
 "Bind" is the address the socket listens on. "LAN" means 192.168.86.0/24; "tailnet" means it is also reachable over
-Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `docker ps` on 2026-11-15.
+Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `docker ps` on 2026-11-15 (LiteLLM and
+Pocket ID rows: 2026-11-16, after their move into k3s).
 
 ## dgx-1 (192.168.86.44, 100.65.137.82)
 
@@ -14,14 +15,15 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | 53 | 100.65.137.82 | edge-dns (k3s, kube-proxy DNAT) | edge-dnsmasq on 192.168.86.44 stopped 2026-11-15 |
 | 80, 443 | 100.65.137.82 | edge-caddy (k3s, kube-proxy DNAT) | the old edge-caddy on 0.0.0.0 stopped 2026-11-15 |
 | 3100 | all | Open WebUI (Docker): **stopped** since the move into k3s (2026-11-16); only `webui.nghodki.ai` now | |
-| 4000 | all | LiteLLM | also via `model.nghodki.ai` |
+| 4000 | 127.0.0.1, 10.100.136.1 | transition relays → LiteLLM in k3s (10.43.0.150:4000) | until 2026-11-23. LiteLLM itself listened on all interfaces until it moved into k3s (2026-11-16); use `model.nghodki.ai` |
+| 8091 | 10.100.136.1 | relay → DGXMM's on-demand gateway, for the LiteLLM pods | |
 | 4222 | all | NATS (TLS, homelab CA) | |
 | 8883 | all | NATS MQTT (TLS) | picoclaw |
 | 8222 | 127.0.0.1 | NATS monitoring | |
 | 8884 | all | Fleet Mosquitto (TLS, MQTT 5) | Edge Connector devices, the Fleet gateway |
 | 8971 | all (host network) | fleet-caddy, Fleet API TLS proxy | forwards only `/api/v1/fleet/*` |
-| 18970 | 127.0.0.1 | DefenseClaw gateway API (incl. Fleet) | |
-| 5432, 6379 | 127.0.0.1 | LiteLLM Postgres, Redis | fixed in P0.6 |
+| 18970 | 127.0.0.1; 10.100.136.1 (relay) | DefenseClaw gateway API (incl. Fleet); the relay `litellm-defenseclaw-cable` for the LiteLLM pods | |
+| 5432, 6379 | 127.0.0.1 | LiteLLM Postgres, Redis (Docker): **stopped** since the move into k3s (2026-11-16) | |
 | 8090 | 127.0.0.1 | DGXMM | via `dgxmanager.nghodki.ai` |
 | 9109 | all | fleet-metrics | |
 | 9400 | 127.0.0.1 | dcgm-exporter | |
@@ -37,7 +39,7 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | 6006 | all | Phoenix (UI and OTLP HTTP `/v1/traces`) |
 | 4317, 4318 | all | otel-defenseclaw (OTLP gRPC/HTTP) |
 | 4319, 4320 | all | otel-fleet (OTLP gRPC/HTTP), host collectors push here |
-| 1411 | 192.168.86.36 | Pocket ID |
+| 1411 | 192.168.86.36 | Pocket ID (Docker): **stopped** since the move into k3s (2026-11-16); only `id.nghodki.ai` now |
 | 7233 | 192.168.86.36 | Temporal frontend gRPC (mTLS required) |
 | 8233 | 192.168.86.36 | Temporal Web UI |
 | 9233 | 192.168.86.36 | Temporal Prometheus metrics |
