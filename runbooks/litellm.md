@@ -175,7 +175,48 @@ Per-request rows without prompts are in the spend log (below); daily per-key tot
 
 ## Who called the model API
 
-Three places, from the most direct:
+**Dashboard: Grafana → Fleet → Model API callers** (`/d/model-api-callers/model-api-callers`,
+`hosts/stacks/observe/grafana/dashboards/fleet/model-api-callers.json`): calls per key alias, error rate per key,
+latency p50/p95 per model, top callers of the last 24 h (alias, hash8, calls, tokens, errors), calls per key and
+source host, and the front door's access log per key hash and node, with the hash8 → alias table next to it.
+
+It is fed by **`litellm-usage-exporter`** on dgx-1 (role `litellm_usage_exporter`, `playbooks/litellm-usage.yml`):
+
+- Polls Postgres every 30 s over 127.0.0.1:5432 as **`litellm_usage_ro`**: `LOGIN`, nothing else (no superuser,
+  `NOINHERIT`, 3 connections), `default_transaction_read_only = on`, `statement_timeout = 20s`, and `SELECT` on listed
+  columns of `"LiteLLM_SpendLogs"` (request id, key hash, metadata, model group, status, token counts, times, duration,
+  requester IP) and `"LiteLLM_VerificationToken"` (token hash, alias) only: no prompts, replies, other columns or
+  tables (`litellm_usage_exporter_db_grants`). The SQL cuts each hash to its first 8 hex digits (`case when ~ '^[0-9a-f]{64}$'`;
+  anything else, e.g. LiteLLM's own calls or the master key, becomes `(not a virtual key)`), so a full hash never
+  leaves Postgres. Password: `litellm_usage_db_password` in `secrets/observe.enc.yaml`, root-only file on dgx-1, given
+  to the service with `LoadCredential`; the role SQL goes to `psql` on stdin (`/etc/litellm-usage-exporter/role.sql`,
+  root 0600, rerun when it changes).
+- Serves `127.0.0.1:9112/metrics`, scraped by dgx-1's host collector (job `litellm-usage`) into VictoriaMetrics:
+  `litellm_usage_key_info{key_alias, api_key_hash}`, `litellm_usage_requests_total{key_alias, api_key_hash, model,
+  status, src}`, `litellm_usage_tokens_total{key_alias, model, kind}`, `litellm_usage_request_duration_seconds`
+  (histogram of successful requests, by model), `litellm_usage_last24h_requests{key_alias, model, status, src}` and
+  `litellm_usage_last24h_tokens{key_alias, kind}` (exact, from the DB), `litellm_usage_db_up`.
+- `src` is the calling host from `requester_ip_address`: `10.42.1.x` dgx-1, `10.42.0.x` dgx-2, `10.42.2.x` Jetson,
+  `10.42.3.x` Dell (`litellm_usage_exporter_src_nodes`), loopback and Docker bridges `dgx-1 (local)`, anything else as is.
+- Counters count rows seen after the exporter started (each poll looks back 15 min and skips request ids it
+  counted); the "last 24 h" numbers don't depend on that.
+
+Why an exporter and not a Postgres data source in Grafana: Postgres listens on dgx-1's loopback only. A data source
+on dgx-2 needs it on the network (a new listener, `pg_hba` and TLS for the LiteLLM database), and anyone who can edit
+a Grafana panel could then run any SQL the role allows, including reading full key hashes (a column grant can't
+allow `left(token, 8)` without the whole column). The exporter keeps the database on loopback, runs fixed queries
+only and publishes hash8 ↔ alias as a metric label.
+
+```bash
+curl -s 127.0.0.1:9112/metrics | grep -E 'db_up|last24h_requests' | head     # on dgx-1
+journalctl -u litellm-usage-exporter -n 20                                     # "poll failed: ..." if the DB is unreachable
+```
+
+Rotate the role password: `python3 -c 'import secrets,json; print(json.dumps(secrets.token_urlsafe(32)), end="")' |
+sops set --value-stdin secrets/observe.enc.yaml '["litellm_usage_db_password"]'`, PR, then
+`ansible-playbook playbooks/litellm-usage.yml` (it re-runs the role SQL and restarts the exporter).
+
+Raw sources, from the most direct:
 
 1. **Spend logs** (since 2026-11-16; `disable_spend_logs: false`): one row per request in `LiteLLM_SpendLogs`, shown on
    the admin UI's **Logs** page (`/spend/logs/ui`): key alias (`metadata.user_api_key_alias`), key hash (`api_key`),

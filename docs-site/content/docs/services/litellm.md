@@ -57,6 +57,11 @@ project `litellm`, system API key `litellm-dgx-1`): model, key alias, token coun
 
 ## Who called the model API
 
+- **Grafana → Fleet → Model API callers** (`/d/model-api-callers/model-api-callers`): calls and errors per key
+  alias, latency per model, top callers (24 h), calls per key and source host, and the front door's log per key
+  hash. Fed by `litellm-usage-exporter` on dgx-1, which reads the spend log as the read-only role `litellm_usage_ro`
+  (a few columns of two tables, read-only transactions) over loopback and publishes metrics with only the first 8 hex
+  digits of key hashes (runbooks/litellm.md).
 - **Spend logs** on the admin UI's Logs page: key alias and hash, user, team, model, tokens, status, client IP; no
   prompts; kept 30 days (LiteLLM's own cleanup).
 - **Phoenix**, project `litellm`, by key alias (with prompts and replies).

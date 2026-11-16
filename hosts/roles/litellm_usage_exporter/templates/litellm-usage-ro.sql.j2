@@ -1,0 +1,18 @@
+-- Managed by homelab Ansible (roles/litellm_usage_exporter). Read-only role for the usage exporter.
+\set ON_ERROR_STOP on
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ litellm_usage_exporter_db_role }}') THEN
+    CREATE ROLE {{ litellm_usage_exporter_db_role }};
+  END IF;
+END $$;
+ALTER ROLE {{ litellm_usage_exporter_db_role }} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS
+  CONNECTION LIMIT 3 PASSWORD '{{ litellm_usage_exporter_db_password | replace("'", "''") }}';
+ALTER ROLE {{ litellm_usage_exporter_db_role }} SET default_transaction_read_only = on;
+ALTER ROLE {{ litellm_usage_exporter_db_role }} SET statement_timeout = '20s';
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {{ litellm_usage_exporter_db_role }};
+GRANT CONNECT ON DATABASE {{ litellm_usage_exporter_db_name }} TO {{ litellm_usage_exporter_db_role }};
+GRANT USAGE ON SCHEMA public TO {{ litellm_usage_exporter_db_role }};
+{% for table, cols in litellm_usage_exporter_db_grants.items() %}
+REVOKE ALL ON "{{ table }}" FROM {{ litellm_usage_exporter_db_role }};
+GRANT SELECT ({{ cols | map('regex_replace', '^(.*)$', '"\\1"') | join(', ') }}) ON "{{ table }}" TO {{ litellm_usage_exporter_db_role }};
+{% endfor %}

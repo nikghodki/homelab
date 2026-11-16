@@ -1,0 +1,25 @@
+# Who called the model API (runbooks/litellm.md): LiteLLM's spend log and key aliases as metrics, for Grafana.
+# Runs next to LiteLLM's Postgres (dgx-1), reads it over loopback as a read-only role, serves 127.0.0.1 only; the
+# host collector scrapes it (otel_host_collector_extra_scrapes in host_vars/dgx-1.yml).
+litellm_usage_exporter_enabled: false
+litellm_usage_exporter_port: 9112
+litellm_usage_exporter_poll_s: 30
+litellm_usage_exporter_prefix: /opt/litellm-usage-exporter
+litellm_usage_exporter_db_container: litellm-postgres
+litellm_usage_exporter_db_name: litellm
+litellm_usage_exporter_db_admin: litellm        # the owner, used only to create/alter the read-only role (docker exec)
+litellm_usage_exporter_db_role: litellm_usage_ro
+litellm_usage_exporter_db_password: ""          # secrets/observe.enc.yaml litellm_usage_db_password (playbook)
+# Columns the role may read; nothing else in the database (no prompts, no other tables). The full key hash
+# columns are readable only so the SQL can cut them to 8 digits; the exporter never selects them whole.
+litellm_usage_exporter_db_grants:
+  LiteLLM_VerificationToken: [token, key_alias]
+  LiteLLM_SpendLogs: [request_id, api_key, metadata, model_group, status, prompt_tokens, completion_tokens,
+                      startTime, endTime, request_duration_ms, requester_ip_address]
+# Caller host from requester_ip_address: k3s pod-network prefixes (runbooks/edge.md "Access log",
+# `kubectl get nodes -o custom-columns=N:.metadata.name,C:.spec.podCIDR`); loopback and Docker bridges are this host.
+litellm_usage_exporter_src_nodes:
+  "10.42.1.": dgx-1
+  "10.42.0.": dgx-2
+  "10.42.2.": jetson
+  "10.42.3.": dell

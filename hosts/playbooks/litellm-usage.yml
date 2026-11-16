@@ -1,0 +1,15 @@
+# Who called the model API: LiteLLM usage exporter on dgx-1 (runbooks/litellm.md). Always --check --diff first.
+- name: LiteLLM usage exporter
+  hosts: litellm
+  become: true
+  pre_tasks:
+    - name: Load the read-only DB role password from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/observe.enc.yaml"
+        name: observe_secrets
+      no_log: true
+  roles:
+    - role: litellm_usage_exporter
+      vars:
+        litellm_usage_exporter_enabled: true
+        litellm_usage_exporter_db_password: "{{ observe_secrets.litellm_usage_db_password | default('') }}"

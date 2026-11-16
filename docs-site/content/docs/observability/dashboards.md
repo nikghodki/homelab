@@ -1,6 +1,6 @@
 ---
 title: "Dashboards"
-description: "Grafana at grafana.nghodki.ai: folders, the Fleet Home and AI inventory dashboards, the Argo CD board, the 19 DefenseClaw dashboards, data sources."
+description: "Grafana at grafana.nghodki.ai: folders, the Fleet Home, AI inventory and Model API callers dashboards, the Argo CD board, the 19 DefenseClaw dashboards, data sources."
 ---
 
 Grafana 13.3.1 runs on dgx-2 (`192.168.86.36:3000`), served as `https://grafana.nghodki.ai`. Sign-in is Pocket ID;
@@ -9,7 +9,7 @@ Grafana 13.3.1 runs on dgx-2 (`192.168.86.36:3000`), served as `https://grafana.
 
 | Folder | Path in the repo | Dashboards |
 |---|---|---|
-| Fleet | `hosts/stacks/observe/grafana/dashboards/fleet/` | Fleet Home (home page), AI inventory |
+| Fleet | `hosts/stacks/observe/grafana/dashboards/fleet/` | Fleet Home (home page), AI inventory, Model API callers |
 | Cluster | `.../dashboards/cluster/` | Argo CD |
 | Security (DefenseClaw) | `.../dashboards/defenseclaw/` | 19 vendored DefenseClaw dashboards |
 
@@ -33,6 +33,15 @@ Grafana 13.3.1 runs on dgx-2 (`192.168.86.36:3000`), served as `https://grafana.
 Cisco AIBOM results from Loki: components per host (latest run), new and removed components in the last 24 h, latest
 runs (counts per type and target, errors), plus the DefenseClaw AIBOM (Jetson, `homelab-aibom`) and two MCP drift
 panels ("MCP drift findings, last 2 days" and "MCP drift (Jetson, mcp-drift)", from journal tag `mcp-drift`).
+
+## Model API callers (`uid model-api-callers`)
+
+Who called LiteLLM. From `litellm-usage-exporter` on dgx-1 (VictoriaMetrics, `litellm_usage_*`): requests and failed
+share in the last 24 h, tokens, whether the exporter reads the DB; calls per key alias per minute, error rate by key,
+latency p50/p95 by model (successful requests), top callers of the last 24 h (alias, hash8, calls, tokens, errors),
+calls per key and source host. From the front door's access log (Loki, `model.nghodki.ai` `/v1/`): calls by source
+node over time and requests per `api_key_hash` and node, next to the hash8 → alias table. Source nodes: `10.42.1.x`
+dgx-1, `10.42.0.x` dgx-2, `10.42.2.x` Jetson, `10.42.3.x` Dell. See [LiteLLM](../services/litellm.md).
 
 ## Argo CD (`uid argocd`)
 

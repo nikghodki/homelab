@@ -1,0 +1,901 @@
+{
+  "uid": "model-api-callers",
+  "title": "Model API callers",
+  "tags": [
+    "fleet",
+    "litellm",
+    "access"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "editable": false,
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Who called the model API.** Per key: LiteLLM's spend log (every caller, front door or :4000), read on dgx-1 by `litellm-usage-exporter` (read-only DB role, column grants only; role `litellm_usage_exporter`, runbooks/litellm.md). Per source: the front door's access log in Loki (`model.nghodki.ai`, runbooks/edge.md). The two meet on `api_key_hash` (first 8 hex of SHA-256 of the key); no key or full hash is stored here. Source node: `10.42.1.x` dgx-1, `10.42.0.x` dgx-2, `10.42.2.x` Jetson, `10.42.3.x` Dell. k3s nodes appear as themselves; any other client (Pi, Mac, phone) appears as the node that took its connection. Time-series counters start when the exporter starts; the 24 h numbers come straight from the DB."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Requests, last 24 h",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum(litellm_usage_last24h_requests)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed, last 24 h",
+      "description": "",
+      "gridPos": {
+        "x": 6,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum(litellm_usage_last24h_requests{status!=\"success\"}) / sum(litellm_usage_last24h_requests)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.05
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Tokens, last 24 h",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum(litellm_usage_last24h_tokens)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Exporter reads the DB",
+      "description": "1 = the last poll of LiteLLM's Postgres worked",
+      "gridPos": {
+        "x": 18,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "min(litellm_usage_db_up)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Calls per key alias (per minute)",
+      "description": "Every LiteLLM request (success or failure) by the caller's key alias; keys without an alias show as key:<hash8>, requests refused before auth as (no key).",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum by (key_alias) (rate(litellm_usage_requests_total[$__rate_interval])) * 60",
+          "legendFormat": "{{key_alias}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Error rate by key",
+      "description": "Share of a key's requests that LiteLLM logged as failures (rate limits, auth, upstream errors, guardrail blocks), 10-minute window.",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum by (key_alias) (rate(litellm_usage_requests_total{status!=\"success\"}[10m])) / sum by (key_alias) (rate(litellm_usage_requests_total[10m]))",
+          "legendFormat": "{{key_alias}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Latency p50 / p95 by model (successful requests)",
+      "description": "LiteLLM's request duration (request_duration_ms) of successful requests, by the model name the caller asked for. Estimated from histogram buckets (0.25 s ... 600 s); a cold on-demand model start (~4.5 min) shows as a p95 spike.",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (model, le) (rate(litellm_usage_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50 {{model}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series",
+          "interval": "5m"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (model, le) (rate(litellm_usage_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95 {{model}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series",
+          "interval": "5m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "stacking": {
+              "mode": "none"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Front-door calls by source node",
+      "description": "Requests to model.nghodki.ai /v1/ in the front door's access log, by the pod-network address of the node that took the connection (mapping above).",
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "expr": "sum by (src) (count_over_time({service_name=\"edge-caddy\"} | json remote_ip=\"request.remote_ip\", req_host=\"request.host\", uri=\"request.uri\", api_key_hash, status | req_host=\"model.nghodki.ai\" | uri=~\"/v1/.*\" | label_format api_key_hash=`{{ or .api_key_hash \"(none)\" }}` | label_format src=`{{ if hasPrefix \"10.42.1.\" .remote_ip }}dgx-1{{ else if hasPrefix \"10.42.0.\" .remote_ip }}dgx-2{{ else if hasPrefix \"10.42.2.\" .remote_ip }}jetson{{ else if hasPrefix \"10.42.3.\" .remote_ip }}dell{{ else }}{{ .remote_ip }}{{ end }}` [$__interval]))",
+          "legendFormat": "{{src}}",
+          "queryType": "range"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 15,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Top callers, last 24 h",
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "description": "From LiteLLM's spend log, the last 24 h (not the time picker). Errors = rows with status failure.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum by (key_alias) (litellm_usage_last24h_requests)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum by (key_alias) (litellm_usage_last24h_tokens)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum by (key_alias) (litellm_usage_last24h_requests{status!=\"success\"})",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "max by (key_alias, api_key_hash) (litellm_usage_key_info)",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value #D": true
+            },
+            "indexByName": {
+              "key_alias": 0,
+              "api_key_hash": 1,
+              "Value #A": 2,
+              "Value #B": 3,
+              "Value #C": 4
+            },
+            "renameByName": {
+              "key_alias": "Alias",
+              "api_key_hash": "Key hash8",
+              "Value #A": "Calls",
+              "Value #B": "Tokens",
+              "Value #C": "Errors"
+            }
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "Calls",
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                }
+              }
+            ],
+            "type": "exclude",
+            "match": "any"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Calls",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          },
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Calls by key and source host, last 24 h",
+      "description": "LiteLLM's spend log, last 24 h, by key alias and calling host (requester_ip_address: the front door's X-Forwarded-For, i.e. the node's pod-network address; loopback and Docker bridge = dgx-1 itself; a LAN address = a direct call to :4000).",
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "sum by (key_alias, src) (litellm_usage_last24h_requests)",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "key_alias": 0,
+              "src": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "key_alias": "Alias",
+              "src": "Source host",
+              "Value": "Calls"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Calls",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Front-door requests by key hash and node (access log)",
+      "description": "The front door's access log (Loki), model.nghodki.ai /v1/, selected time range. Look the hash up in the next table; a hash that isn't there is not a LiteLLM virtual key (e.g. the master key); (none) = no key sent.",
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "expr": "sum by (api_key_hash, src) (count_over_time({service_name=\"edge-caddy\"} | json remote_ip=\"request.remote_ip\", req_host=\"request.host\", uri=\"request.uri\", api_key_hash, status | req_host=\"model.nghodki.ai\" | uri=~\"/v1/.*\" | label_format api_key_hash=`{{ or .api_key_hash \"(none)\" }}` | label_format src=`{{ if hasPrefix \"10.42.1.\" .remote_ip }}dgx-1{{ else if hasPrefix \"10.42.0.\" .remote_ip }}dgx-2{{ else if hasPrefix \"10.42.2.\" .remote_ip }}jetson{{ else if hasPrefix \"10.42.3.\" .remote_ip }}dell{{ else }}{{ .remote_ip }}{{ end }}` [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "api_key_hash": 0,
+              "src": 1,
+              "Value": 2,
+              "Value #A": 3
+            },
+            "renameByName": {
+              "api_key_hash": "Key hash8",
+              "src": "Source node",
+              "Value": "Requests",
+              "Value #A": "Requests"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Requests",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "Key aliases (hash8 to alias)",
+      "description": "Every LiteLLM virtual key: its alias and the first 8 hex digits of its hash, as the front door logs them (litellm_usage_key_info). Keys without an alias show as key:<hash8>.",
+      "gridPos": {
+        "x": 12,
+        "y": 33,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "defenseclaw-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "defenseclaw-prometheus"
+          },
+          "expr": "max by (key_alias, api_key_hash) (litellm_usage_key_info)",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "indexByName": {
+              "key_alias": 0,
+              "api_key_hash": 1
+            },
+            "renameByName": {
+              "key_alias": "Alias",
+              "api_key_hash": "Key hash8"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Alias",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ]
+}
