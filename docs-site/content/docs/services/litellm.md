@@ -58,6 +58,6 @@ project `litellm`, system API key `litellm-dgx-1`): model, key alias, token coun
 ## Gotchas
 
 - Bound on all interfaces: anything on the LAN can reach :4000 directly (keys are still required).
-- `litellm-admin.nghodki.ai` goes through the front door, which family and guests may reach over Tailscale; the admin
-  UI login is the only gate.
+- `litellm-admin.nghodki.ai` goes through the front door, which family and guests may reach over Tailscale. Since
+  2026-11-16 the door signs you in first (edge-auth, `admins`); the LiteLLM UI login follows.
 - Redis stays 7.4 (RSALv2/SSPL, free for private use); the Valkey switch was declined.

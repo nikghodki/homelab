@@ -27,6 +27,7 @@
 		}
 		reverse_proxy 10.100.136.1:8090 {
 			header_up X-Real-IP {remote_host}
+			header_up Cookie "_edge_auth[^;]*(;\s*)?" ""
 			flush_interval -1
 			transport http {
 				read_timeout 1h
@@ -38,7 +39,8 @@
 (model_plane) {
 	# nginx redirected the bare prefixes to the slashed ones
 	redir /v1 /v1/ 301
-	import dgxmm_ui
+	# DGXMM has no login of its own, so it's only on dgxmanager.nghodki.ai, behind sign-in; old links go there.
+	redir /dgxmm* https://dgxmanager.nghodki.ai{uri} 308
 	# LiteLLM. On-demand models: a cold start or queued request can wait several minutes; stream without buffering.
 	@litellm path /v1/* /health*
 	handle @litellm {
@@ -63,13 +65,13 @@
 # without it) and without the session cookie. Signed out, edge-auth's /oauth2/start answers here: a CSRF cookie and a
 # 302 to Pocket ID; after the passkey the browser comes back through https://auth.nghodki.ai/oauth2/callback to the
 # URL it asked for. The cookie is for .nghodki.ai, so one sign-in covers every signed-in route.
-(signed_in) {
+(session_check) {
 	@plain protocol http
 	redir @plain https://{host}{uri} 308
 	reverse_proxy edge-auth.edge.svc.cluster.local:4180 {
 		# forward auth, written out (forward_auth can't pass the refreshed session cookie back to the browser)
 		method GET
-		rewrite /oauth2/auth?allowed_groups={args[1]}
+		rewrite /oauth2/auth?allowed_groups={args[0]}
 		header_up X-Forwarded-Method {method}
 		header_up X-Forwarded-Uri {uri}
 		@ok status 2xx
@@ -90,6 +92,12 @@
 		}
 		# anything else (403: signed in, not in the group; 5xx: edge-auth down) goes back to the browser as it is
 	}
+}
+
+# `import session_check <group>` alone, inside a `route` (which keeps the order), is for routes with their own proxy
+# settings: DGXMM (SSE, 1 MB limit) and the LiteLLM admin UI.
+(signed_in) {
+	import session_check {args[1]}
 	reverse_proxy {args[0]} {
 		header_up X-Edge-Origin {env.EDGE_ORIGIN_TOKEN}
 		header_up Cookie "_edge_auth[^;]*(;\s*)?" ""
@@ -203,10 +211,15 @@
 
 	@admin host litellm-admin.nghodki.ai
 	handle @admin {
-		reverse_proxy 100.65.137.82:4000 {
-			header_up Host {upstream_hostport}
-			header_up X-Real-IP {remote_host}
-			header_up X-Forwarded-For {remote_host}
+		# Front door sign-in first (admins), then LiteLLM's own UI login.
+		route {
+			import session_check admins
+			reverse_proxy 100.65.137.82:4000 {
+				header_up Host {upstream_hostport}
+				header_up X-Real-IP {remote_host}
+				header_up X-Forwarded-For {remote_host}
+				header_up Cookie "_edge_auth[^;]*(;\s*)?" ""
+			}
 		}
 	}
 
@@ -217,13 +230,23 @@
 	}
 
 	# DGXMM's UI only (2026-11-15: LiteLLM's /v1/ no longer answers here; use model.nghodki.ai for model requests).
+	# DGXMM has no login of its own, so the whole name is behind sign-in (admins).
 	@dgxmm host dgxmanager.nghodki.ai
 	handle @dgxmm {
-		redir / /dgxmm/ 302
-		import dgxmm_ui
+		# Liveness for Gatus and Homepage without a session: DGXMM's SPA shell (static HTML, no API, no data).
+		handle /dgxmm/healthz {
+			reverse_proxy 10.100.136.1:8090
+		}
 		handle {
-			header Content-Type application/json
-			respond `{"error": "dgxmanager.nghodki.ai serves the DGXMM UI only; use https://model.nghodki.ai/v1/ for model requests"}` 404
+			route {
+				import session_check admins
+				redir / /dgxmm/ 302
+				import dgxmm_ui
+				handle {
+					header Content-Type application/json
+					respond `{"error": "dgxmanager.nghodki.ai serves the DGXMM UI only; use https://model.nghodki.ai/v1/ for model requests"}` 404
+				}
+			}
 		}
 	}
 

@@ -17,7 +17,8 @@ the k3s alerts and the dead man).
 |---|---|---|---|
 | web | model.nghodki.ai (LiteLLM) | `http://192.168.86.11/health/liveliness`, Host `model.nghodki.ai` | 200 |
 | web | webui.nghodki.ai | `http://192.168.86.11/`, Host `webui...` | below 400 |
-| web | dgxmanager.nghodki.ai | `http://192.168.86.11/`, Host `dgxmanager...` | below 400 |
+| web | dgxmanager.nghodki.ai | `https://192.168.86.11/`, Host `dgxmanager...`, no redirect follow | 302 (behind sign-in) |
+| web | litellm-admin.nghodki.ai | `https://192.168.86.11/ui/`, Host `litellm-admin...`, no redirect follow | 302 (behind sign-in) |
 | web | ha.nghodki.ai | `http://192.168.86.11/`, Host `ha...` | below 400 |
 | web | ops.nghodki.ai (Homepage) | `https://192.168.86.11/`, Host `ops...`, no redirect follow | 302 (to Pocket ID) |
 | web | ntfy.nghodki.ai | `https://192.168.86.11/v1/health` | 200 and `healthy == true` |
@@ -42,7 +43,8 @@ the k3s alerts and the dead man).
 | k3s | etcd dgx-1, dgx-2, jetson | `tcp://10.100.136.1:2379`, `10.100.136.2:2379`, `192.168.86.211:2379` | connected |
 | edge | edge DNS (VIP), edge DNS tailnet view (dgx-1), (dgx-2) | `tcp://192.168.86.11:53`, `tcp://100.65.137.82:53`, `tcp://100.124.175.23:53` | connected (TCP: the Dell's containers can't send UDP to k3s Services) |
 | edge | edge Caddy (VIP) | `https://192.168.86.11/`, Host `ca...` | 200 and cert > 720 h |
-| edge | DGXMM UI (direct) | `http://192.168.86.11/dgxmm/`, Host `dgxmanager...` | 200 (Caddy → DGXMM on dgx-1's direct-cable address; replaced the edge-caddy relay check on 2026-11-15) |
+| edge | DGXMM UI (direct) | `https://192.168.86.11/dgxmm/healthz`, Host `dgxmanager...` | 200 (Caddy → DGXMM on dgx-1's direct-cable address; the one path open without sign-in) |
+| edge | DGXMM not on the model host | `https://192.168.86.11/dgxmm/`, Host `model...`, no redirect follow | 308 (DGXMM is only on its signed-in name) |
 | edge | API (VIP) | `https://192.168.86.10:6443/readyz` | 401 |
 
 Since the P3.3 cutover (#79) the front-door checks go to the edge VIP 192.168.86.11 (the k3s Caddy); the `edge` group
