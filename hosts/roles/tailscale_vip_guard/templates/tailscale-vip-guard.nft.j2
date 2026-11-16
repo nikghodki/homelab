@@ -1,0 +1,11 @@
+#!/usr/sbin/nft -f
+# Managed by homelab Ansible (role tailscale_vip_guard). runbooks/edge.md, known issues.
+# Its own table: nothing else (k3s, Docker, iptables-nft) touches it. Recreated on every load.
+table inet tailscale_vip_guard
+delete table inet tailscale_vip_guard
+table inet tailscale_vip_guard {
+	chain input {
+		type filter hook input priority filter - 10; policy accept;
+		ip daddr { {{ tailscale_vip_guard_vips | join(', ') }} } udp dport {{ tailscale_vip_guard_port }} counter drop comment "no Tailscale paths over the VIPs"
+	}
+}

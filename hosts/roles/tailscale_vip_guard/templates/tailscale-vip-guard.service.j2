@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (role tailscale_vip_guard). runbooks/edge.md, known issues.
+# Stop (or disable) to remove the rule; it never touches tailscaled.
+[Unit]
+Description=Drop Tailscale UDP {{ tailscale_vip_guard_port }} on the kube-vip VIPs
+After=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft -f {{ tailscale_vip_guard_file }}
+ExecStop=/usr/sbin/nft delete table inet tailscale_vip_guard
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

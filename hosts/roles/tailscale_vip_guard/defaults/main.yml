@@ -1,0 +1,10 @@
+---
+# Drop Tailscale's UDP port on the kube-vip VIPs (runbooks/edge.md, known issues). tailscaled advertises every
+# local address as an endpoint, the VIPs included; a peer that picked a VIP endpoint lands on the other Spark
+# after the VIP moves. With the port closed on the VIPs, peers never confirm those endpoints and use the node's
+# own address instead.
+tailscale_vip_guard_vips:
+  - 192.168.86.10   # API server VIP (kube-vip)
+  - 192.168.86.11   # front door VIP (edge)
+tailscale_vip_guard_port: 41641
+tailscale_vip_guard_file: /etc/homelab/tailscale-vip-guard.nft

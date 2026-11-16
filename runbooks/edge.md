@@ -206,10 +206,18 @@ What a user notices when a Spark dies: for ~20–40 s about one request in five 
 surviving Spark works. ntfy only fires for checks that fail 3 minutes in a row: the dead Spark's own services
 (`k3s/API <spark>`, and for dgx-2 Pocket ID, Grafana, MLflow; for dgx-1 LiteLLM, Open WebUI, DGXMM).
 
+Fixed after the drill: **Tailscale advertised the VIPs as the Sparks' endpoints.** tailscaled (1.104.7) offers every
+local address as an endpoint, and kube-vip puts the VIPs on `wlP9s9`: dgx-1's `tailscale status --json` listed
+`192.168.86.10:41641` and `192.168.86.11:41641` next to `192.168.86.44:41641`, and the Pi had reached dgx-1 over
+`192.168.86.10:41641`. After a VIP move that endpoint is the other Spark, so the tailnet path was slow for a few
+seconds. Tailscale has no per-address exclusion (`TS_DEBUG_OMIT_LOCAL_ADDRS` drops *all* LAN endpoints), so the role
+`tailscale_vip_guard` (`playbooks/tailscale-vip-guard.yml`, imported by `k3s.yml`, both Sparks) drops UDP 41641 to the
+VIPs in its own nftables table (`inet tailscale_vip_guard`, unit `tailscale-vip-guard.service`). Peers never confirm a
+VIP endpoint and use the node's own address; tailscaled isn't restarted. Check: `sudo nft list table inet
+tailscale_vip_guard` (the counter grows as peers try the VIPs) and `tailscale ping` from the Pi says `via
+192.168.86.44:41641` / `192.168.86.36:41641`. Undo: `sudo systemctl disable --now tailscale-vip-guard`.
+
 Known, not fixed:
-- **Tailscale advertises the VIPs as dgx-1's/dgx-2's endpoints** (the Pi reached dgx-1's Tailscale over
-  `192.168.86.10:41641`). After the VIP moves, that endpoint is the other Spark; Tailscale's disco notices and picks
-  another path, so expect a few slow seconds on the tailnet right after a VIP move.
 - **The Sparks' Wi-Fi is the weak link**: dgx-2 at -71 dBm on 6 GHz had two episodes of 100–800 ms RTT to the router
   during the drill. Wired Ethernet (P0.11) fixes it; until then move the VIPs to the better Spark (step 6).
 - ~~Argo CD's server is one replica~~ Fixed 2026-11-16: server and repo-server run one replica per Spark
