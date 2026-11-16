@@ -31,6 +31,8 @@ endpoints:
   # The sign-in proxy (edge-auth in k3s, decision 0011) answers on its callback host, and the backends of the signed-in
   # routes refuse requests that don't come through the door (403 without the edge origin token).
   - {name: auth.nghodki.ai (edge-auth), group: web, url: "https://192.168.86.11/ping", headers: {Host: auth.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
+  # Pocket ID (console stack on dgx-2): every sign-in depends on it. Its OIDC discovery through the door, issuer checked.
+  - {name: id.nghodki.ai (Pocket ID), group: web, url: "https://192.168.86.11/.well-known/openid-configuration", headers: {Host: id.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[BODY].issuer == https://id.nghodki.ai"], alerts: [{type: ntfy}]}
   - {name: Homepage gate refuses direct access, group: web, url: "http://192.168.86.49:4180/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
   - {name: docs gate refuses direct access, group: web, url: "http://192.168.86.49:4181/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
   - {name: status gate refuses direct access, group: web, url: "http://status-gate:8081/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
@@ -69,6 +71,8 @@ endpoints:
   - {name: etcd dgx-1, group: k3s, url: "tcp://10.100.136.1:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: etcd dgx-2, group: k3s, url: "tcp://10.100.136.2:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: etcd jetson, group: k3s, url: "tcp://192.168.86.211:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  # Argo CD (plan P3.4, runbooks/argocd.md): /healthz through the door is open without sign-in.
+  - {name: argocd.nghodki.ai, group: k3s, url: "https://192.168.86.11/healthz", headers: {Host: argocd.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
   # The in-cluster front door (plan P3.3, decision 0007, runbooks/edge.md), on its VIPs. The Dell is a k3s node, so its
   # kube-proxy answers for the VIPs locally: these check CoreDNS, Caddy and the API, not which Spark holds the VIP over ARP
   # (vmalert KubeVipNotReady watches kube-vip). TLS isn't verified (no web CA in Gatus), only the cert's expiry.
