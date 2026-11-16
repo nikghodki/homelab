@@ -1,0 +1,114 @@
+name: build-sign
+
+# Builds the fleet images from this repo, pushes them to ghcr.io/nikghodki/<name>, signs them with cosign keyless
+# (GitHub OIDC; no keys) and attaches a signed SPDX SBOM. Kyverno admits ghcr.io/nikghodki/* only with this
+# workflow's signature from main (policies/kyverno/verify-images.yaml). Runbook: runbooks/build-sign.md.
+# Not built here: robots/sim/mujoco (~12 GB with the CUDA wheels; decision 0008).
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-sign.yml
+      - .github/scripts/image-spec.sh
+      - hosts/stacks/ml/mlflow/**
+      - hosts/stacks/ml/compose.yaml
+      - hosts/roles/ros_zenoh_router/templates/Dockerfile.j2
+      - hosts/roles/ros_zenoh_router/defaults/main.yml
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: build-sign-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BINFMT_IMAGE: tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+  BUILDKIT_IMAGE: moby/buildkit:v0.35.0@sha256:aa632b921ef07411d2cb77292cd34213d4f7b384001d6fceef1e1f25bf9752bb
+  BUILDX_VERSION: v0.39.0
+  COSIGN_VERSION: v3.1.4
+  PLATFORMS: linux/amd64,linux/arm64
+  # What Kyverno and `cosign verify` check (runbooks/build-sign.md).
+  CERT_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build-sign.yml@refs/heads/main
+  CERT_ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  build:
+    name: Build, sign, attest (${{ matrix.image }})
+    # Only main: the signing identity is the workflow at refs/heads/main, and nothing else may push images.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write   # push to ghcr.io/nikghodki
+      id-token: write   # cosign keyless (Fulcio certificate from the GitHub OIDC token)
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [mlflow, ros-zenoh]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build spec
+        id: spec
+        run: .github/scripts/image-spec.sh "${{ matrix.image }}" "$GITHUB_SHA" | tee -a "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: ${{ env.BINFMT_IMAGE }}
+          platforms: arm64
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ steps.spec.outputs.context }}
+          file: ${{ steps.spec.outputs.file }}
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: ${{ steps.spec.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          # BuildKit SPDX SBOM and provenance per platform, inside the image index (so covered by the signature).
+          sbom: true
+          provenance: mode=max
+          # Layer cache in the Actions cache (10 GB per repo), one scope per image: unchanged layers aren't rebuilt.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+      - name: Sign (keyless) and attest the SBOM
+        env:
+          REF: ${{ steps.spec.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "$REF"
+          # The arm64 SBOM (what the fleet runs) from BuildKit's attestation, as a signed SPDX attestation.
+          docker buildx imagetools inspect "$REF" --format '{{ json (index .SBOM "linux/arm64").SPDX }}' > sbom.spdx.json
+          test -s sbom.spdx.json && [ "$(head -c 4 sbom.spdx.json)" != "null" ]
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
+      - name: Verify
+        env:
+          REF: ${{ steps.spec.outputs.image }}@${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.spec.outputs.tags }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          cosign verify "$REF" --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null
+          cosign verify-attestation "$REF" --type spdxjson \
+            --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null
+          {
+            echo "### $IMAGE"
+            echo "- \`$REF\` ($PLATFORMS)"
+            echo "- tags: \`$TAGS\`"
+            echo "- signed and SBOM-attested by \`$CERT_IDENTITY\`"
+          } >> "$GITHUB_STEP_SUMMARY"
