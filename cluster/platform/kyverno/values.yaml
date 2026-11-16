@@ -1,0 +1,62 @@
+# Kyverno: chart kyverno 3.10.0 (Kyverno v1.20.0), namespace kyverno. Used by cluster/bootstrap/apps/kyverno.yaml.
+# Policies live in policies/kyverno (Audit mode, runbooks/kyverno.md). Admission + reports controllers only, one
+# replica each on the Sparks, small limits (decision 0006).
+crds:
+  install: true
+  # Storage-version migration Job (post-upgrade hook = Argo CD PostSync, runs when this app syncs).
+  migration:
+    nodeSelector:
+      nghodki.ai/role: gpu
+
+features:
+  # Audit only for now, and one replica that a GPU OOM can take down: never block the API on Kyverno.
+  # Remove when moving policies to Enforce (runbooks/kyverno.md).
+  forceFailurePolicyIgnore:
+    enabled: true
+  backgroundScan:
+    enabled: true
+    backgroundScanWorkers: 1
+    backgroundScanInterval: 1h
+  policyExceptions:
+    enabled: false
+  logging:
+    format: json
+
+# Hooks not needed here: the legacy-policy check (fresh v1.20 install) and the pre-delete webhook cleanup (with
+# failurePolicy Ignore a leftover webhook can't block anything; runbooks/kyverno.md says how to remove one).
+# Helm test pods are skipped by Argo CD.
+upgrade:
+  legacyPolicyCheck:
+    enabled: false
+webhooksCleanup:
+  enabled: false
+
+admissionController:
+  replicas: 1
+  revisionHistoryLimit: 3
+  nodeSelector:
+    nghodki.ai/role: gpu
+  initContainer:
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 100m, memory: 128Mi}
+  container:
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: "1", memory: 384Mi}
+
+reportsController:
+  enabled: true
+  replicas: 1
+  revisionHistoryLimit: 3
+  nodeSelector:
+    nghodki.ai/role: gpu
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+
+# Generate / mutate-existing and cleanup policies aren't used yet.
+backgroundController:
+  enabled: false
+cleanupController:
+  enabled: false

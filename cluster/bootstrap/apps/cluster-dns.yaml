@@ -1,0 +1,20 @@
+# CoreDNS extra zone for *.nghodki.ai (cluster/platform/cluster-dns).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-dns
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: git@github.com:nikghodki/homelab.git
+    targetRevision: p3.4-platform
+    path: cluster/platform/cluster-dns
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}

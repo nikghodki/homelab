@@ -1,0 +1,32 @@
+# Every container (and init container) sets cpu and memory requests and limits. Audit (runbooks/kyverno.md).
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-resource-limits
+  annotations:
+    policies.kyverno.io/title: Require requests and limits
+    policies.kyverno.io/description: Containers must set cpu and memory requests and limits (design, "limits required").
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background: {enabled: true}
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: containers
+      expression: >-
+        object.spec.containers + (has(object.spec.initContainers) ? object.spec.initContainers : [])
+    - name: missing
+      expression: >-
+        variables.containers.filter(c, !has(c.resources)
+          || !has(c.resources.requests) || !('cpu' in c.resources.requests) || !('memory' in c.resources.requests)
+          || !has(c.resources.limits) || !('cpu' in c.resources.limits) || !('memory' in c.resources.limits)
+        ).map(c, c.name)
+  validations:
+    - expression: size(variables.missing) == 0
+      messageExpression: >-
+        'containers without cpu/memory requests and limits: ' + variables.missing.join(', ')

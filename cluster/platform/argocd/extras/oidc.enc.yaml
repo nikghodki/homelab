@@ -1,0 +1,26 @@
+# Pocket ID client secret for Argo CD: a copy of oidc_argocd_secret in secrets/console.enc.yaml. KSOPS decrypts it.
+apiVersion: v1
+kind: Secret
+metadata:
+    name: argocd-oidc
+    namespace: argocd
+    labels:
+        app.kubernetes.io/part-of: argocd
+type: Opaque
+stringData:
+    clientSecret: ENC[AES256_GCM,data:4t3a0hqzlBTpvtazE1rQjEtjtPw/kxEeHULPxauV3no=,iv:pLW9+ti4ANyWyTsjKQGkFaRFet8lE/J//nJQRuTYcJs=,tag:evNsQ7DdHVRN+kKBDnN5IQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBPZW5QdkdXT3pkOUk1MzQr
+            VlhBbHNlOVphNlBrUVlPeWkzcnV6N0ZxOFZzCkNNUG9hM1BpdnlkS3JFUUhuQkhH
+            SFY4dTVhTlA0VWtONzIvQStqamxaL2sKLS0tIDIxM3Y0ZkFuSzhwa3RLZmt4M2VM
+            WG5zSWhCWlZCMzRBTi9MVU43aDZmdTQKqbbhqN6DWuBNwC5EMac1QvMLZrj8Q1m7
+            JXcvvyxBtBvcVjjOk3hV3ou1qxGUoqZVDaqRzeBd/JQvp+Ud17CuWw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T00:13:38Z"
+    mac: ENC[AES256_GCM,data:6XgcC4pa7w9MNkxkO+ZYf7jrM8NianYhmRWqhfK7VBy3sK0NxOVcdbVQYGnR/mgLkewjBj9TmFbeYo80lAogNJxyp7exnrn3bUa+ZJ2ojtsFCifI8xgeJFr1Bv8ZZtzi4dO0R7wdjo/gNGeVaCvO98NkTFMiHtc3FBTCMW4L7eM=,iv:8i48lx/6WPDSA+qZAFTesm+FoZbsWIajPtFtLO4PHAc=,tag:B4YY6vxaBRtiVhO559ZOCw==,type:str]
+    version: 3.13.3

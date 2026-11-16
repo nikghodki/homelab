@@ -1,0 +1,30 @@
+# Fixed ClusterIPs (static band, cluster/README.md) that VictoriaMetrics on dgx-2 scrapes from the host.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kyverno-admission-host
+  namespace: kyverno
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.110
+  selector:
+    app.kubernetes.io/component: admission-controller
+    app.kubernetes.io/instance: kyverno
+    app.kubernetes.io/part-of: kyverno
+  ports:
+    - {name: metrics, port: 8000, targetPort: 8000, protocol: TCP}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kyverno-reports-host
+  namespace: kyverno
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.111
+  selector:
+    app.kubernetes.io/component: reports-controller
+    app.kubernetes.io/instance: kyverno
+    app.kubernetes.io/part-of: kyverno
+  ports:
+    - {name: metrics, port: 8000, targetPort: 8000, protocol: TCP}

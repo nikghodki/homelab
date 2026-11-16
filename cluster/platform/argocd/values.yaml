@@ -1,0 +1,136 @@
+# Argo CD: chart argo-cd 10.18.0 (Argo CD v3.6.1), namespace argocd. Used by the `argocd` Application
+# (cluster/bootstrap/apps/argocd.yaml) and once by the bootstrap (runbooks/argocd.md), so both render the same.
+# Sparks only, one replica of everything, small requests and limits (decision 0006).
+global:
+  domain: argocd.nghodki.ai
+  nodeSelector:
+    nghodki.ai/role: gpu
+  revisionHistoryLimit: 3
+
+crds:
+  install: true
+  keep: true
+
+configs:
+  cm:
+    url: https://argocd.nghodki.ai
+    # Built-in admin account: off once Pocket ID sign-in works. Break-glass: runbooks/argocd.md.
+    admin.enabled: false
+    exec.enabled: false
+    statusbadge.enabled: false
+    users.anonymous.enabled: false
+    # GitHub can't reach home (design D15), so no webhook: Argo CD polls the repo every 2 minutes.
+    timeout.reconciliation: 120s
+    # KSOPS (kustomize exec plugin) decrypts SOPS files in the repo-server.
+    kustomize.buildOptions: --enable-alpha-plugins --enable-exec
+    oidc.config: |
+      name: Pocket ID
+      issuer: https://id.nghodki.ai
+      clientID: argocd
+      clientSecret: $argocd-oidc:clientSecret
+      requestedScopes: [openid, profile, email, groups]
+      enablePKCEAuthentication: true
+      rootCA: |
+        -----BEGIN CERTIFICATE-----
+        MIIB3jCCAYWgAwIBAgIUcuvnEZeRqgptjzLMIdkOgYtFsdMwCgYIKoZIzj0EAwIw
+        PTEfMB0GA1UEAwwWbmdob2RraSBob21lbGFiIHdlYiBDQTEaMBgGA1UECgwRbmlr
+        Z2hvZGtpIGhvbWVsYWIwHhcNMjYxMTE1MTc1MjQyWhcNMzYxMTEyMTc1MjQyWjA9
+        MR8wHQYDVQQDDBZuZ2hvZGtpIGhvbWVsYWIgd2ViIENBMRowGAYDVQQKDBFuaWtn
+        aG9ka2kgaG9tZWxhYjBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABFMI2BGdTSxT
+        wXPqFitfj558y/mP5xmbW8iNQcjTr99eeXONja0FYn8PGQxeSw6SqQZAFGy0r0Nk
+        dUuxQ+z6oxyjYzBhMBIGA1UdEwEB/wQIMAYBAf8CAQAwDgYDVR0PAQH/BAQDAgEG
+        MBwGA1UdHgEB/wQSMBCgDjAMggpuZ2hvZGtpLmFpMB0GA1UdDgQWBBQx8QdzjG+9
+        C3rlfZEVC/QxPGeymTAKBggqhkjOPQQDAgNHADBEAiBkv4e5F9vmjdHvdV3TFbKc
+        9WQS/+BdPHeFQR4QV8iwgQIgJKyoF/ukMWm/kCfVPTDYYUodA4rUT71WFslx1TIo
+        NH8=
+        -----END CERTIFICATE-----
+  params:
+    # Plain HTTP inside the cluster; edge-caddy on dgx-1 terminates TLS for argocd.nghodki.ai.
+    server.insecure: true
+    controller.status.processors: 4
+    controller.operation.processors: 2
+    controller.repo.server.timeout.seconds: 120
+    reposerver.parallelism.limit: 2
+  rbac:
+    # Pocket ID group `admins` is admin; everyone else (and no group) gets nothing.
+    policy.default: ""
+    policy.csv: |
+      g, admins, role:admin
+    scopes: "[groups]"
+  secret:
+    createSecret: true
+
+controller:
+  replicas: 1
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {cpu: "1", memory: 512Mi}
+
+repoServer:
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: "1", memory: 512Mi}
+  env:
+    - name: SOPS_AGE_KEY_FILE
+      value: /sops-age/keys.txt
+  volumes:
+    - name: custom-tools
+      emptyDir: {}
+    # The fleet age key, created by hand from dgx-1 (runbooks/argocd.md). Never in Git.
+    - name: sops-age
+      secret:
+        secretName: sops-age
+        defaultMode: 256  # 0400
+  initContainers:
+    - name: install-ksops
+      image: quay.io/viaductoss/ksops:v4.5.1@sha256:4def9fdd4e2f850265740ebe9592c5455d19b76891e88e602df8b52d74b95334
+      command: ["/usr/local/bin/ksops", "install", "/custom-tools"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 200m, memory: 64Mi}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: [ALL]}
+        seccompProfile: {type: RuntimeDefault}
+      volumeMounts:
+        - {name: custom-tools, mountPath: /custom-tools}
+  volumeMounts:
+    # Only ksops is added; Argo CD's own kustomize is kept.
+    - {name: custom-tools, mountPath: /usr/local/bin/ksops, subPath: ksops}
+    - {name: sops-age, mountPath: /sops-age, readOnly: true}
+
+server:
+  replicas: 1
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+
+redis:
+  enabled: true
+  resources:
+    requests: {cpu: 10m, memory: 16Mi}
+    limits: {cpu: 200m, memory: 96Mi}
+  exporter:
+    enabled: false
+
+redisSecretInit:
+  resources:
+    requests: {cpu: 10m, memory: 16Mi}
+    limits: {cpu: 100m, memory: 64Mi}
+
+# Not used: SSO goes straight to Pocket ID, no notifications yet, app-of-apps instead of ApplicationSets.
+dex:
+  enabled: false
+notifications:
+  enabled: false
+applicationSet:
+  replicas: 0
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {cpu: 100m, memory: 128Mi}
+commitServer:
+  enabled: false

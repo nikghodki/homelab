@@ -1,0 +1,7 @@
+# Extras next to the Argo CD chart: projects, fixed-IP Services for the hosts, the Pocket ID client secret.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - host-services.yaml
+generators:
+  - secret-generator.yaml

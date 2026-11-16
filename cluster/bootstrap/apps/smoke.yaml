@@ -1,0 +1,22 @@
+# SOPS canary (cluster/apps/_smoke): a KSOPS-decrypted Secret, no pods. If decryption breaks, this app goes
+# Unknown/Degraded and ArgoCDAppNotHealthy fires.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: smoke
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: apps
+  source:
+    repoURL: git@github.com:nikghodki/homelab.git
+    targetRevision: p3.4-platform
+    path: cluster/apps/_smoke
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: smoke
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}

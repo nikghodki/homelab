@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: sops-canary
+    namespace: smoke
+type: Opaque
+stringData:
+    canary: ENC[AES256_GCM,data:ku/ZKRsI5HS6ntQlZ5pD,iv:JpCI3MVQDjmxgpik33PEvfbMcNm4BIqjB4ZFfGmBxBY=,tag:lCvMc/LYiTdI2RhHQ0Xnpw==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBFSExSWXZRUFZqTk1nN0tG
+            andzNHViVG1oMWdVUDVDSkIwdnZyVTRCcndZCkhkZ1Ztc0FHdVZSZTUwSjhPMzNi
+            ckI5UE9jR0dhZkd6UVBVU1hHczlOeFkKLS0tIEY1ak9YK3FxUkRnQkIrWXlha3Uw
+            Tmt1aEk4NDAvRGhhaXJBalR1S3BHNU0KsA2OwKZMErrKG7DAnh+Zi5+K32pMpx6K
+            Ho7D7XFjNEFJV4cBsKwd1BYg3fi2t68wiabOYFJBBerjS9pBX/W5yg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T00:16:00Z"
+    mac: ENC[AES256_GCM,data:m+Y/MsYuvmV//vi9gw7XlPPLGQNLtabL2zFJOx02P4KPbucdfupdGj29tKqiGzJAVu6O8NJAuVjrOmfLxLuylAjrbS5hQHNKxqRiOPMdICr+2c+nyt4xGb6gSPtS4U0Urdg2gaoq9Dz44jX53gosQKhnvsfoW0T8N2fpVEn03Ig=,iv:HMOVs8ojh/eXC1BXIoAav59o6tZdzDuh2E0vsIE09CA=,tag:XPj0jcM6M9P3BAwy/G4Aag==,type:str]
+    version: 3.13.3
