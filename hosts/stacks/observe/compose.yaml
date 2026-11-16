@@ -18,6 +18,9 @@ services:
     volumes:
       - vm-data:/storage
       - ./victoriametrics/scrape.yml:/etc/vm/scrape.yml:ro
+    # Peak 514 MiB (cgroup, 2026-11-16), RSS max 481 MiB in 3 days. VictoriaMetrics sizes its caches to 60 % of this
+    # limit. Infra review 2026-11 §1.3: no unbounded service may eat the Sparks' model margin.
+    mem_limit: 2g
 
   vmalert:
     <<: *restart
@@ -50,6 +53,8 @@ services:
     volumes:
       - loki-data:/loki
       - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+    # Peak 1,135 MiB (cgroup, with page cache), RSS max 801 MiB in 3 days; queries over 30 days can spike.
+    mem_limit: 3g
 
   tempo:
     <<: *restart
@@ -123,6 +128,8 @@ services:
     ports:
       - "3000:3000"
     depends_on: [victoriametrics, loki, tempo, alertmanager]
+    # Peak 349 MiB (cgroup), RSS max 410 MiB in 3 days.
+    mem_limit: 1g
 
   # LLM and agent traces (plan P2.6). OTLP over HTTP at :6006/v1/traces; UI at phoenix.nghodki.ai.
   phoenix:
@@ -155,6 +162,9 @@ services:
     extra_hosts: ["id.nghodki.ai:192.168.86.11"]
     ports:
       - "6006:6006"
+    # Peak 884 MiB (cgroup) and growing with its data (48 -> 741 MiB in two days, no retention yet: infra review §2).
+    # Raise this, or set retention, if it nears the limit.
+    mem_limit: 3g
 
 volumes:
   vm-data:
