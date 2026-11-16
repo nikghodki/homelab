@@ -42,7 +42,7 @@ the k3s alerts and the dead man).
 | k3s | etcd dgx-1, dgx-2, jetson | `tcp://10.100.136.1:2379`, `10.100.136.2:2379`, `192.168.86.211:2379` | connected |
 | edge | edge DNS (VIP), edge DNS tailnet view (dgx-1), (dgx-2) | `tcp://192.168.86.11:53`, `tcp://100.65.137.82:53`, `tcp://100.124.175.23:53` | connected (TCP: the Dell's containers can't send UDP to k3s Services) |
 | edge | edge Caddy (VIP) | `https://192.168.86.11/`, Host `ca...` | 200 and cert > 720 h |
-| edge | edge-caddy relay (dgx-1) | `http://192.168.86.44/health/liveliness`, Host `model...` | 200 (the relay to nginx-gateway) |
+| edge | DGXMM UI (direct) | `http://192.168.86.11/dgxmm/`, Host `dgxmanager...` | 200 (Caddy → DGXMM on dgx-1's direct-cable address; replaced the edge-caddy relay check on 2026-11-15) |
 | edge | API (VIP) | `https://192.168.86.10:6443/readyz` | 401 |
 
 Since the P3.3 cutover (#79) the front-door checks go to the edge VIP 192.168.86.11 (the k3s Caddy); the `edge` group

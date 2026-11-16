@@ -19,7 +19,7 @@ description: Names, abbreviations and plan IDs used across the fleet docs.
 | DefenseClaw | Cisco AI Defense's open-source agent security product (1.0.9). Hooks, guardrails, scanners, Fleet, Edge Connector. |
 | DGXMM | DGX Model Manager: the separate project on dgx-1 that owns the GPUs and starts model engines. |
 | Edge Connector | DefenseClaw's C daemon for small devices. Runs on the Pi, reports to the Fleet gateway on dgx-1. |
-| edge-caddy / edge-dnsmasq | The old front door containers on dgx-1 (`~/edge-gateway`), outside the repo. Since the P3.3 cutover: the nginx-gateway relay and the rollback. |
+| edge-caddy / edge-dnsmasq | The old front door containers on dgx-1 (`~/edge-gateway`), outside the repo. Stopped on 2026-11-15, with nginx-gateway; kept a week for a rollback. |
 | `edge` (namespace) | The front door in k3s (P3.3): `edge-caddy` and `edge-dns` (CoreDNS) pods on both Sparks, on the Sparks' Tailscale IPs and the kube-vip VIP. |
 | Fleet (DefenseClaw) | The Fleet gateway inside dgx-1's DefenseClaw, its Mosquitto broker (8884) and API proxy (8971). |
 | fleet-metrics | Small stdlib Python agent on every host (`:9109`): JSON and Prometheus host metrics. |
@@ -42,6 +42,6 @@ description: Names, abbreviations and plan IDs used across the fleet docs.
 | Safety governor | ROS 2 node on the Pi that sits between every command source and the motors. |
 | SOPS | Encrypts values in YAML files in `secrets/` and `cluster/**/*.enc.yaml`. |
 | Spark | An NVIDIA DGX Spark (dgx-1, dgx-2). |
-| Split DNS | Tailscale setting that sends `nghodki.ai` queries to dgx-1's dnsmasq. |
+| Split DNS | Tailscale setting that sends `nghodki.ai` queries to both Sparks' Tailscale IPs, where edge-dns (k3s) answers. |
 | Tagged device | A Tailscale node owned by a tag instead of a person (no key expiry). |
 | Zenoh | The transport under ROS 2 here (`rmw_zenoh`); router on the Jetson. |

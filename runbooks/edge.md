@@ -5,7 +5,7 @@ Design and test results: [decision 0007](../decisions/0007-edge-in-cluster.md). 
 **Status: cut over (P3.3); the old door is retired (2026-11-15).** The tailnet (every client) uses the in-cluster door
 on both Sparks' Tailscale IPs; the LAN view is on the VIP. Caddy reaches every backend directly: the relay through
 dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and nginx-gateway are **stopped**
-(containers kept, `restart: no`; backup in `/root/backups/` on dgx-1, see [Rollback](#rollback)).
+(containers kept, `restart: no`; backup `~/backups/edge-gateway-2026-11-15.tgz` on dgx-1, root-only, see [Rollback](#rollback)).
 
 | | In-cluster door (live) |
 |---|---|
@@ -183,16 +183,17 @@ IP from the Services, with dnsmasq and edge-caddy still listening) are gone. In 
 2. **One backend unreachable from the pods** (DGXMM after a Docker change, HA after a trusted-proxy change): fix the
    backend side (DGXMM's `.env` bind/trusted proxies, HA's trusted proxies; see "How it works"); the Caddyfile stays.
 3. **The old door back on dgx-1** (the cluster's Caddy or CoreDNS broken, or step 1 needs the relay). The containers
-   still exist and their config files are where they were; a root-only copy is in
-   `/root/backups/edge-gateway-2026-11-15.tgz` (kept until 2026-11-22: `~/edge-gateway`, `~/voice-assistant/nginx`,
-   `docker inspect` of the three containers):
+   still exist and their config files are where they were; a root-only (0600) copy is
+   `~/backups/edge-gateway-2026-11-15.tgz` (kept until 2026-11-22: `~/edge-gateway`, `~/voice-assistant/nginx`,
+   `docker inspect` of the three containers, `docker save` of `edge-dnsmasq:local`):
    ```bash
-   # if the files are gone: sudo tar -C / -xzf /root/backups/edge-gateway-2026-11-15.tgz
+   # if the files are gone (only the home/ paths; the rest is the inspect JSON and the image tar):
+   #   sudo tar -C / -xzf ~/backups/edge-gateway-2026-11-15.tgz home
    for c in nginx-gateway edge-caddy edge-dnsmasq; do docker update --restart unless-stopped $c; done
    docker start nginx-gateway edge-caddy edge-dnsmasq
    ```
    nginx-gateway reaches DGXMM on the Docker network, which DGXMM still trusts only if `172.23.0.0/16` is back in
-   `DGXMM_TRUSTED_PROXIES` (it was removed after the retirement; the `.env` backup is `/root/backups/dgxmm-env-*`).
+   `DGXMM_TRUSTED_PROXIES` (it was removed after the retirement; the `.env` backup is `/root/backups/dgxmm-env-20261115-192847`).
    edge-caddy then serves dgx-1's LAN IP again; the tailnet stays on the cluster (kube-proxy owns dgx-1's Tailscale
    IP :53/:80/:443) until the cutover is reverted too: revert #79 or drop `100.65.137.82` from the two tailnet
    Services (`kubectl -n edge patch svc edge-caddy-tailnet --type merge -p '{"spec":{"externalIPs":["100.124.175.23"]}}'`,
@@ -206,4 +207,4 @@ IP from the Services, with dnsmasq and edge-caddy still listening) are gone. In 
    Tailscale admin console.
 
 After 2026-11-22 (a week without a rollback) the containers and `~/edge-gateway` can be deleted; the tarball stays in
-`/root/backups` until then and goes with them.
+`~/backups` until then and goes with them.

@@ -142,7 +142,7 @@ All are listed with their hosts and roles in [operations/deploy](content/docs/op
 | `ops` | [services/homepage](content/docs/services/homepage.md), [services/docs-site](content/docs/services/docs-site.md) |
 | `sim` | [robotics/simulation](content/docs/robotics/simulation.md) |
 
-Outside the repo: edge-gateway (rollback and nginx-gateway relay since the P3.3 cutover) → [network/front-door](content/docs/network/front-door.md), LiteLLM →
+Outside the repo: edge-gateway and nginx-gateway (stopped 2026-11-15, kept a week for a rollback) → [network/front-door](content/docs/network/front-door.md), LiteLLM →
 [services/litellm](content/docs/services/litellm.md), Open WebUI, Home Assistant, LiveKit/control center →
 their service pages.
 

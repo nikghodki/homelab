@@ -28,7 +28,7 @@ sequenceDiagram
   edge-dns replica answers with its own Spark (P3.3, [DNS](../network/dns.md)). LAN clients would have to use the
   VIP 192.168.86.11 as their resolver for `nghodki.ai` (unverified how each LAN device is configured; the Nest
   router's DHCP doesn't hand it out by itself).
-- model, dgxmanager and ha go one hop further: the Caddy pod → edge-caddy on 192.168.86.44:80 → nginx-gateway.
+- model, dgxmanager and ha go straight to their backends too (LiteLLM and DGXMM on dgx-1's direct-cable address, HA on the Jetson).
 - TLS: the device must trust the homelab web CA, installed once from `http://ca.nghodki.ai`. See [PKI](../security/pki.md).
 - Every service behind the front door has the same shape. The full table is in [Front door](../network/front-door.md).
 
@@ -79,8 +79,8 @@ Details: [Deploying](../operations/deploy.md).
 
 ```mermaid
 flowchart LR
-  A["Agent or Open WebUI"] -- "http(s)://model.nghodki.ai/v1" --> C["edge-caddy (dgx-1)"]
-  C --> N["nginx-gateway (dgx-1)"] --> L["litellm-proxy :4000"]
+  A["Agent or Open WebUI"] -- "http(s)://model.nghodki.ai/v1" --> C["Caddy (k3s, edge)"]
+  C --> L["litellm-proxy :4000 (dgx-1)"]
   L --> D["DGXMM-started engine (vLLM / llama.cpp)"]
 ```
 

@@ -15,7 +15,7 @@ and a robot, survives any single machine rebooting, and is easy to grow.
 
 | Inventory name | Hostname | Hardware | LAN IP | Tailscale | Role |
 |---|---|---|---|---|---|
-| [dgx-1](../hosts/dgx-1.md) | `spark-83dc` | DGX Spark, GB10, 20 cores, 121 GiB unified, 3.7 TB NVMe | 192.168.86.44 | 100.65.137.82 | Interactive models (DGXMM, LiteLLM, Open WebUI), half of the front door (k3s) plus the nginx-gateway relay, NATS, DefenseClaw Fleet, Ansible control node, k3s server |
+| [dgx-1](../hosts/dgx-1.md) | `spark-83dc` | DGX Spark, GB10, 20 cores, 121 GiB unified, 3.7 TB NVMe | 192.168.86.44 | 100.65.137.82 | Interactive models (DGXMM, LiteLLM, Open WebUI), half of the front door (k3s), NATS, DefenseClaw Fleet, Ansible control node, k3s server |
 | [dgx-2](../hosts/dgx-2.md) | `nikghodki-dgx-2` | DGX Spark, same as dgx-1 | 192.168.86.36 | 100.124.175.23 | Batch and simulation, observability, Pocket ID, Temporal, MLflow, k3s server (cluster-init) |
 | [jetson](../hosts/jetson.md) | `nikhil-jetson` | Jetson Orin, 6 cores, 7.4 GiB, 3.6 TB NVMe, JetPack 7.2.1 | 192.168.86.211 | 100.78.145.123 | Home and robot brain: Hermes (2 profiles), Home Assistant, Zenoh router, LiveKit; etcd member + tainted worker |
 | [omarchy](../hosts/omarchy.md) ("the Dell") | `nikghodki-omarchy-local` | Dell Inspiron 7348 (2015), i5-5200U 2c/4t, 8 GB, 500 GB HDD | 192.168.86.49 | 100.117.118.69 | Alerting path (Gatus, ntfy), Homepage launcher, k3s agent; never sleeps |
@@ -36,7 +36,7 @@ flowchart LR
     PHONE[Phone / admin devices]
   end
   subgraph LAN["Home LAN 192.168.86.0/24 (Wi-Fi)"]
-    DGX1["dgx-1 .44<br/>front door (k3s) + nginx relay<br/>LiteLLM, Open WebUI, DGXMM<br/>NATS, Fleet broker"]
+    DGX1["dgx-1 .44<br/>front door (k3s)<br/>LiteLLM, Open WebUI, DGXMM<br/>NATS, Fleet broker"]
     DGX2["dgx-2 .36<br/>front door (k3s)<br/>observe stack, Pocket ID<br/>Temporal, MLflow, sims"]
     JET["Jetson .211<br/>Hermes x2, Home Assistant<br/>Zenoh router, LiveKit"]
     DELL["Dell .49<br/>Gatus, ntfy, Homepage"]
@@ -77,8 +77,8 @@ Some pieces are hand-run and not managed by Ansible or Argo CD yet. Know them be
 
 | Piece | Host | Where | Plan |
 |---|---|---|---|
-| Old front door: `edge-caddy` + `edge-dnsmasq` | dgx-1 | `~/edge-gateway` | Replaced for clients by the in-cluster door at the P3.3 cutover ([Front door](../network/front-door.md#in-cluster-front-door-p33)); kept as the nginx-gateway relay and the rollback until P3.7 |
-| `nginx-gateway` (routes model, DGXMM, TTS, HA; its voice page is unreachable since D26) | dgx-1 | `~/voice-assistant/nginx/nginx.conf` | — |
+| Old front door: `edge-caddy` + `edge-dnsmasq` | dgx-1 | `~/edge-gateway` | Replaced for clients by the in-cluster door at the P3.3 cutover ([Front door](../network/front-door.md#in-cluster-front-door-p33)); **stopped 2026-11-15** (relay retired, PR #88), kept until 2026-11-22 for a rollback |
+| `nginx-gateway` (routed model, DGXMM, TTS, HA) | dgx-1 | `~/voice-assistant/nginx/nginx.conf` | **stopped 2026-11-15**: its routes are in the k3s Caddyfile |
 | LiteLLM proxy + Postgres + Redis | dgx-1 | `~/litellm-setup` (owned by the DGXMM/LiteLLM session) | P3.7 |
 | Open WebUI | dgx-1 | container `open-webui` | P3.7 |
 | DGXMM and its engines | dgx-1, dgx-2 | `~/workspace/dgx-model-manager` (separate project) | stays outside k3s (D3) |
