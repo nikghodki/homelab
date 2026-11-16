@@ -1,0 +1,38 @@
+# The in-cluster front door (plan P3.3, decision 0007, runbooks/edge.md): kube-vip and the edge pods, from
+# kube-state-metrics (10.43.0.120). Gatus group `edge` checks the VIPs themselves and alerts through ntfy directly.
+# All warnings until the cutover; raise EdgeFrontDoorDown and KubeVipDown to critical when clients use the VIPs.
+groups:
+  - name: front-door
+    rules:
+      - alert: KubeVipNotReady
+        expr: >-
+          kube_daemonset_status_number_ready{namespace="kube-system", daemonset="kube-vip"}
+          < kube_daemonset_status_desired_number_scheduled{namespace="kube-system", daemonset="kube-vip"}
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "kube-vip isn't ready on every Spark: the VIPs can't fail over (runbooks/edge.md)"
+      - alert: KubeVipDown
+        expr: kube_daemonset_status_number_ready{namespace="kube-system", daemonset="kube-vip"} == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "No kube-vip is ready: 192.168.86.10/.11 may be on no node (runbooks/edge.md)"
+      - alert: EdgeReplicasDown
+        expr: min by (deployment) (kube_deployment_status_replicas_available{namespace="edge"}) < 2
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "edge/{{ $labels.deployment }} has {{ $value }} of 2 replicas ready for 10 min (runbooks/edge.md)"
+      - alert: EdgeFrontDoorDown
+        expr: min by (deployment) (kube_deployment_status_replicas_available{namespace="edge"}) == 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "edge/{{ $labels.deployment }} has no ready replica: *.nghodki.ai DNS or HTTPS is down (runbooks/edge.md)"
+      - alert: KubeStateMetricsDown
+        expr: up{job="kube-state-metrics"} == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "kube-state-metrics isn't answering at 10.43.0.120: the front-door alerts are blind"

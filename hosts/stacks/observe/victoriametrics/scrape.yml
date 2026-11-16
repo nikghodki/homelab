@@ -37,3 +37,7 @@ scrape_configs:
     static_configs: [{targets: ["10.43.0.110:8000"], labels: {service: kyverno}}]
   - job_name: kyverno-reports
     static_configs: [{targets: ["10.43.0.111:8000"], labels: {service: kyverno}}]
+  # kube-state-metrics (cluster/platform/kube-state-metrics): pod/deployment/daemonset readiness for
+  # vmalert/rules/front-door.yml, at its fixed ClusterIP.
+  - job_name: kube-state-metrics
+    static_configs: [{targets: ["10.43.0.120:8080"], labels: {service: kube-state-metrics}}]
