@@ -23,8 +23,8 @@ SOPS). All images are pinned by digest; Renovate keeps them current.
 | `backup` | dgx-2 | `backups.yml` | restic rest-server 0.14.0 | `backup`, `pki` | stays on the host |
 | `sim` | dgx-2 | none (run by hand) | isaaclab (local image on NVIDIA's + MLflow client), mujoco (local image) (profile `jobs`) | — | `sim` |
 
-Outside the repo (hand-run): edge-gateway (`edge-caddy`, `edge-dnsmasq`; replaced for clients by `edge` in k3s at the P3.3 cutover, kept as the nginx-gateway relay and rollback), LiteLLM + Postgres + Redis →
-`models` and `data`, Open WebUI → `agents` or `models`, nginx-gateway, DGXMM and engines (stay outside).
+Outside the repo (hand-run): edge-gateway (`edge-caddy`, `edge-dnsmasq`; replaced for clients by `edge` in k3s at the P3.3 cutover, stopped 2026-11-15), LiteLLM + Postgres + Redis →
+`models` and `data`, Open WebUI → `agents` or `models`, DGXMM and engines (stay outside). nginx-gateway was stopped on 2026-11-15 (its routes are in k3s).
 
 ## The `compose_stack` role
 

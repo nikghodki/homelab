@@ -11,8 +11,8 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | Port | Bind | Service | Notes |
 |---|---|---|---|
 | 22 | all | sshd | |
-| 53 | 192.168.86.44, 100.65.137.82 | edge-dnsmasq | old `nghodki.ai` server; on 100.65.137.82 kube-proxy DNATs :53 to edge-dns first (P3.3) |
-| 80, 443 | all | edge-caddy | old front door: nginx-gateway relay on 192.168.86.44; on 100.65.137.82 kube-proxy DNATs to the k3s Caddy first |
+| 53 | 100.65.137.82 | edge-dns (k3s, kube-proxy DNAT) | edge-dnsmasq on 192.168.86.44 stopped 2026-11-15 |
+| 80, 443 | 100.65.137.82 | edge-caddy (k3s, kube-proxy DNAT) | the old edge-caddy on 0.0.0.0 stopped 2026-11-15 |
 | 3100 | all | Open WebUI | also via `webui.nghodki.ai` |
 | 4000 | all | LiteLLM | also via `model.nghodki.ai` |
 | 4222 | all | NATS (TLS, homelab CA) | |

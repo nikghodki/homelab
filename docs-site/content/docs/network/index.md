@@ -37,7 +37,7 @@ Pages:
 
 - [LAN](lan.md): router, reservations, what is exposed on the LAN.
 - [Tailscale](tailscale.md): tags, every grant in the policy, split DNS, HTTPS certs.
-- [DNS](dns.md): `*.nghodki.ai`, edge-dnsmasq, the AAAA quirk, the CoreDNS zone in k3s.
+- [DNS](dns.md): `*.nghodki.ai`, edge-dns, the old edge-dnsmasq, the AAAA quirk, the CoreDNS zone in k3s.
 - [Front door](front-door.md): every Caddy route with its backend and sign-in.
 - [Cluster networking](cluster-network.md): node IPs, flannel over the cable, the /32 routes, fixed ClusterIPs.
 - [Ports](ports.md): every listening port that matters, per host.

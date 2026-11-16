@@ -1,13 +1,13 @@
 ---
 title: "dgx-1"
-description: "The first DGX Spark: interactive models, a front-door replica and the nginx-gateway relay, NATS, DefenseClaw Fleet, Ansible control node, k3s server."
+description: "The first DGX Spark: interactive models, a front-door replica, NATS, DefenseClaw Fleet, Ansible control node, k3s server."
 ---
 
 dgx-1 is the busiest host. It serves the interactive models and runs one of the two front-door replicas. It is also
 where people and agents work: the repo clone, the age key, Ansible and kubectl all live here. Since the P3.3 cutover
 (2026-11-15) the web front door and DNS run in k3s on both Sparks
-([Front door](../network/front-door.md#in-cluster-front-door-p33)), but the routes behind nginx-gateway (model,
-dgxmanager, ha), LiteLLM, NATS and Fleet still go down with dgx-1 (see
+([Front door](../network/front-door.md#in-cluster-front-door-p33)), but LiteLLM and DGXMM (model,
+dgxmanager), NATS and Fleet still go down with dgx-1 (see
 [Failure scenarios](../observability/failure-scenarios.md)).
 
 ## Hardware and OS
@@ -30,9 +30,9 @@ dgxmanager, ha), LiteLLM, NATS and Fleet still go down with dgx-1 (see
 
 | Container | Image | Published | Managed by |
 |---|---|---|---|
-| `edge-caddy` | `caddy:2.11` (tag, not a digest) | 0.0.0.0:80, :443 (reached on 192.168.86.44: the nginx-gateway relay and the rollback since the P3.3 cutover) | hand, `~/edge-gateway` |
-| `edge-dnsmasq` | `edge-dnsmasq:local` (Alpine 3.20 + dnsmasq) | host network, :53 on 192.168.86.44 and 100.65.137.82 (the latter is DNATed to the cluster since the cutover; kept for the rollback) | hand, `~/edge-gateway` |
-| `nginx-gateway` | `nginx:alpine` | none (Docker network `gateway`) | hand, `~/voice-assistant/nginx` |
+| `edge-caddy` | `caddy:2.11` | **stopped 2026-11-15** (`restart: no`), kept until 2026-11-22 for a rollback | hand, `~/edge-gateway` |
+| `edge-dnsmasq` | `edge-dnsmasq:local` | **stopped 2026-11-15** (`restart: no`), kept until 2026-11-22 | hand, `~/edge-gateway` |
+| `nginx-gateway` | `nginx:alpine` | **stopped 2026-11-15** (`restart: no`; its routes are in the k3s Caddyfile) | hand, `~/voice-assistant/nginx` |
 | `litellm-proxy` | `ghcr.io/berriai/litellm:v1.109.1` (digest-pinned, P0.13) | 0.0.0.0:4000 | hand, `~/litellm-setup` |
 | `litellm-postgres` | `postgres:16-alpine` | 127.0.0.1:5432 | hand |
 | `litellm-redis` | `redis:7-alpine` | 127.0.0.1:6379 | hand |
@@ -76,7 +76,7 @@ scheduler put them; any Spark is fine); one replica each of `edge/edge-caddy` an
 | `~/.venvs/ansible` | Ansible venv. Run playbooks from `~/homelab/hosts`. |
 | `~/.kube/config` | Admin kubeconfig (server `https://192.168.86.44:6443`), not in Git |
 | `~/.local/bin` | `gh` (as nikghodki), `sops`, `helm`, `argocd`, `cosign`, `safety-reset`, `safety-estop` |
-| `~/edge-gateway/conf/Caddyfile`, `~/edge-gateway/dnsmasq/dnsmasq.conf` | The old front door and DNS (outside the repo): nginx-gateway relay and rollback. Routes live in `cluster/platform/edge/` since the P3.3 cutover (`runbooks/edge.md`) |
+| `~/edge-gateway/conf/Caddyfile`, `~/edge-gateway/dnsmasq/dnsmasq.conf` | The old front door and DNS (outside the repo), stopped 2026-11-15; kept until 2026-11-22 for a rollback (backup `~/backups/edge-gateway-2026-11-15.tgz`, root-only). Routes live in `cluster/platform/edge/` since the P3.3 cutover (`runbooks/edge.md`) |
 | `~/.defenseclaw/` | DefenseClaw config, `.env` (Fleet secrets), audit DB |
 | `/opt/homelab/bus`, `/opt/homelab/fleet`, `/opt/homelab/gpu` | Deployed stacks |
 | `/etc/safety-operator/nats-operator.json` | NATS `operator` credentials for `safety-reset` (root, 0600) |

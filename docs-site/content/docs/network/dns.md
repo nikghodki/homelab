@@ -1,13 +1,13 @@
 ---
 title: "DNS"
-description: "How *.nghodki.ai resolves: edge-dns in k3s since the P3.3 cutover (tailnet and LAN views), split DNS on the tailnet, the k3s CoreDNS forward, edge-dnsmasq kept on dgx-1 for rollback, and the AAAA quirk."
+description: "How *.nghodki.ai resolves: edge-dns in k3s since the P3.3 cutover (tailnet and LAN views), split DNS on the tailnet, the k3s CoreDNS forward, edge-dnsmasq on dgx-1 (stopped 2026-11-15), and the AAAA quirk."
 ---
 
 `nghodki.ai` is **not a registered public domain**. Only the home DNS knows it. That is why the sites use a private web
 CA (D25), and why the name could in theory be registered by someone else (risk noted in D25).
 
 Since the P3.3 cutover (PR #79, 2026-11-15; decision 0007, runbook `runbooks/edge.md`) the authority is **edge-dns in
-k3s**. edge-dnsmasq on dgx-1 still runs, for the rollback.
+k3s**. edge-dnsmasq on dgx-1 was stopped on 2026-11-15 (kept a week for a rollback).
 
 ## edge-dns (in k3s, the authority)
 
@@ -52,17 +52,18 @@ Names that do **not** exist: `hermes.nghodki.ai` (the URL in `agents/hermes/card
 k3s's CoreDNS: cache 30 s, AAAA answered with an empty NOERROR, everything else forwarded to edge-dns at **10.43.0.53**
 (the LAN view: front-door names → the VIP). Before the cutover it forwarded to edge-dnsmasq at 192.168.86.44.
 
-## edge-dnsmasq (old door, rollback)
+## edge-dnsmasq (old door, stopped 2026-11-15)
 
 | | |
 |---|---|
 | Host | dgx-1, container `edge-dnsmasq` (host network, `NET_ADMIN`), image `edge-dnsmasq:local` (Alpine 3.20 + dnsmasq) |
 | Config | `~/edge-gateway/dnsmasq/dnsmasq.conf` (outside the repo; backups `dnsmasq.conf.bak-*` next to it). Same records as `names.txt` for an `edge` name: 192.168.86.44 and 100.65.137.82 |
-| Listens | 192.168.86.44:53 and 100.65.137.82:53 (`bind-dynamic`). Since the cutover, queries to 100.65.137.82:53 are DNATed to the cluster first, so in practice only 192.168.86.44:53 reaches it |
+| Listens | nothing: the container is stopped (`restart: no`). It listened on 192.168.86.44:53 and 100.65.137.82:53 (`bind-dynamic`); a 5-minute capture before the stop saw no queries, and no fleet host, Docker daemon or router used it |
 | Upstream | 8.8.8.8, 8.8.4.4 (`no-resolv`) |
 
-Rollback (`runbooks/edge.md`, "Cutover" → "Rollback"): reverting #79, or dropping 100.65.137.82 from the two tailnet
-Services, hands dgx-1's Tailscale IP back to dnsmasq and edge-caddy, which never stopped listening.
+Rollback (`runbooks/edge.md`, "Rollback"): start the stopped container again (`docker update --restart unless-stopped
+edge-dnsmasq && docker start edge-dnsmasq`; backup `~/backups/edge-gateway-2026-11-15.tgz`, root-only, until
+2026-11-22). dgx-1's Tailscale IP stays the cluster's until #79 is reverted.
 
 ## The AAAA quirk
 
@@ -84,6 +85,3 @@ Since the cutover, in Git only (`runbooks/edge.md`, "Add or change a route"):
    `.github/scripts/edge-zone.py generate`, PR, merge. Argo CD rolls edge-dns within ~3 minutes.
 2. Add the Caddy route ([Front door](front-door.md#add-a-route)).
 3. Check: `dig +short @100.65.137.82 <name>.nghodki.ai`, the same at 100.124.175.23 and at the VIP 192.168.86.11.
-4. To keep the rollback complete (and for a route behind nginx-gateway), also add the `address=` lines from
-   `.github/scripts/edge-zone.py dnsmasq` to `~/edge-gateway/dnsmasq/dnsmasq.conf` on dgx-1 (back it up first),
-   `docker restart edge-dnsmasq`, and check with `edge-zone.py diff-dnsmasq ~/edge-gateway/dnsmasq/dnsmasq.conf`.

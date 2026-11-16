@@ -39,7 +39,6 @@ Services that publish on all interfaces or on a LAN address (full list in [Ports
 | Host | Port | Service | Auth |
 |---|---|---|---|
 | dgx-1 | 80, 443 | front door | per route |
-| dgx-1 | 53 | edge-dnsmasq (on .44 and the Tailscale IP) | — |
 | dgx-1 | 4000 | LiteLLM | API keys |
 | dgx-1 | 3100 | Open WebUI | its own accounts |
 | dgx-1 | 4222, 8883 | NATS, MQTT (TLS) | users, deny by default |
