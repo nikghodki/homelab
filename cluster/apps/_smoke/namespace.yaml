@@ -4,4 +4,4 @@ metadata:
   name: smoke
   labels:
     nghodki.ai/purpose: canary
-    nghodki.ai/sync-test: "1"
+    nghodki.ai/sync-test: "2"
