@@ -1,8 +1,10 @@
-# Static docs server (stacks/ops service `docs`, runbooks/docs-site.md). Rendered 0600 for uid 65534 (the container
-# user): it holds the edge origin token. The site is /srv/docs/current (a symlink that docs-build swaps atomically).
-#   :8080  the stack network only (Homepage's siteMonitor); no published port
-#   :4181  published on 192.168.86.49 for the front door, which signs people in (edge-auth, decision 0011) and adds
-#          X-Edge-Origin; without that header only /healthz answers
+# The ops stack's Caddy (service `docs`): the static docs site (runbooks/docs-site.md) and the gate in front of
+# Homepage. Rendered 0600 for uid 65534 (the container user): it holds the edge origin token. The site is
+# /srv/docs/current (a symlink that docs-build swaps atomically).
+#   :8080  docs, stack network only (Homepage's siteMonitor); no published port
+#   :4181  docs, published on 192.168.86.49 for the front door, which signs people in (edge-auth, decision 0011) and
+#          adds X-Edge-Origin; without that header only /healthz answers
+#   :4180  Homepage, published on 192.168.86.49 for the front door, the same way (Homepage has no login of its own)
 {
 	admin off
 	auto_https off
@@ -54,4 +56,15 @@
 		respond "Use https://docs.nghodki.ai" 403
 	}
 	import not_found
+}
+
+:4180 {
+	@door header X-Edge-Origin "{{ edge_origin_token }}"
+	handle @door {
+		request_header -X-Edge-Origin
+		reverse_proxy homepage:3000
+	}
+	handle {
+		respond "Use https://ops.nghodki.ai" 403
+	}
 }

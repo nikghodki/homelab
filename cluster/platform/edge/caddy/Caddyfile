@@ -79,6 +79,8 @@
 			reverse_proxy edge-auth.edge.svc.cluster.local:4180 {
 				method GET
 				rewrite /oauth2/start?
+				# oauth2-proxy builds the return URL from X-Forwarded-Host/-Uri only if Host differs from X-Forwarded-Host
+				header_up Host {upstream_hostport}
 				header_up X-Forwarded-Uri {http.request.orig_uri}
 			}
 		}
@@ -99,12 +101,10 @@
 		reverse_proxy 192.168.86.36:1411
 	}
 
-	# Homepage launcher (Dell ops stack) behind oauth2-proxy + Pocket ID. Session cookies are Secure, so http is redirected.
+	# Homepage launcher (Dell ops stack): the docs Caddy's gate on :4180 in front of it.
 	@ops host ops.nghodki.ai
 	handle @ops {
-		@plain protocol http
-		redir @plain https://{host}{uri} 308
-		reverse_proxy 192.168.86.49:4180
+		import signed_in 192.168.86.49:4180 admins
 	}
 
 	# Sign-in (decision 0011): edge-auth's callback, sign-out (/oauth2/sign_out) and probe. Anything else goes to Homepage.

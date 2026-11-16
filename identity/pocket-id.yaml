@@ -24,11 +24,6 @@ clients:
     callbackURLs: [https://phoenix.nghodki.ai/oauth2/pocketid/tokens]
     launchURL: https://phoenix.nghodki.ai
     groups: [admins]
-  - id: ops
-    name: Homepage (ops)
-    callbackURLs: [https://ops.nghodki.ai/oauth2/callback]
-    launchURL: https://ops.nghodki.ai
-    groups: [admins]      # oauth2-proxy also checks --allowed-group=admins; PKCE S256
   - id: temporal
     name: Temporal
     callbackURLs: [https://temporal.nghodki.ai/auth/sso/callback]
@@ -57,3 +52,4 @@ clients:
 # edge-auth replaced.
 removedClients:
   - docs
+  - ops
