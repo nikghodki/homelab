@@ -3,6 +3,13 @@
 cisco_aibom_enabled: false
 cisco_aibom_dirs: []         # [{name: hermes-agent, path: /home/...}] scanned in place, read-only
 cisco_aibom_containers: []   # running container names; the image each one runs is scanned
+# false = no image scans on this host at all (the role refuses `cisco_aibom_containers`); its images can be scanned
+# from another host by digest instead (cisco_aibom_remote_images there). The Jetson: runbooks/aibom.md.
+cisco_aibom_image_scans: true
+# Other hosts' images, pulled here by digest and scanned here; reported as that host's (`host`, `scanned_on`).
+# [{host: jetson, name: homeassistant, image: "repo:tag@sha256:...", paths: [/usr/src/homeassistant]}]
+# `paths`: extra dirs for the docker-cp fallback (containerd image store; the working dir, /app, /opt, /srv always).
+cisco_aibom_remote_images: []
 cisco_aibom_time: "*-*-* 04:20:00"
 cisco_aibom_keep_days: 30
 cisco_aibom_memory_max: 4G   # systemd MemoryMax of the unit (the Sparks: 6G, group_vars/sparks.yml)

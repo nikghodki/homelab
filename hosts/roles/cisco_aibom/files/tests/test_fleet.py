@@ -99,7 +99,7 @@ def test_image_falls_back_to_copied_app_dirs(run, monkeypatch):
             raise RuntimeError('docker discovery failed: "blobs/sha256/x not found"')
         return json.loads(json.dumps(REPORTS["img:1"] if "image-app" in source else REPORTS[source]))
     monkeypatch.setattr(fleet, "scan", scan)
-    monkeypatch.setattr(fleet, "copy_app_dirs", lambda image, dest: ["/app"])
+    monkeypatch.setattr(fleet, "copy_app_dirs", lambda image, dest, extra=(): ["/app"])
     rc, lines = go()
     assert rc == 0 and lines[0]["targets"] == {"a": 2, "container:litellm": 1}
     doc = json.loads(next(state.glob("h-*.json")).read_text())
@@ -157,3 +157,83 @@ def test_skipped_target_is_compared_with_its_last_real_scan(run, tmp_path, monke
 
 def test_mem_available_reads_proc_meminfo():
     assert fleet.mem_available_gib() > 0
+
+
+HA = "ghcr.io/home-assistant/home-assistant@sha256:" + "a" * 64
+
+
+def remote_run(run, tmp_path, monkeypatch, **extra):
+    """dgx-2-style config: its own container plus the Jetson's image by digest."""
+    go, state = run
+    set_cfg(tmp_path, remote_images=[{"host": "jetson", "name": "homeassistant", "image": HA,
+                                      "paths": ["/usr/src/homeassistant"]}], **extra)
+    REPORTS[HA] = report("/y", {"model": [{"name": "whisper", "file_path": "/y/stt.py"}]})
+    docker_calls = []
+
+    def docker(*args, timeout=600):
+        docker_calls.append(args)
+        if args[:2] == ("image", "inspect"):
+            raise RuntimeError("no such image")
+        return ""
+    monkeypatch.setattr(fleet, "docker", docker)
+    return go, state, docker_calls
+
+
+def test_remote_image_is_logged_and_stored_as_the_other_host(run, tmp_path, monkeypatch):
+    go, state, docker_calls = remote_run(run, tmp_path, monkeypatch)
+    rc, lines = go()
+    assert rc == 0
+    own, remote = lines
+    assert own["host"] == "h" and "scanned_on" not in own and "image:homeassistant" not in own["targets"]
+    assert remote["host"] == "jetson" and remote["scanned_on"] == "h"
+    assert remote["targets"] == {"image:homeassistant": 1}
+    doc = json.loads(next(state.glob("jetson-*.json")).read_text())
+    assert doc["scanned_on"] == "h" and doc["targets"]["image:homeassistant"]["image"] == HA
+    assert ("pull", "--quiet", HA) in docker_calls
+    assert json.loads((state / "remote-images.json").read_text()) == [HA]
+
+
+def test_remote_image_respects_the_memory_guard(run, tmp_path, monkeypatch):
+    go, state, docker_calls = remote_run(run, tmp_path, monkeypatch, image_min_mem_gib=20)
+    monkeypatch.setattr(fleet, "mem_available_gib", lambda: 8.0)
+    rc, lines = go()
+    assert rc == 0
+    skipped = [x for x in lines if x["event"] == "aibom.skipped"]
+    assert {(x["host"], x["target"]) for x in skipped} == {("h", "container:litellm"), ("jetson", "image:homeassistant")}
+    assert [x for x in skipped if x["host"] == "jetson"][0]["scanned_on"] == "h"
+    assert not any(c[0] == "pull" for c in docker_calls)
+
+
+def test_remote_image_must_be_pinned_by_digest(run, tmp_path, monkeypatch):
+    go, state = run
+    set_cfg(tmp_path, remote_images=[{"host": "jetson", "name": "ha", "image": "ghcr.io/home-assistant/home-assistant:stable"}])
+    rc, lines = go()
+    assert rc == 1 and "pinned by digest" in lines[-1]["errors"][0]
+
+
+def test_remote_fallback_copies_the_extra_paths(run, tmp_path, monkeypatch):
+    go, state, _ = remote_run(run, tmp_path, monkeypatch)
+    seen = {}
+
+    def scan(exe, source, is_image, timeout, work):
+        if is_image:
+            raise RuntimeError("docker discovery failed")
+        return json.loads(json.dumps(REPORTS[HA] if "image-app" in source else REPORTS[source]))
+
+    def copy(image, dest, extra=()):
+        seen[image] = list(extra)
+        return ["/config", *extra]
+    monkeypatch.setattr(fleet, "scan", scan)
+    monkeypatch.setattr(fleet, "copy_app_dirs", copy)
+    rc, _ = go()
+    assert rc == 0 and seen[HA] == ["/usr/src/homeassistant"]
+
+
+def test_images_no_longer_configured_are_removed(run, tmp_path, monkeypatch):
+    go, state, docker_calls = remote_run(run, tmp_path, monkeypatch)
+    state.mkdir(parents=True)
+    old = "ghcr.io/home-assistant/home-assistant@sha256:" + "b" * 64
+    (state / "remote-images.json").write_text(json.dumps([old]))
+    go()
+    assert ("image", "rm", old) in docker_calls
+    assert json.loads((state / "remote-images.json").read_text()) == [HA]

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Nightly Cisco AIBOM of one host: scan its agent code dirs and AI container images, keep the JSON, log the diff.
+Optionally it also scans other hosts' images by digest (`remote_images`), so a small host needn't run image scans:
+those results are written and logged as the other host's (`host`), with `scanned_on` set to this host.
 
 Reads a targets file (roles/cisco_aibom/templates/targets.json.j2), runs `cisco-aibom analyze` once per target,
 writes <state>/<host>-<date>.json (kept `keep_days` days) and prints journal lines (SyslogIdentifier cisco-aibom)
@@ -8,7 +10,8 @@ that the host collector ships to Loki:
   {"event": "aibom.new", ...}      one per component that was not in the previous run (capped)
   {"event": "aibom.removed", ...}  one per component that is gone (capped)
   {"event": "aibom.skipped", "reason": "skipped: low memory", ...}  an image target not scanned because MemAvailable
-                                   was below its threshold (image_min_mem_gib / image_min_mem_gib_by_container)
+                                   was below its threshold (image_min_mem_gib / image_min_mem_gib_by_container, keyed by container
+                                   or remote image name)
 Secret findings are counted, never named. No LLM is configured, so the BOM is deterministic-only (runbooks/aibom.md).
 Managed by homelab Ansible (roles/cisco_aibom). Usage: cisco-aibom-fleet <targets.json>
 """
@@ -58,12 +61,13 @@ def docker(*args: str, timeout: int = 600) -> str:
     return out.stdout.strip()
 
 
-def copy_app_dirs(image: str, dest: pathlib.Path) -> list[str]:
+def copy_app_dirs(image: str, dest: pathlib.Path, extra: list | tuple = ()) -> list[str]:
     """Fallback when cisco-aibom's `docker save` discovery fails (Docker's containerd image store drops the
-    compressed layers after unpacking): copy the image's working dir and the usual app dirs out of a created,
-    never started, container, the way cisco-aibom's own create+cp extraction does."""
+    compressed layers after unpacking): copy the image's working dir, the usual app dirs and `extra` (per target,
+    e.g. /usr/src/homeassistant) out of a created, never started, container, the way cisco-aibom's own create+cp
+    extraction does."""
     wd = docker("image", "inspect", "-f", "{{.Config.WorkingDir}}", image) or "/"
-    wanted = [d for d in dict.fromkeys([wd, "/app", "/opt", "/srv"]) if d != "/"]
+    wanted = [d for d in dict.fromkeys([wd, "/app", "/opt", "/srv", *extra]) if d != "/"]
     cid = docker("create", image)
     copied = []
     try:
@@ -139,62 +143,97 @@ def baseline(paths: list, names: set) -> set:
     return out
 
 
-def changes(event: str, host: str, items: set) -> None:
+def changes(event: str, host: str, items: set, extra: dict | None = None) -> None:
     for target, ctype, name, path in sorted(items)[:MAX_LINES]:
         if ctype in HIDDEN_TYPES:
             name = "(secret)"
-        log(event, host=host, target=target, type=ctype, name=name, file=path)
+        log(event, host=host, target=target, type=ctype, name=name, file=path, **(extra or {}))
 
 
-def main() -> int:
-    cfg = json.loads(pathlib.Path(sys.argv[1]).read_text())
-    host, state = cfg["host"], pathlib.Path(cfg["state"])
-    state.mkdir(parents=True, exist_ok=True)
-    targets = [(d["name"], d["path"], False) for d in cfg.get("dirs", [])]
-    targets += [(f"container:{c}", c, True) for c in cfg.get("containers", [])]
-    doc = {"host": host, "started": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-           "targets": {}}
+def ensure_image(ref: str) -> bool:
+    """Make a digest-pinned image present locally; True if this call pulled it."""
+    try:
+        docker("image", "inspect", "-f", "{{.Id}}", ref, timeout=60)
+        return False
+    except RuntimeError:
+        docker("pull", "--quiet", ref, timeout=1800)
+        return True
+
+
+def prune_remote_images(state: pathlib.Path, wanted: set, pulled: set) -> None:
+    """Remove images this job pulled on an earlier night that are no longer configured; remember what it pulled."""
+    book = state / "remote-images.json"
+    ours = set(json.loads(book.read_text())) if book.exists() else set()
+    ours |= pulled
+    for ref in sorted(ours - wanted):
+        try:
+            docker("image", "rm", ref, timeout=300)
+        except RuntimeError:
+            pass  # already gone, or used by a container (then it is not ours to remove)
+    book.write_text(json.dumps(sorted(ours & wanted)))
+
+
+def scan_target(cfg: dict, host: str, name: str, source: str, kind: str, opts: dict, work: pathlib.Path,
+                pulled: set) -> dict:
+    """Scan one target into an entry ({"status": ok | skipped, ...}; errors raise). kind: dir | container | image."""
+    entry = {"kind": "dir" if kind == "dir" else "image"}
+    is_image = kind != "dir"
+    if is_image:
+        min_gib_by = cfg.get("image_min_mem_gib_by_container") or {}
+        need = float(min_gib_by.get(opts.get("key", source), cfg.get("image_min_mem_gib", 0)))
+        avail = mem_available_gib() if need > 0 else None
+        if avail is not None and avail < need:
+            entry["container" if kind == "container" else "image"] = source
+            entry.update(status="skipped", reason="low memory", mem_available_gib=round(avail, 1), need_gib=need)
+            log("aibom.skipped", host=host, target=name, reason="skipped: low memory",
+                mem_available_gib=round(avail, 1), need_gib=need, **opts.get("log", {}))
+            return entry
+    if kind == "container":
+        entry["container"], source = source, image_of(source)
+    elif kind == "image":
+        # another host's image, scanned here by digest so the small host doesn't pay for it (runbooks/aibom.md)
+        if "@sha256:" not in source:
+            raise RuntimeError(f"{source}: remote images must be pinned by digest")
+        entry["image"] = source
+        if ensure_image(source):
+            pulled.add(source)
+    elif not os.path.isdir(source):
+        raise RuntimeError(f"{source} does not exist")
+    entry["source"] = source
+    timeout = int(cfg.get("timeout_s", 3600))
+    try:
+        entry["report"] = scan(cfg["exe"], source, is_image, timeout, work)
+        entry["method"] = "aibom-container" if is_image else "dir"
+    except RuntimeError as e:
+        if not (is_image and "discovery failed" in str(e)):
+            raise
+        app = work / "image-app"
+        shutil.rmtree(app, ignore_errors=True)
+        entry["copied"] = copy_app_dirs(source, app, opts.get("paths") or [])
+        entry["report"] = scan(cfg["exe"], str(app), False, timeout, work)
+        entry["method"] = "docker-cp-fallback"
+        shutil.rmtree(app, ignore_errors=True)
+    entry["status"] = "ok"
+    return entry
+
+
+def run_host(cfg: dict, host: str, targets: list, state: pathlib.Path, work: pathlib.Path, pulled: set,
+             scanned_on: str | None = None) -> list:
+    """Scan one host's targets, write <state>/<host>-<date>.json, log the summary and the diff; return the errors.
+    scanned_on is set when the targets belong to another host (its images, scanned here)."""
+    extra = {"scanned_on": scanned_on} if scanned_on else {}
+    doc = {"host": host, **extra,
+           "started": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "targets": {}}
     errors, skipped = [], []
-    min_gib = float(cfg.get("image_min_mem_gib", 0))
-    min_gib_by = cfg.get("image_min_mem_gib_by_container") or {}
-    with tempfile.TemporaryDirectory(prefix="cisco-aibom-") as tmp:
-        work = pathlib.Path(tmp)
-        for name, source, is_image in targets:
-            entry = {"kind": "image" if is_image else "dir"}
-            try:
-                if is_image:
-                    need = float(min_gib_by.get(source, min_gib))
-                    avail = mem_available_gib() if need > 0 else None
-                    if avail is not None and avail < need:
-                        entry.update(container=source, status="skipped", reason="low memory",
-                                     mem_available_gib=round(avail, 1), need_gib=need)
-                        skipped.append(name)
-                        log("aibom.skipped", host=host, target=name, reason="skipped: low memory",
-                            mem_available_gib=round(avail, 1), need_gib=need)
-                        doc["targets"][name] = entry
-                        continue
-                    entry["container"], source = source, image_of(source)
-                elif not os.path.isdir(source):
-                    raise RuntimeError(f"{source} does not exist")
-                entry["source"] = source
-                timeout = int(cfg.get("timeout_s", 3600))
-                try:
-                    entry["report"] = scan(cfg["exe"], source, is_image, timeout, work)
-                    entry["method"] = "aibom-container" if is_image else "dir"
-                except RuntimeError as e:
-                    if not (is_image and "discovery failed" in str(e)):
-                        raise
-                    app = work / "image-app"
-                    shutil.rmtree(app, ignore_errors=True)
-                    entry["copied"] = copy_app_dirs(source, app)
-                    entry["report"] = scan(cfg["exe"], str(app), False, timeout, work)
-                    entry["method"] = "docker-cp-fallback"
-                    shutil.rmtree(app, ignore_errors=True)
-                entry["status"] = "ok"
-            except (RuntimeError, subprocess.TimeoutExpired, ValueError, OSError) as e:
-                entry["status"], entry["error"] = "error", str(e)[-300:]
-                errors.append(f"{name}: {entry['error']}")
-            doc["targets"][name] = entry
+    for name, source, kind, opts in targets:
+        try:
+            entry = scan_target(cfg, host, name, source, kind, {**opts, "log": extra}, work, pulled)
+            if entry["status"] == "skipped":
+                skipped.append(name)
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError, OSError) as e:
+            entry = {"kind": "dir" if kind == "dir" else "image", "status": "error", "error": str(e)[-300:]}
+            errors.append(f"{name}: {entry['error']}")
+        doc["targets"][name] = entry
     doc["finished"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
     today = state / f"{host}-{datetime.date.today().isoformat()}.json"
@@ -202,7 +241,7 @@ def main() -> int:
     today.write_text(json.dumps(doc, indent=1))
     now = load_components(doc)
     by_type, by_target = counts(now)
-    summary = {"host": host, "total": len(now), "counts": by_type, "targets": by_target,
+    summary = {"host": host, **extra, "total": len(now), "counts": by_type, "targets": by_target,
                "errors": errors, "skipped": skipped, "agentic": "off"}
     if previous:
         last_doc = json.loads(previous[-1].read_text())
@@ -214,8 +253,8 @@ def main() -> int:
         added, removed = now - before, before - now
         summary.update(first_run=False, added=len(added), removed=len(removed), compared_to=previous[-1].name)
         log("aibom", **summary)
-        changes("aibom.new", host, added)
-        changes("aibom.removed", host, removed)
+        changes("aibom.new", host, added, extra)
+        changes("aibom.removed", host, removed, extra)
     else:
         summary.update(first_run=True, added=0, removed=0)
         log("aibom", **summary)
@@ -224,6 +263,29 @@ def main() -> int:
     for old in state.glob(f"{host}-*.json"):
         if old.stem[len(host) + 1:] < cutoff:
             old.unlink()
+    return errors
+
+
+def main() -> int:
+    cfg = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    host, state = cfg["host"], pathlib.Path(cfg["state"])
+    state.mkdir(parents=True, exist_ok=True)
+    targets = [(d["name"], d["path"], "dir", {}) for d in cfg.get("dirs", [])]
+    targets += [(f"container:{c}", c, "container", {"key": c}) for c in cfg.get("containers", [])]
+    # other hosts' images by digest ({host, name, image, paths}); logged as that host's, scanned_on = this host
+    remote = {}
+    for r in cfg.get("remote_images", []):
+        if r["host"] == host:
+            raise SystemExit(f"remote_images entry {r['name']} is for {host} itself: use containers")
+        remote.setdefault(r["host"], []).append(
+            (f"image:{r['name']}", r["image"], "image", {"key": r["name"], "paths": r.get("paths") or []}))
+    pulled = set()
+    with tempfile.TemporaryDirectory(prefix="cisco-aibom-") as tmp:
+        work = pathlib.Path(tmp)
+        errors = run_host(cfg, host, targets, state, work, pulled)
+        for rhost, rtargets in sorted(remote.items()):
+            errors += run_host(cfg, rhost, rtargets, state, work, pulled, scanned_on=host)
+    prune_remote_images(state, {r["image"] for r in cfg.get("remote_images", [])}, pulled)
     return 1 if errors else 0
 
 

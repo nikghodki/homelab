@@ -1,0 +1,18 @@
+# LiveKit server on the Jetson, used by the control center (runbooks/jetson-services.md). Not --dev: a config file
+# with the key from SOPS (secrets/voice.enc.yaml), HTTP on loopback only, as before.
+livekit_user: nikjetson
+livekit_home: "/home/{{ livekit_user }}"
+# Pinned release, checked against this SHA-256 of the release tarball (bump both together).
+livekit_version: 1.13.5
+livekit_tarball_sha256:
+  arm64: 332015305518765fe05bad74fc3a9d9583e635e7dd130de3c4fc563d69c550f3
+livekit_prefix: /opt/livekit
+livekit_port: 7880
+livekit_bind_addresses: ["127.0.0.1", "::1"]
+# WebRTC: ICE over TCP 7881 and one muxed UDP port 7882 (what --dev used)
+livekit_rtc_tcp_port: 7881
+livekit_rtc_udp_port: 7882
+livekit_log_level: info
+# set by the playbook from SOPS
+livekit_api_key: ""
+livekit_api_secret: ""

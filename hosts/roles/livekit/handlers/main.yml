@@ -1,0 +1,11 @@
+- name: Restart livekit-server
+  become: true
+  become_user: "{{ livekit_user }}"
+  ansible.builtin.systemd_service:
+    name: livekit-server.service
+    scope: user
+    state: restarted
+    daemon_reload: true
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ getent_passwd[livekit_user][1] }}"
+  when: not ansible_check_mode

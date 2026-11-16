@@ -3,6 +3,16 @@ restic_backup_paths:
 # Cisco AIBOM (runbooks/aibom.md)
 cisco_aibom_enabled: true
 cisco_aibom_containers: [observe-phoenix-1]
+# The Jetson's images, by the digest it runs (one source: its compose stack), scanned here with this host's memory
+# guard (group_vars/sparks.yml) and reported as host "jetson". ros-zenoh is built on the Jetson (no registry
+# digest) and has no AI components; it isn't listed.
+cisco_aibom_remote_images:
+  - host: jetson
+    name: homeassistant
+    image: "{{ (lookup('file', inventory_dir ~ '/stacks/home-assistant/compose.yaml') | from_yaml).services.homeassistant.image }}"
+    paths: [/usr/src/homeassistant]
+# Home Assistant's core is ~10,900 Python files (over 30 min here): 3 h per target, like the Jetson
+cisco_aibom_timeout_s: 10800
 # k3s (plan P3.2): starts the cluster (dgx-2 is the less critical Spark)
 k3s_node_ip: 10.100.136.2
 k3s_node_external_ip: 192.168.86.36

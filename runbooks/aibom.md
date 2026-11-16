@@ -18,9 +18,35 @@ secrets. Decision: decisions/0003-cisco-ai-defense-tools.md.
 | Host | Code dirs (read in place) | Container images (of the running containers) |
 |---|---|---|
 | dgx-1 | DGXMM `~/workspace/dgx-model-manager`, LiteLLM config `~/litellm-setup` | `litellm-proxy`, `open-webui` |
-| dgx-2 | — | `observe-phoenix-1` |
-| jetson | Hermes `~nikjetson/.hermes/hermes-agent`, Hermes `~hermes-nikhil/.hermes/hermes-agent`, `~/workspace/roboclaw` | — |
+| dgx-2 | — | `observe-phoenix-1`; and the **Jetson's** Home Assistant image by digest (below) |
+| jetson | Hermes `~nikjetson/.hermes/hermes-agent`, Hermes `~hermes-nikhil/.hermes/hermes-agent`, `~/workspace/roboclaw` | none here (`cisco_aibom_image_scans: false`); scanned on dgx-2 |
 | pi | PicoClaw `/var/lib/picoclaw/.picoclaw` (config, workspace, skills) and its MCP server `/var/lib/picoclaw/roboclaw` (own user since 2026-11-15, runbooks/robot-safety.md), `~/workspace/roboclaw` | — |
+
+### Another host's images, scanned on dgx-2
+
+An image scan doesn't have to run where the image runs. The Jetson has ~3 GiB free, and one AIBOM run there took
+~1.1 GiB (tool review 2026-11 §2.7), so it runs **code-dir scans only**: `cisco_aibom_image_scans: false` in
+`host_vars/jetson.yml` makes the role refuse `cisco_aibom_containers` there. dgx-2 scans the Jetson's images instead:
+
+```yaml
+# host_vars/dgx-2.yml
+cisco_aibom_remote_images:
+  - host: jetson                 # reported as this host
+    name: homeassistant          # target "image:homeassistant"
+    image: <repo:tag@sha256:...> # read from hosts/stacks/home-assistant/compose.yaml: the digest the Jetson runs
+    paths: [/usr/src/homeassistant]   # extra dirs for the docker-cp fallback
+```
+
+The job on dgx-2 pulls the digest if it isn't there (and removes images it pulled once they leave the list,
+`/var/lib/cisco-aibom/remote-images.json`), scans it under dgx-2's memory guard (`image_min_mem_gib` 20,
+per-image override by `name` in `cisco_aibom_image_min_mem_gib_by_container`), and writes and logs the result as the
+Jetson's: `/var/lib/cisco-aibom/jetson-<date>.json` **on dgx-2**, journal lines with `"host": "jetson"` and
+`"scanned_on": "dgx-2"`. The AI inventory dashboard groups by that `host` field (`fleet_host` becomes the JSON
+`host`; `scanned_on` keeps the scanning host), so the Jetson's code (from the Jetson) and image (from dgx-2) add up
+under `jetson`. Remote images must be pinned by digest (the role and the job both refuse a tag).
+
+Not scanned remotely: `ros-zenoh` (built on the Jetson from a digest-pinned base, no registry digest, no AI
+components). The Pi runs no containers.
 
 Pocket ID and the rest of the observe stack are not AI components and are not scanned. To add a target, extend
 `cisco_aibom_dirs` / `cisco_aibom_containers` in the host's `host_vars` and run the playbook.
@@ -73,6 +99,12 @@ sudo journalctl -t cisco-aibom --since today -o cat | grep -E '"aibom.skipped"|"
 ```
 Each Hermes checkout on the Jetson is about 8,000 Python files and takes over an hour on the Orin, so the Jetson
 starts at 01:30 with a 3 h limit per target.
+
+```bash
+# the Jetson's images, scanned on dgx-2
+sudo journalctl -t cisco-aibom --since today -o cat | grep '"scanned_on"'
+sudo ls /var/lib/cisco-aibom/jetson-*.json     # on dgx-2
+```
 
 **No LLM.** `cisco-aibom analyze` requires `--llm-model`; its agentic stage confirms or drops each candidate and adds
 identifiers. The job points it at a closed port, so it falls back to its deterministic scanners (`agentic_status:

@@ -1,6 +1,17 @@
 - name: Cisco AIBOM fleet inventory
   when: cisco_aibom_enabled | bool
   block:
+    - name: Image scans only where they are allowed; other hosts' images by digest
+      ansible.builtin.assert:
+        that:
+          - cisco_aibom_image_scans | bool or cisco_aibom_containers | length == 0
+          - cisco_aibom_remote_images | rejectattr('image', 'search', '@sha256:[a-f0-9]{64}$') | list | length == 0
+          - cisco_aibom_remote_images | selectattr('host', 'equalto', inventory_hostname) | list | length == 0
+        fail_msg: >-
+          {{ inventory_hostname }}: cisco_aibom_image_scans is false (no image scans here), or a remote image is not
+          pinned by digest or is this host's own (runbooks/aibom.md)
+        quiet: true
+
     - name: Python venv support
       ansible.builtin.apt:
         name: python3-venv

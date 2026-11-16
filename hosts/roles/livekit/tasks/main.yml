@@ -1,0 +1,97 @@
+- name: Keys are set
+  ansible.builtin.assert:
+    that: [livekit_api_key | length > 0, livekit_api_secret | length > 0]
+    fail_msg: livekit_api_key / livekit_api_secret come from secrets/voice.enc.yaml (playbooks/home.yml)
+    quiet: true
+  no_log: true
+
+- name: Release architecture
+  ansible.builtin.set_fact:
+    livekit_arch: "{{ {'aarch64': 'arm64', 'x86_64': 'amd64'}[ansible_facts['architecture']] }}"
+
+- name: Look up the user (its uid for the user bus)
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ livekit_user }}"
+
+- name: Is this version installed
+  ansible.builtin.stat:
+    path: "{{ livekit_prefix }}/{{ livekit_version }}/livekit-server"
+  register: livekit_installed
+
+- name: Install folder
+  ansible.builtin.file:
+    path: "{{ livekit_prefix }}/{{ livekit_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download the release (hash-locked)
+  ansible.builtin.get_url:
+    url: "https://github.com/livekit/livekit/releases/download/v{{ livekit_version }}/livekit_{{ livekit_version }}_linux_{{ livekit_arch }}.tar.gz"
+    checksum: "sha256:{{ livekit_tarball_sha256[livekit_arch] }}"
+    dest: "{{ livekit_prefix }}/{{ livekit_version }}/livekit.tar.gz"
+    owner: root
+    group: root
+    mode: "0644"
+  # a first install can't be simulated in check mode (the folder doesn't exist yet)
+  when: not (ansible_check_mode and not livekit_installed.stat.exists)
+
+- name: Unpack the server binary (root-owned; the user can't change it)
+  ansible.builtin.unarchive:
+    src: "{{ livekit_prefix }}/{{ livekit_version }}/livekit.tar.gz"
+    dest: "{{ livekit_prefix }}/{{ livekit_version }}"
+    remote_src: true
+    include: [livekit-server]
+    owner: root
+    group: root
+    creates: "{{ livekit_prefix }}/{{ livekit_version }}/livekit-server"
+  notify: Restart livekit-server
+  when: not ansible_check_mode
+
+- name: User files
+  become: true
+  become_user: "{{ livekit_user }}"
+  block:
+    - name: Config folder
+      ansible.builtin.file:
+        path: "{{ livekit_home }}/.config/livekit"
+        state: directory
+        mode: "0700"
+
+    - name: Config with the API key (0600; LiveKit refuses a key file others can read)
+      ansible.builtin.template:
+        src: livekit.yaml.j2
+        dest: "{{ livekit_home }}/.config/livekit/livekit.yaml"
+        mode: "0600"
+      no_log: true
+      notify: Restart livekit-server
+
+    - name: User unit
+      ansible.builtin.template:
+        src: livekit-server.service.j2
+        dest: "{{ livekit_home }}/.config/systemd/user/livekit-server.service"
+        mode: "0644"
+      notify: Restart livekit-server
+
+    - name: Unit is enabled
+      ansible.builtin.systemd_service:
+        name: livekit-server.service
+        scope: user
+        enabled: true
+        daemon_reload: true
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ getent_passwd[livekit_user][1] }}"
+      when: not ansible_check_mode
+
+- name: Flush handlers (restart on the new config before removing the old files)
+  ansible.builtin.meta: flush_handlers
+
+- name: Hand-installed leftovers (the old key file and binary; the key now lives in livekit.yaml)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ livekit_home }}/.config/livekit/keys.yaml"
+    - "{{ livekit_home }}/.local/bin/livekit-server"

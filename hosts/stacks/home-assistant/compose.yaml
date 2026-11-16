@@ -1,0 +1,22 @@
+# Home Assistant on the Jetson (tool review 2026-11 §2.17, runbooks/jetson-services.md). Deployed by
+# playbooks/home.yml to /opt/homelab/home-assistant. Same project, service and container name as the hand-run
+# compose it replaces (~/workspace/roboclaw/home-assistant, retired), so the deploy recreates the container in place.
+# The config dir stays on the host, not in Git (restic backs it up: host_vars/jetson.yml). Pinned by digest:
+# upgrades come as Renovate PRs (check the MCP tool hashes after one, runbooks/mcp-admission.md).
+name: home-assistant
+
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:2026.11.1@sha256:6785d1eca68747a524c156faae1b139ed415c07357386ae6fe17291986e59e82
+    restart: unless-stopped
+    # Google Cast and mDNS discovery need multicast, which Docker bridge networking drops. HA listens on :8123
+    # (ha.nghodki.ai via the front door).
+    network_mode: host
+    environment:
+      TZ: America/Los_Angeles
+    volumes:
+      - /home/nikjetson/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      # for Bluetooth and Thread/Matter later, without recreating the container
+      - /run/dbus:/run/dbus:ro

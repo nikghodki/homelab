@@ -27,6 +27,9 @@ restic_backup_sqlite:
   - {name: home-assistant, path: /home/nikjetson/homeassistant/config/home-assistant_v2.db}
 # Cisco AIBOM (runbooks/aibom.md); DefenseClaw's own AIBOM above keeps running next to it
 cisco_aibom_enabled: true
+# Code dirs only. No image scans here (one took ~1.1 GiB with ~3 GiB free): dgx-2 scans this host's images by digest
+# (cisco_aibom_remote_images in host_vars/dgx-2.yml), reported as host "jetson".
+cisco_aibom_image_scans: false
 cisco_aibom_memory_max: 3G
 # Each Hermes checkout is ~8,000 Python files: over an hour per install on the Orin, so start early
 cisco_aibom_time: "*-*-* 01:30:00"
