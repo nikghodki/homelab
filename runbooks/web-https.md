@@ -21,8 +21,8 @@ hosts). That CA has no name constraint, so it must never be installed on phones 
 
 ## Front door (dgx-1 `~/edge-gateway`, not in this repo)
 
-The in-cluster replacement (Caddy and CoreDNS in `edge`, same routes, same cert as the Secret `edge/web-tls`) runs in
-parallel until the cutover: [edge.md](edge.md).
+Since P3.3 the clients use the in-cluster door (Caddy and CoreDNS in `edge`, same routes, same cert as the Secret
+`edge/web-tls`; [edge.md](edge.md)); edge-caddy below remains as the relay to nginx-gateway and the rollback.
 
 - `conf/Caddyfile`: every route lives in the `(nghodki_routes)` snippet, imported by `:80` and by `:443`
   (`tls /etc/caddy/certs/web.crt /etc/caddy/certs/web.key`). `voice-agent.nghodki.ai` uses the same cert.

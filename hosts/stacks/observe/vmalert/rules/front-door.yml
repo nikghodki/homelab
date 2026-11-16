@@ -1,6 +1,6 @@
 # The in-cluster front door (plan P3.3, decision 0007, runbooks/edge.md): kube-vip and the edge pods, from
 # kube-state-metrics (10.43.0.120). Gatus group `edge` checks the VIPs themselves and alerts through ntfy directly.
-# All warnings until the cutover; raise EdgeFrontDoorDown and KubeVipDown to critical when clients use the VIPs.
+# KubeVipDown and EdgeFrontDoorDown are critical since the cutover (clients use the in-cluster door).
 groups:
   - name: front-door
     rules:
@@ -15,7 +15,7 @@ groups:
       - alert: KubeVipDown
         expr: kube_daemonset_status_number_ready{namespace="kube-system", daemonset="kube-vip"} == 0
         for: 1m
-        labels: {severity: warning}
+        labels: {severity: critical}
         annotations:
           summary: "No kube-vip is ready: 192.168.86.10/.11 may be on no node (runbooks/edge.md)"
       - alert: EdgeReplicasDown
@@ -27,7 +27,7 @@ groups:
       - alert: EdgeFrontDoorDown
         expr: min by (deployment) (kube_deployment_status_replicas_available{namespace="edge"}) == 0
         for: 2m
-        labels: {severity: warning}
+        labels: {severity: critical}
         annotations:
           summary: "edge/{{ $labels.deployment }} has no ready replica: *.nghodki.ai DNS or HTTPS is down (runbooks/edge.md)"
       - alert: KubeStateMetricsDown

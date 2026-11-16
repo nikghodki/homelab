@@ -1,6 +1,8 @@
 # k3s imports *.server keys of this ConfigMap into CoreDNS (https://docs.k3s.io/advanced#coredns-custom-configuration-imports).
-# Pods resolve *.nghodki.ai through edge-dnsmasq on dgx-1 (P3.3 moves that DNS into the cluster). edge-dnsmasq answers
-# AAAA with NXDOMAIN, which Go programs (Argo CD) treat as "no such host", so AAAA gets an empty NOERROR here.
+# Pods resolve *.nghodki.ai through the in-cluster edge DNS (edge/edge-dns-lan, fixed ClusterIP 10.43.0.53, the LAN
+# view: front-door names -> the edge VIP, which kube-proxy routes for pods too). Since the P3.3 cutover; before, this
+# forwarded to edge-dnsmasq on dgx-1, whose AAAA NXDOMAIN broke Go resolvers, hence the AAAA template (kept: harmless,
+# and it keeps the fix if the forward is ever pointed back at dnsmasq).
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,5 +16,5 @@ data:
         template IN AAAA nghodki.ai {
             rcode NOERROR
         }
-        forward . 192.168.86.44
+        forward . 10.43.0.53
     }

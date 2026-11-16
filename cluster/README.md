@@ -50,7 +50,7 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 | IP:port | Service | Used by |
 |---|---|---|
 | 10.43.0.10:53 | kube-dns (k3s) | pods |
-| 10.43.0.53:53 | `edge/edge-dns-lan` (also on the VIP 192.168.86.11) | kube-system's CoreDNS for `nghodki.ai` (after the P3.3 cutover) |
+| 10.43.0.53:53 | `edge/edge-dns-lan` (also on the VIP 192.168.86.11) | kube-system's CoreDNS for `nghodki.ai` |
 | 10.43.0.100:80, :8083 | `argocd/argocd-server-host` | edge-caddy (`argocd.nghodki.ai`), VictoriaMetrics |
 | 10.43.0.101:8082 | `argocd/argocd-controller-host` | VictoriaMetrics |
 | 10.43.0.102:8084 | `argocd/argocd-repo-server-host` | VictoriaMetrics |
@@ -67,7 +67,7 @@ Pick the next free address here and add a row. If the pods behind one have a Net
 |---|---|---|
 | 192.168.86.10 | k3s API VIP (`k8s.nghodki.ai` on the LAN) | kube-vip, lease `kube-system/plndr-cp-lock` |
 | 192.168.86.11 | edge VIP: `edge-dns-lan` :53, `edge-caddy-lan` :80/:443 | kube-vip (`kube-vip.io/loadbalancerIPs`), lease `plndr-svcs-lock` |
-| 100.124.175.23 (+ 100.65.137.82 after the cutover) | the Sparks' Tailscale IPs: `edge-dns-tailnet` :53, `edge-caddy-tailnet` :80/:443 | `externalIPs` (kube-proxy) |
+| 100.65.137.82, 100.124.175.23 | the Sparks' Tailscale IPs: `edge-dns-tailnet` :53, `edge-caddy-tailnet` :80/:443 | `externalIPs` (kube-proxy) |
 
 Both VIPs are below the Nest's DHCP pool (`.20`–`.250`). LoadBalancer Services here set
 `allocateLoadBalancerNodePorts: false` (no NodePorts on every node address).
