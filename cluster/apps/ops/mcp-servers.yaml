@@ -1,5 +1,6 @@
 # The read-only MCP servers the agent investigates with (design §5.1), pinned by digest, one replica each.
-# Only the agent's own pods may call them (networkpolicies.yaml); each holds one read-only credential.
+# Only the agent's own pods may call them (networkpolicies.yaml); each holds one read-only credential. Their
+# Services have fixed ClusterIPs (cluster/README.md), so neither the agent nor the replay harness needs cluster DNS.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -39,7 +40,7 @@ spec:
             - 0.0.0.0:8000
             - --disable-write
             - --allowed-hosts
-            - mcp-grafana.ops.svc:8000,mcp-grafana.ops.svc.cluster.local:8000,mcp-grafana:8000
+            - 10.43.0.144:8000,mcp-grafana.ops.svc:8000,mcp-grafana:8000
             - --prometheus-guardrail-max-range
             - 168h
             - --loki-guardrail-max-range
@@ -71,6 +72,7 @@ kind: Service
 metadata:
   name: mcp-grafana
 spec:
+  clusterIP: 10.43.0.144
   selector: {app.kubernetes.io/name: mcp-grafana}
   ports:
     - {name: mcp, port: 8000, targetPort: mcp, protocol: TCP}
@@ -126,6 +128,7 @@ kind: Service
 metadata:
   name: mcp-kubernetes
 spec:
+  clusterIP: 10.43.0.145
   selector: {app.kubernetes.io/name: mcp-kubernetes}
   ports:
     - {name: mcp, port: 8080, targetPort: mcp, protocol: TCP}
@@ -162,7 +165,7 @@ spec:
         - name: mcp-argocd
           # mcp-for-argocd 0.9.0 (Apache-2.0), read-only, Argo CD account ops-agent (role:readonly, runbooks/argocd.md).
           image: ghcr.io/argoproj-labs/mcp-for-argocd:v0.9.0@sha256:dffc6c719d8635be2d5f2c8ad1c0178540325da4b40da0b373307e12b4c48f86
-          args: ["http", "--port", "3000", "--bind-address", "0.0.0.0", "--allowed-host-header", "mcp-argocd.ops.svc", "--allowed-host-header", "mcp-argocd"]
+          args: ["http", "--port", "3000", "--bind-address", "0.0.0.0", "--allowed-host-header", "10.43.0.146", "--allowed-host-header", "mcp-argocd.ops.svc"]
           env:
             - {name: ARGOCD_BASE_URL, value: "http://10.43.0.100"}
             - {name: MCP_READ_ONLY, value: "true"}
@@ -194,6 +197,7 @@ kind: Service
 metadata:
   name: mcp-argocd
 spec:
+  clusterIP: 10.43.0.146
   selector: {app.kubernetes.io/name: mcp-argocd}
   ports:
     - {name: mcp, port: 3000, targetPort: mcp, protocol: TCP}
