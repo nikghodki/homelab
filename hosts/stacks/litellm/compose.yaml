@@ -51,6 +51,10 @@ services:
       # Traces to Phoenix on dgx-2 over the LAN (P2.6); PHOENIX_API_KEY is in litellm.env
       PHOENIX_COLLECTOR_HTTP_ENDPOINT: http://192.168.86.36:6006/v1/traces
       PHOENIX_PROJECT_NAME: litellm
+      # LiteLLM puts more than the OTel default of 128 attributes on a span; past it the SDK drops the oldest ones
+      # (the key alias among them)
+      OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "1024"
+      OTEL_ATTRIBUTE_COUNT_LIMIT: "1024"
       # Admin UI sign-in (P1.13): generic OIDC SSO with Pocket ID, client `litellm` (identity/pocket-id.yaml). Free while
       # LiteLLM_UserTable has fewer than 5 users. The groups claim maps admins -> proxy_admin; Pocket ID only lets the
       # admins group sign in to this client. UI_USERNAME/UI_PASSWORD stay as the break-glass login (/fallback/login).

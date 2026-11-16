@@ -31,7 +31,16 @@ general_settings:
   telemetry: false
   stream_response: true
   max_parallel_requests: 100
-  disable_spend_logs: true
+  # Who called the model API: one spend-log row per request (key alias and hash, user, team, model, tokens, status,
+  # requester IP), without prompts or replies (those go to Phoenix). Rows older than 30 days are deleted by LiteLLM's
+  # own cleanup job (free in 1.109). runbooks/litellm.md "Who called the model API".
+  disable_spend_logs: false
+  store_prompts_in_spend_logs: false
+  # requester_ip_address = X-Forwarded-For. The front door (Caddy) sets it fresh for every request; a caller that
+  # reaches :4000 directly on the LAN can put anything there.
+  use_x_forwarded_for: true
+  maximum_spend_logs_retention_period: 30d
+  maximum_spend_logs_retention_interval: 1d
 
 litellm_settings:
   drop_params: true
