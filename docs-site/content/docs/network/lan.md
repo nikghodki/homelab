@@ -50,15 +50,15 @@ Services that publish on all interfaces or on a LAN address (full list in [Ports
 | dgx-2 | 1411 | Pocket ID | passkeys |
 | dgx-2 | 7233 | Temporal gRPC | **none** (no mTLS yet) |
 | dgx-2 | 8233, 9233 | Temporal UI, metrics | UI: Pocket ID |
-| dgx-2 | 4181, 5000 | MLflow (oauth2-proxy, job API) | Pocket ID; basic auth |
+| dgx-2 | 4181, 5000 | MLflow (UI gate, job API) | front door token (sign-in at the door); basic auth |
 | dgx-2 | 8000 | restic rest-server (TLS) | per-host htpasswd |
 | Jetson | 8123 | Home Assistant | its own login |
 | Jetson | 8642 | Hermes api_server (main profile) | (unverified) |
 | Jetson | 8200 | RoboClaw control center | (unverified) |
 | Jetson | 7447 | Zenoh router | **none** (no Zenoh auth/TLS yet) |
-| Dell | 8081 | Gatus via status-proxy | Pocket ID (some paths open) |
+| Dell | 8081 | Gatus via status-gate | front door token (sign-in at the door); `/health`, `/metrics`, heartbeat open |
 | Dell | 8085 | ntfy | ntfy users |
-| Dell | 4180 | Homepage via oauth2-proxy | Pocket ID |
+| Dell | 4180, 4181 | Homepage, docs site (ops stack Caddy) | front door token (sign-in at the door) |
 | all | 9109 | fleet-metrics | none (read-only metrics) |
 
 The design goal (§4.3) is "nothing listens on the LAN that doesn't need to". The **none** rows are known gaps.

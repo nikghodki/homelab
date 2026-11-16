@@ -1,6 +1,6 @@
 # Console stack on dgx-2 (plan P1.13; architecture: namespace `console`). Deployed by playbooks/console.yml.
 # pocket-id: passkey-only OIDC provider at https://id.nghodki.ai (dgx-1 Caddy terminates TLS, D25).
-# The launcher at https://ops.nghodki.ai (Homepage + oauth2-proxy, plan P1.15) moved to the Dell: stacks/ops.
+# The launcher at https://ops.nghodki.ai (Homepage, plan P1.15) moved to the Dell: stacks/ops.
 name: console
 
 services:

@@ -1,13 +1,14 @@
 ---
 title: "Pocket ID and sign-in"
-description: "One passkey sign-in for every web UI: Pocket ID, its groups and OIDC clients, the sync script, the oauth2-proxy pattern, and break-glass."
+description: "One passkey sign-in for every web UI: Pocket ID, its groups and OIDC clients, the sync script, the edge-auth sign-in for apps without a login, and break-glass."
 ---
 
-Pocket ID (D22) is a passkey-only OIDC provider. One person signs in once per app with a passkey; no passwords.
+Pocket ID (D22) is a passkey-only OIDC provider; no passwords. Apps with their own OIDC are one sign-in each; the apps
+without a login share one sign-in at the front door (`edge-auth`).
 
 | | |
 |---|---|
-| Version | Pocket ID 2.19.2 (`ghcr.io/pocket-id/pocket-id`, digest-pinned) |
+| Version | Pocket ID 2.19.3 (`ghcr.io/pocket-id/pocket-id`, digest-pinned) |
 | Host | dgx-2, stack `console` (`hosts/stacks/console`, `playbooks/console.yml`), `/opt/homelab/console` |
 | Port | 192.168.86.36:1411 (LAN only; dgx-1's Caddy is the only client) |
 | URL | `https://id.nghodki.ai` (http redirects: passkeys need HTTPS) |
@@ -24,11 +25,9 @@ Groups: `admins`, `family`. Users: `nikghodki` (admin, in `admins`). Nobody is i
 | Client | Callback | PKCE | Allowed group | App side |
 |---|---|---|---|---|
 | `grafana` | `https://grafana.nghodki.ai/login/generic_oauth` | yes | admins | Grafana generic OAuth; `admins` → GrafanaAdmin, else Viewer (strict) |
-| `gatus` | `https://status.nghodki.ai/authorization-code/callback` | **no** (Gatus 5.38 doesn't send it) | admins | oauth2-proxy `status-proxy` on the Dell, `proxy_prefix=/authorization-code` to keep this callback |
 | `phoenix` | `https://phoenix.nghodki.ai/oauth2/pocketid/tokens` | yes | admins | `PHOENIX_OAUTH2_POCKETID_*`; scope `groups` must be requested; `admins` → ADMIN |
-| `ops` | `https://ops.nghodki.ai/oauth2/callback` | yes (S256) | admins | oauth2-proxy in `hosts/stacks/ops` on the Dell |
+| `edge-auth` | `https://auth.nghodki.ai/oauth2/callback` | yes (S256) | admins | `edge/edge-auth` (oauth2-proxy in k3s) for Homepage, docs, Gatus' status page, MLflow; each route also checks its group |
 | `temporal` | `https://temporal.nghodki.ai/auth/sso/callback` | **no** (Temporal UI 2.58 doesn't send it) | admins | Temporal UI's own OIDC |
-| `mlflow` | `https://mlflow.nghodki.ai/oauth2/callback` | yes (S256) | admins | oauth2-proxy in `hosts/stacks/ml` |
 | `argocd` | `https://argocd.nghodki.ai/auth/callback` | yes (S256) | admins | Argo CD OIDC; RBAC `g, admins, role:admin`, no default role |
 
 Client secrets are `oidc_<client>_secret` in `secrets/console.enc.yaml`. The Argo CD one is also copied to
@@ -61,23 +60,29 @@ Env: `POCKETID_URL` (default `https://id.nghodki.ai`). The host must trust the w
 
 **If it speaks OIDC:** add a client to the YAML, sync, wire the secret into the app (`compose_stack_env` or a
 template), redeploy its stack. Containers that talk to Pocket ID need
-`extra_hosts: ["id.nghodki.ai:192.168.86.44"]` and the host CA bundle mounted at `/etc/ssl/certs/ca-certificates.crt`.
+`extra_hosts: ["id.nghodki.ai:192.168.86.11"]` (the front door's VIP) and the host CA bundle mounted at `/etc/ssl/certs/ca-certificates.crt`.
 
-**If it has no login (oauth2-proxy pattern):**
+**If it has no login: one block in the front door's Caddyfile** ([decision 0011](https://github.com/nikghodki/homelab/blob/main/decisions/0011-one-sign-in-proxy.md)).
+One oauth2-proxy, `edge/edge-auth` in k3s (2 replicas, one per Spark), signs people in for every such app with one
+Pocket ID client (`edge-auth`) and one callback (`https://auth.nghodki.ai/oauth2/callback`). Its cookie `_edge_auth`
+is for `.nghodki.ai` (Secure, HttpOnly, 7 days, refreshed hourly), so **one sign-in opens Homepage, the docs, Gatus'
+status page and MLflow**.
 
-1. Client with callback `https://<app>.nghodki.ai/oauth2/callback`, `groups: [admins]`; sync.
-2. A cookie secret in the stack's SOPS file (32 random bytes, base64url), e.g. `oauth2_proxy_<client>_cookie_secret`.
-3. An oauth2-proxy 7.15 container next to the app, from a private template like
-   `hosts/stacks/ops/oauth2-proxy/oauth2-proxy.cfg.j2` (rendered 0600 for uid 65532): provider `oidc`, issuer
-   `https://id.nghodki.ai`, `code_challenge_method = "S256"`, scope `openid email profile groups`,
-   `oidc_groups_claim = "groups"`, `allowed_groups`, `reverse_proxy = true`, `trusted_proxy_ips = ["192.168.86.44/32"]`,
-   secure cookies scoped to the app's host, `skip_provider_button = true`, `upstreams` = the app on the stack network.
-4. Publish only oauth2-proxy, on the host's LAN address. The app gets no `ports:`.
-5. Front-door route to oauth2-proxy with the http → https redirect.
-6. Check signed out: `curl -s -o /dev/null -w "%{http_code} %{redirect_url}" https://<app>.nghodki.ai/` gives 302 to
-   `https://id.nghodki.ai/authorize?...client_id=<client>...`; `/ping` answers 200.
+1. Put a token gate in front of the app on its host: a Caddy site on the host's LAN IP that passes only requests with
+   the front door's `X-Edge-Origin` token (`edge_origin_token`) and answers 403 otherwise (examples: the ops stack's
+   `docs/Caddyfile.j2`, `alerting/status-gate/Caddyfile.j2`). The app itself gets no `ports:`.
+2. In `cluster/platform/edge/caddy/Caddyfile`:
+   ```caddyfile
+   @<app> host <app>.nghodki.ai
+   handle @<app> {
+   	import signed_in <LAN IP>:<gate port> admins
+   }
+   ```
+   The last word is the Pocket ID group the route requires. No Pocket ID change for a new app.
+3. Check: `.github/scripts/verify-edge-auth.sh`: signed out, 302 to `https://id.nghodki.ai/authorize?...client_id=edge-auth...`;
+   the gate answers 403 without the door.
 
-Two oauth2-proxy instances don't share sessions: each app is its own sign-in (one passkey tap, no consent screen).
+Full recipe, rotation and troubleshooting: `runbooks/sign-in.md`.
 
 ## Not on Pocket ID, and why
 
@@ -103,6 +108,8 @@ Two oauth2-proxy instances don't share sessions: each app is its own sign-in (on
 ## Gotchas
 
 - Gatus' own `security.oidc` panics at start when Pocket ID is unreachable, which would stop all checks exactly when
-  the Sparks are down. That's why Gatus sits behind oauth2-proxy instead.
+  the Sparks are down. That's why Gatus' UI is signed in at the front door instead (its checks don't go through it).
 - Phoenix answers "authentication failed" unless the client requests the `groups` scope (PR #36).
-- Pocket ID runs on dgx-2 but is reached through dgx-1's front door: either Spark being down breaks sign-in.
+- Pocket ID runs on dgx-2 and is reached through the front door (either Spark): dgx-2 down breaks sign-in.
+- Retired clients (`ops`, `docs`, `gatus`, `mlflow`, replaced by `edge-auth`) are listed under `removedClients`; the
+  sync deletes them in Pocket ID and drops their secrets.

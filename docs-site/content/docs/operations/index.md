@@ -61,7 +61,7 @@ Details: [PR and merge rules](../development/rules.md).
 ```bash
 kubectl get nodes                                   # 4 Ready
 kubectl get applications -n argocd                  # all Synced/Healthy
-curl -s -o /dev/null -w '%{http_code}\n' http://192.168.86.49:8081/health   # Gatus via status-proxy: 200
+curl -s -o /dev/null -w '%{http_code}\n' http://192.168.86.49:8081/health   # Gatus via status-gate: 200
 curl -s http://192.168.86.49:8085/v1/health        # ntfy
 curl -s http://127.0.0.1:4000/health/liveliness    # LiteLLM
 docker ps                                          # dgx-1 containers

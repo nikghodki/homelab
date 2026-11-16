@@ -1,0 +1,6 @@
+# Documentation site build (docs-site/mkdocs.yml). Compile with: uv pip compile --generate-hashes --python-version 3.12 --python-platform x86_64-manylinux_2_28 docs-site/requirements-docs.in -o docs-site/requirements-docs.txt
+# Same versions as DGXMM except certifi (>= 2026.10.18 for PYSEC-2026-4320). Renovate (pip-compile manager) keeps both files current.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+pymdown-extensions==12.3
+certifi>=2026.10.18

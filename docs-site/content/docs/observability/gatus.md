@@ -55,8 +55,9 @@ Gatus has neither CA in its image, so HTTPS checks use `insecure: true` and only
 
 ## Sign-in
 
-Gatus itself has **no login** and listens only on the Dell's loopback (127.0.0.1:8082). `status-proxy` (oauth2-proxy
-7.15.6, client `gatus`) is published on 192.168.86.49:8081. Without a session it lets through only `GET /health`,
+Gatus itself has **no login** and listens only on the Dell's loopback (127.0.0.1:8082). People sign in at the front
+door (`edge-auth`, the same session as Homepage, the docs and MLflow); `status-gate` (Caddy) is published on
+192.168.86.49:8081 and passes the UI only with the front door's token. Without it it lets through only `GET /health`,
 `GET /metrics` and `POST /api/v1/endpoints/<key>/external` (the heartbeat, which Gatus checks with its own token,
 `gatus_heartbeat_token`). Gatus' own OIDC isn't used because it panics at start when Pocket ID is unreachable.
 

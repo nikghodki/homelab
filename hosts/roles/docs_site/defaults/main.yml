@@ -1,7 +1,7 @@
 ---
 # Private docs site build on the Dell (runbooks/docs-site.md): a timer fetches main with a read-only deploy key, builds
 # docs-site/ with MkDocs in a pinned Python container and swaps the result into docs_site_srv_dir/current, which the
-# ops stack's `docs` Caddy serves behind oauth2-proxy-docs. Secrets (deploy key, Gatus token) come from
+# ops stack's `docs` Caddy serves to the front door, which signs people in (edge-auth). Secrets (deploy key, Gatus token) come from
 # secrets/docs.enc.yaml through the playbook.
 docs_site_repo_url: git@github.com:nikghodki/homelab.git
 docs_site_branch: main

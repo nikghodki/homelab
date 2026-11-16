@@ -22,15 +22,16 @@ All in `cluster/platform/edge/caddy/Caddyfile`, on :80 and :443 (wildcard from t
 | Hostname | Backend | Sign-in | http → https | Notes |
 |---|---|---|---|---|
 | `id.nghodki.ai` | Pocket ID, 192.168.86.36:1411 (dgx-2) | passkeys | yes (308) | passkeys need HTTPS |
-| `ops.nghodki.ai` | oauth2-proxy → Homepage, 192.168.86.49:4180 (Dell) | Pocket ID, client `ops` | yes | |
+| `ops.nghodki.ai` | ops stack Caddy gate → Homepage, 192.168.86.49:4180 (Dell) | `signed_in` (edge-auth, admins) | yes | |
 | `ca.nghodki.ai` | static files in `/etc/caddy/ca` | none | no | `.mobileconfig` and `.crt` get the right content types; in k3s a ConfigMap copy of `hosts/files/web-ca` (checked by CI) |
-| `docs.nghodki.ai` | oauth2-proxy-docs → this site, 192.168.86.49:4181 (Dell) | Pocket ID, client `docs` (admins) | yes | added with the docs site (`runbooks/docs-site.md`) |
+| `docs.nghodki.ai` | docs Caddy → this site, 192.168.86.49:4181 (Dell) | `signed_in` (edge-auth, admins) | yes | `runbooks/docs-site.md` |
+| `auth.nghodki.ai` | `edge/edge-auth` (oauth2-proxy in k3s): `/oauth2/*`, `/ping`; anything else → Homepage | it *is* the sign-in (callback for every `signed_in` route) | yes | decision 0011 |
 | `model.nghodki.ai` | the `(model_plane)` snippet: `/v1/*`, `/health*` → LiteLLM 10.100.136.1:4000; `/dgxmm/*` → DGXMM 10.100.136.1:8090; `/dgxmm/ondemand/*` 404; `/v1`, `/dgxmm` → 301 with a slash; else a JSON 404 | LiteLLM keys | no | LiteLLM: 30 min read/write timeouts, no buffering (cold starts). DGXMM: SSE unbuffered, 1 h reads, 1 MB request limit. (nginx-gateway until 2026-11-15; `/tts/` dropped, D26) |
 | `grafana.nghodki.ai` | 192.168.86.36:3000 | Pocket ID (Grafana's own OAuth) | no | |
-| `status.nghodki.ai` | status-proxy → Gatus, 192.168.86.49:8081 (Dell) | Pocket ID, client `gatus` | no | `/health`, `/metrics` and the heartbeat POST pass without a session |
+| `status.nghodki.ai` | status-gate → Gatus, 192.168.86.49:8081 (Dell) | `signed_in` (edge-auth, admins) | yes | `/health` passes without a session (and `/metrics`, the heartbeat POST on the gate itself) |
 | `ntfy.nghodki.ai` | 192.168.86.49:8085 (Dell) | ntfy users | no | `flush_interval -1` so streams aren't buffered. The phone does **not** use this name |
 | `phoenix.nghodki.ai` | 192.168.86.36:6006 | Pocket ID (Phoenix OAuth) | no | |
-| `mlflow.nghodki.ai` | oauth2-proxy, 192.168.86.36:4181 → MLflow | Pocket ID, client `mlflow` | yes | |
+| `mlflow.nghodki.ai` | ml stack Caddy gate, 192.168.86.36:4181 → MLflow | `signed_in` (edge-auth, admins) | yes | |
 | `temporal.nghodki.ai` | Temporal UI, 192.168.86.36:8233 | Pocket ID (Temporal UI OIDC) | yes | |
 | `argocd.nghodki.ai` | `argocd-server.argocd.svc.cluster.local:80` | Pocket ID (Argo CD OIDC) | yes | Argo CD runs in insecure mode; TLS ends here |
 | `litellm-admin.nghodki.ai` | 100.65.137.82:4000 (LiteLLM on dgx-1, by its Tailscale IP) | LiteLLM UI login | no | Host header rewritten to the upstream |
@@ -51,10 +52,12 @@ broker (8884) and API (8971) have their own TLS with the internal homelab CA.
 Two patterns, both in [Pocket ID and sign-in](../security/identity.md):
 
 - **The app speaks OIDC** (Grafana, Phoenix, Temporal UI, Argo CD): Caddy only proxies.
-- **The app has no login** (Homepage, Gatus, MLflow): an oauth2-proxy container next to the app is the only thing
-  published on the LAN; Caddy points at it. oauth2-proxy trusts `X-Forwarded-*` only from 192.168.86.44 (the docs
-  proxy also from 192.168.86.36). Requests from the Caddy pod on dgx-2 probably arrive from 192.168.86.36, so the
-  `status` and `mlflow` proxies may ignore their forwarded headers (unverified).
+- **The app has no login** (Homepage, the docs, Gatus' UI, MLflow): one line, `import signed_in <backend> <group>`.
+  Caddy checks the session with `edge/edge-auth` (one oauth2-proxy in k3s, reachable only from the Caddy pods and
+  trusting `X-Forwarded-*` only from pod IPs), sends signed-out browsers to Pocket ID (callback `auth.nghodki.ai`,
+  one cookie for `.nghodki.ai`, so one sign-in covers all of them), and proxies to a token gate on the app's host
+  (`X-Edge-Origin`; without it 403). Since 2026-11-15; before, each app had its own oauth2-proxy that trusted only
+  dgx-1 (decision 0011).
 
 ## Add a route
 

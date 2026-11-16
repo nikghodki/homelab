@@ -11,8 +11,9 @@ dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and n
 |---|---|
 | DNS | `edge/edge-dns` (CoreDNS, 2 replicas): VIP `192.168.86.11:53` (LAN view), both Sparks' Tailscale IPs `:53` (tailnet view) |
 | HTTPS | `edge/edge-caddy` (Caddy, 2 replicas): VIP `192.168.86.11:80/443`, both Sparks' Tailscale IPs `:80/443` |
+| Sign-in | `edge/edge-auth` (oauth2-proxy, 2 replicas) for the routes that use `import signed_in`: ops, docs, status, mlflow; callback host `auth.nghodki.ai` ([sign-in.md](sign-in.md), decision 0011) |
 | Floating IPs | kube-vip (`kube-system`, DaemonSet on the Sparks): `192.168.86.10` (k3s API), `192.168.86.11` (edge) |
-| Config | `cluster/platform/edge/`: `names.txt` (every name), `caddy/Caddyfile`, generated `coredns/*.db`, `web-tls.enc.yaml` |
+| Config | `cluster/platform/edge/`: `names.txt` (every name), `caddy/Caddyfile`, generated `coredns/*.db`, `web-tls.enc.yaml`, `edge-auth.yaml` + `edge-auth/oauth2-proxy.cfg` + `edge-auth.enc.yaml` |
 | Argo CD apps | `kube-vip`, `edge`, `kube-state-metrics` (project `platform`) |
 | Retired (stopped on dgx-1) | edge-caddy (`~/edge-gateway/conf/Caddyfile`), edge-dnsmasq (`~/edge-gateway/dnsmasq/dnsmasq.conf`), nginx-gateway (`~/voice-assistant/nginx/nginx.conf`) |
 
@@ -42,6 +43,14 @@ dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and n
   Sparks' LAN IPs `192.168.86.44` and `192.168.86.36` (the pods leave from their node's IP); set in HA's UI by the
   user. Without the entry HA answers 400 to every request through that Spark's pod.
 
+- **Signed-in routes** (apps without their own login: Homepage, docs, Gatus' UI, MLflow) are one line each,
+  `import signed_in <backend> <group>`: Caddy asks `edge-auth` (`/oauth2/auth?allowed_groups=<group>`) on every
+  request, sends signed-out browsers to Pocket ID (callback `https://auth.nghodki.ai`, one cookie for `.nghodki.ai`),
+  and proxies to the backend with the `X-Edge-Origin` token (env `EDGE_ORIGIN_TOKEN` from the Secret `edge-auth`)
+  and without the session cookie. The backends are token gates on their host's LAN IP that refuse anything else
+  (403). How to add one: [sign-in.md](sign-in.md#apps-without-their-own-login-one-block-in-the-caddyfile).
+  `edge-auth` is reachable only from the Caddy pods (NetworkPolicy) and trusts `X-Forwarded-*` only from pod IPs.
+
 ## Add or change a route
 
 Only the in-cluster door (the old one on dgx-1 is retired):
@@ -63,6 +72,8 @@ Only the in-cluster door (the old one on dgx-1 is retired):
 cd ~/homelab && .github/scripts/compare-front-doors.sh                      # LAN VIP vs dgx-2's Tailscale IP, every route + DNS
 .github/scripts/compare-front-doors.sh -n 100.65.137.82 -o 192.168.86.11 -v tailnet    # tailnet path (dgx-1's Tailscale IP)
 .github/scripts/verify-cutover.sh                                           # also: the old door stays stopped
+.github/scripts/verify-edge-auth.sh                                         # sign-in: every signed-in route -> Pocket ID (client edge-auth), gates 403
+.github/scripts/verify-edge-auth.sh -n 100.124.175.23 -B                    # the same over the tailnet
 export KUBECONFIG=~/.kube/config
 kubectl -n edge get pods -o wide; kubectl -n edge get svc                    # 2+2 pods, one per Spark; VIP in EXTERNAL-IP
 kubectl -n kube-system get lease plndr-cp-lock plndr-svcs-lock              # which Spark holds .10 / .11
@@ -76,6 +87,10 @@ bash /tmp/f/.github/scripts/compare-front-doors.sh -r /tmp/f'`.
 
 **Test ARP from a non-node.** The Dell and the Jetson are k3s nodes: their own kube-proxy DNATs the VIP, so they never
 ARP for it. The MacBook Air (or the Pi) is a real LAN client (`arp -n 192.168.86.11` shows which Spark's MAC it uses).
+
+Sign-in monitoring: Gatus `auth.nghodki.ai (edge-auth)` (`/ping` through the VIP), the four signed-in routes'
+302s, and `... refuses direct access` (403) for each gate; vmalert `EdgeReplicasDown` covers `edge-auth` too (every
+Deployment in `edge`).
 
 Monitoring: Gatus group `edge` on the Dell (DNS on the VIP and on dgx-2's Tailscale IP over TCP, Caddy on the VIP with
 the cert's expiry, grafana through the VIP, the API VIP); vmalert `front-door` (`KubeVipNotReady`, `KubeVipDown`,

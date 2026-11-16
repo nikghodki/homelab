@@ -31,7 +31,7 @@ endpoints:
   - {name: auth.nghodki.ai (edge-auth), group: web, url: "https://192.168.86.11/ping", headers: {Host: auth.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
   - {name: Homepage gate refuses direct access, group: web, url: "http://192.168.86.49:4180/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
   - {name: docs gate refuses direct access, group: web, url: "http://192.168.86.49:4181/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
-  - {name: status gate refuses direct access, group: web, url: "http://192.168.86.49:8081/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
+  - {name: status gate refuses direct access, group: web, url: "http://status-gate:8081/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
   - {name: Home Assistant (direct), group: home, url: "http://192.168.86.211:8123/", <<: *web}
   # dgx-2's observe stack, watched from outside. VictoriaMetrics and Alertmanager aren't on the LAN, so they're checked
   # by a heartbeat: vmalert's always-firing Watchdog -> Alertmanager -> this external endpoint every 5 min. Silence for

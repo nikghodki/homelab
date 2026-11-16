@@ -69,7 +69,7 @@ runners, no home memory). Versions are what is deployed or pinned; "latest" is n
 | Tool | Version | What it does here | Memory | License |
 |---|---|---|---|---|
 | Pocket ID | 2.19.2 (latest 2.19.3) | Passkey OIDC for Grafana, Argo CD, Phoenix, Temporal UI, oauth2-proxies | 44 MiB (m) | BSD-2 |
-| oauth2-proxy ×3 | 7.15.6 (latest) | `alerting-status-proxy` (Gatus), `ops-oauth2-proxy` (Homepage), `ml-oauth2-proxy` (MLflow UI) | 11 + 13 + 8 = 32 MiB (m) | MIT |
+| oauth2-proxy ×3 | 7.15.6 (latest) | `alerting-status-proxy` (Gatus), `ops-oauth2-proxy` (Homepage), `ml-oauth2-proxy` (MLflow UI). **Since 2026-11-15: one, `edge/edge-auth`** (decision 0011) | 11 + 13 + 8 = 32 MiB (m) | MIT |
 
 ### 1.5 Messaging
 
@@ -207,6 +207,13 @@ Each entry: the overlap, the recommendation, the tradeoff.
 - **Tradeoff.** Saves ~20 MiB and two containers; the real gain is that adding a protected app becomes a one-line
   Caddy change. Cost: the single proxy becomes a dependency of several UIs (run 2 replicas when the Sparks have
   room). The Dell's Homepage would then depend on the Sparks' front door, which it already does for TLS.
+- **Applied 2026-11-15** ([decision 0011](../../decisions/0011-one-sign-in-proxy.md)), with two changes: the proxy is
+  `edge/edge-auth` in k3s (2 replicas, next to the front door, so no new failure mode) rather than in `console`, and
+  Gatus stays behind it instead of using its native OIDC (which panics at start without Pocket ID). One Pocket ID
+  client (`edge-auth`), callback `auth.nghodki.ai`, cookie for `.nghodki.ai`: Homepage, the docs site (a fourth
+  proxy added since this review), Gatus' UI and MLflow share one sign-in. The four oauth2-proxies and their
+  clients are gone; the backends sit behind token gates on their hosts (the docs and MLflow ones reuse existing
+  Caddies, Gatus' is a small Caddy).
 
 ### 2.3 Mosquitto vs NATS (MQTT 5? EMQX? NanoMQ?)
 - **Facts (2026-11).** NATS's MQTT listener implements **3.1.1 only**; "a device that requests MQTT v5 is rejected
@@ -518,7 +525,7 @@ Memory figures are measured unless marked (e). Effort: S = under an hour, M = an
 | 3 | **Replace LiteLLM's Redis 7.4 with Valkey** (pinned by digest), as part of moving LiteLLM into the repo (§4) | 0 | Licence back to BSD; one less "could stop being free" | S | No |
 |   | Item 3 declined 2026-11-15: Redis 7.4 under RSALv2/SSPL is free for private use; revisit only if licensing needs change. | | | | |
 | 4 | **Move Cisco AIBOM image scans off the Jetson and Pi** (scan their images by digest from dgx-2; keep code scans light) (§2.7) | ~1.1 GiB peak on the Jetson | Removes the main nightly OOM risk on the tightest host | S–M | No |
-| 5 | **One oauth2-proxy** behind Caddy `forward_auth` for every OIDC-less UI, and **Gatus native OIDC** (§2.2) | ~20 MiB | 3 → 1 proxy; new protected app = one Caddy line | M | No |
+| 5 | **One oauth2-proxy** behind Caddy `forward_auth` for every OIDC-less UI, and **Gatus native OIDC** (§2.2). **Applied 2026-11-15** (decision 0011; Gatus behind the proxy instead) | ~20 MiB | 3 → 1 proxy; new protected app = one Caddy line | M | No |
 | 6 | **Narrow scanner scopes**: Trivy `fs --scanners vuln,misconfig`; add standalone shellcheck; keep digest pins (§2.6) | CI only | Fewer duplicate secret findings; closes the shell-script lint gap | S | No |
 | 7 | **Pin and bring hand-run services into Git**: HA (`:stable`), LiveKit (`--dev`, F4), Open WebUI, LiteLLM; bump Pocket ID, dcgm-exporter, CoreDNS, Lynis (§2.17) | 0 | Renovate sees everything; no silent upgrades | M | No |
 

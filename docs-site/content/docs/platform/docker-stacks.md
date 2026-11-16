@@ -12,14 +12,14 @@ SOPS). All images are pinned by digest; Renovate keeps them current.
 | Stack | Host | Playbook | Containers | Secrets (SOPS file) | k3s target |
 |---|---|---|---|---|---|
 | `observe` | dgx-2 | `observe.yml` | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, otel-defenseclaw, otel-fleet, Grafana, Phoenix | `observe`, `console` | `observe` |
-| `alerting` | Dell | `alerting.yml` | Gatus 5.38.0, status-proxy (oauth2-proxy 7.15.6), ntfy 2.38.0; plus `tailscale serve` | `observe`, `console` | stays on the Dell, outside the cluster |
-| `ops` | Dell | `ops.yml` | Homepage 2.8.0, oauth2-proxy | `console` | `console` |
+| `alerting` | Dell | `alerting.yml` | Gatus 5.38.0, status-gate (Caddy 2.11.9), ntfy 2.38.0; plus `tailscale serve` | `observe`, `console` | stays on the Dell, outside the cluster |
+| `ops` | Dell | `ops.yml` | Homepage 2.8.0, Caddy (docs site + Homepage gate) | `console` | `console` |
 | `console` | dgx-2 | `console.yml` | Pocket ID 2.19.2 | `console` | `console` |
 | `bus` | dgx-1 | `bus.yml` | NATS 2.15.3 | `bus`, `pki` | `bus` (3 replicas) |
 | `fleet` | dgx-1 | `fleet.yml` | Mosquitto 2.1.2, Caddy 2.11.9 (host network) | `fleet`, `pki` | `security` |
 | `gpu` | dgx-1, dgx-2 | `gpu.yml` | dcgm-exporter 4.4.2-4.7.1 | — | `observe` (DaemonSet) |
 | `jobs` | dgx-2 | `jobs.yml` | Temporal 1.32.2, PostgreSQL 17, admin-tools, UI 2.58.1 | `jobs`, `console` | `jobs` |
-| `ml` | dgx-2 | `ml.yml` | MLflow 3.18.0 (built locally), PostgreSQL 17, oauth2-proxy, Caddy job API | `ml`, `console` | `sim` |
+| `ml` | dgx-2 | `ml.yml` | MLflow 3.18.0 (built locally), PostgreSQL 17, Caddy (job API + UI gate) | `ml`, `console` | `sim` |
 | `backup` | dgx-2 | `backups.yml` | restic rest-server 0.14.0 | `backup`, `pki` | stays on the host |
 | `litellm` | dgx-1 | `litellm.yml` | LiteLLM 1.109.1, PostgreSQL 16, Redis 7.4, DefenseClaw relay (socat) | `litellm` | `models` and `data` |
 | `sim` | dgx-2 | none (run by hand) | isaaclab (local image on NVIDIA's + MLflow client), mujoco (local image) (profile `jobs`) | — | `sim` |
@@ -34,7 +34,7 @@ Used by every stack playbook with `compose_stack_name` and `compose_stack_src`.
    deploy can't be simulated).
 2. Creates `/opt/homelab/<name>` (root, 0750) and sub-folders.
 3. Copies plain files (0644) and renders `*.j2` templates without the suffix. Templates in a sub-folder listed in
-   `compose_stack_private_templates` (`{service: uid}`) render 0600 owned by that uid (for example `oauth2-proxy: 65532`,
+   `compose_stack_private_templates` (`{service: uid}`) render 0600 owned by that uid (for example `status-gate: 65532`,
    `pocket-id: 1000`, `mosquitto: 1883`); others render 0644 root. Rendering is `no_log`.
    `compose_stack_extra_files` (`[{src, dest}]`) copies files kept elsewhere in the repo into the stack (0644; the
    first folder of `dest` names the service restarted on change), e.g. LiteLLM's guardrail plugin from `hosts/files/litellm`.

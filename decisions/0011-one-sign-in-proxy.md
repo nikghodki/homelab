@@ -1,7 +1,8 @@
 # 0011: One sign-in proxy: oauth2-proxy `edge-auth` in k3s behind the front door's forward auth
 
 - Date: 2026-11-15
-- Status: decided (nikghodki, tool review recommendation 5 / §2.2); applied app by app (runbooks/sign-in.md)
+- Status: decided (nikghodki, tool review recommendation 5 / §2.2); done 2026-11-15, app by app: docs (#91),
+  Homepage (#93), Gatus' UI (#94), MLflow (#95) (runbooks/sign-in.md)
 
 ## Context
 
@@ -83,9 +84,9 @@ clients.
 
 ## Consequences
 
-- **3 fewer containers** after the migration (four oauth2-proxies on the hosts → two small pods; the docs and MLflow
-  gates reuse existing Caddies, Gatus' gate is a Caddy instead of an oauth2-proxy), **4 Pocket ID clients → 1**, 4
-  cookie secrets → 1. A new app: one `import signed_in` block (runbooks/sign-in.md).
+- **3 fewer containers on the hosts** (four oauth2-proxies gone; the docs and MLflow gates reuse existing Caddies,
+  Gatus' gate is a Caddy, 16 MiB) plus two `edge-auth` pods (~6 MiB each, `crictl stats`), **4 Pocket ID clients →
+  1**, 4 cookie secrets → 1. A new app: one `import signed_in` block (runbooks/sign-in.md).
 - If `edge-auth` is down, every signed-in route answers 502 (fail closed), and Gatus' checks keep running. If Pocket
   ID is down, signed-in sessions work until their next hourly refresh; new sign-ins fail.
 - The session cookie goes to every `*.nghodki.ai` backend, including routes not behind sign-in (Home Assistant, Open
@@ -96,3 +97,25 @@ clients.
   before (Caddy → oauth2-proxy was plain HTTP too). Anyone who can read LAN traffic and take the token can bypass
   sign-in for these four apps; rotate it (runbooks/sign-in.md) if a LAN device is suspect.
 - Removing a person from `admins` in Pocket ID takes effect at the next refresh (≤ 1 h).
+
+## Verification (2026-11-15, after #95)
+
+- `.github/scripts/verify-edge-auth.sh` from dgx-1 through the VIP and through both Sparks' Tailscale IPs: ops, docs,
+  status and mlflow answer http → 308 https, and signed out 302 to `https://id.nghodki.ai/authorize` with
+  `client_id=edge-auth` and `redirect_uri=https://auth.nghodki.ai/oauth2/callback`; the return URL in `state` is the
+  page asked for, query string included (`/some/page?a=1&b=2`).
+- **One session for all four**, scripted with a cookie jar: a one-time Pocket ID sign-in link for `nikghodki` (via the
+  static API key, never printed), Pocket ID's `/authorize` answered 303 to the callback without a prompt, the callback
+  set one `_edge_auth` cookie for `.nghodki.ai` and returned to the docs page asked for; with that jar ops, docs,
+  status and mlflow all answered 200 through the VIP and both Tailscale IPs. A JSON POST to MLflow's
+  `/ajax-api/2.0/mlflow/experiments/search` through the door answered 200 (the request body survives the auth
+  sub-request). `/oauth2/sign_out` cleared the cookie; the jar was deleted.
+- Direct to the backends without the door: Dell `:4180`, `:4181`, `:8081` and dgx-2 `:4181` answer 403 (also with a
+  wrong token); the open paths still answer: docs `/healthz` 200, Gatus `/health` and `/metrics` 200, the heartbeat
+  POST reaches Gatus (401 without its token); the job API on dgx-2 `:5000` is still basic auth (401).
+- Gatus: all checks green, including the new `auth.nghodki.ai (edge-auth)` and `... refuses direct access` ones (the
+  status gate's is checked as `status-gate:8081` from Gatus' own network: through the Dell's LAN IP its own published
+  port times out from inside the same Docker network).
+- Not tested: a non-admin user getting 403 (nobody is in another group), and the hourly refresh passing the new
+  cookie back (needs an hour-old session; the snippet's `copy_response_headers` is the mechanism). Check both in a
+  browser.

@@ -1,7 +1,7 @@
 # Docs site: https://docs.nghodki.ai (private)
 
 The operator docs in `docs-site/` are built with MkDocs Material and served **only** from the Dell (Omarchy), behind
-oauth2-proxy and Pocket ID (group `admins`). They stay readable when both Sparks are down, as long as the front door
+the front door's sign-in (`edge-auth`, Pocket ID group `admins`; [sign-in.md](sign-in.md)). They stay readable when both Sparks are down, as long as the front door
 and Pocket ID are up (see [Limits](#limits)). Never GitHub Pages: the repo is private and nothing is published to the
 internet.
 
@@ -12,7 +12,7 @@ internet.
 | CI | `pr-checks.yml` job `docs`: `mkdocs build --strict` (broken links, anchors or nav entries fail the PR) |
 | Build on the Dell | role `docs_site` (`playbooks/ops.yml`): `docs-build.timer` (every 15 min and 2 min after boot) → `/usr/local/sbin/docs-build` |
 | Served files | `/srv/docs/current` → `releases/<docs tree hash>/` (the newest 5 are kept) |
-| Web server | `docs` (Caddy, read-only, no ports) in the ops stack (`hosts/stacks/ops`), behind `oauth2-proxy-docs` on `192.168.86.49:4181` (LAN only) |
+| Web server | `docs` (Caddy, read-only) in the ops stack (`hosts/stacks/ops`): `192.168.86.49:4181` (LAN only) answers only with the front door's `X-Edge-Origin` token (else 403; `/healthz` open), `:8080` on the stack network for Homepage. The same Caddy gates Homepage on `:4180` |
 | Sign-in | Pocket ID client `docs` (`identity/pocket-id.yaml`, PKCE S256, `allowed_groups = admins`); `oidc_docs_secret` and `oauth2_proxy_docs_cookie_secret` in `secrets/console.enc.yaml` |
 | Front door | in-cluster Caddy (`cluster/platform/edge/caddy/Caddyfile`, `@docs`; name `docs` in `cluster/platform/edge/names.txt`); the same block in dgx-1's `~/edge-gateway` for rollback |
 | Secrets | `secrets/docs.enc.yaml`: `docs_deploy_key` (read-only deploy key `docs-dell`), `docs_build_gatus_token` |
@@ -112,8 +112,8 @@ sudo ln -sfn releases/<tree> /srv/docs/.current.new && sudo mv -T /srv/docs/.cur
 
 It stays until `main` changes again; then revert the bad docs commit in a PR instead.
 
-The hosting: `docker compose --project-directory /opt/homelab/ops stop docs oauth2-proxy-docs`, or revert the PR and
-rerun `playbooks/ops.yml` (`remove_orphans` removes both services). The timer: `sudo systemctl disable --now
+The hosting: remove the `@docs` route from the front door's Caddyfile (PR), or
+`docker compose --project-directory /opt/homelab/ops stop docs` (that also takes Homepage's gate down). The timer: `sudo systemctl disable --now
 docs-build.timer`. The deploy key: `gh repo deploy-key list -R nikghodki/homelab`, then `gh repo deploy-key delete
 <id>`.
 
@@ -124,7 +124,8 @@ docs-build.timer`. The deploy key: `gh repo deploy-key list -R nikghodki/homelab
   secrets/docs.enc.yaml '["docs_deploy_key"]'` (JSON string on stdin), delete the old key, `shred -u` the files,
   rerun `playbooks/ops.yml`.
 - Gatus token: new value in `secrets/docs.enc.yaml`, then `playbooks/alerting.yml` and `playbooks/ops.yml`.
-- OIDC client secret and cookie secret: as for any oauth2-proxy app (`runbooks/sign-in.md`), then `playbooks/ops.yml`.
+- Sign-in: the shared `edge-auth` secrets and the edge origin token (`runbooks/sign-in.md`, "Rotate"); the token also
+  needs `playbooks/ops.yml`.
 
 ## Limits
 

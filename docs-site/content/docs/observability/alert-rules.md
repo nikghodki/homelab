@@ -25,7 +25,7 @@ others every 4 h.
 
 | Alert | Means | For | Severity | Route |
 |---|---|---|---|---|
-| `AlertingHostDown` | `max(up{job="gatus"}) < 1 or absent(...)`: dgx-2 can't scrape the Dell's Gatus (Dell, Docker, status-proxy or Gatus down, or dgx-2 can't reach it) | 15m | critical | ntfy.sh backup topic, fixed text "alerting host unreachable" |
+| `AlertingHostDown` | `max(up{job="gatus"}) < 1 or absent(...)`: dgx-2 can't scrape the Dell's Gatus (Dell, Docker, status-gate or Gatus down, or dgx-2 can't reach it) | 15m | critical | ntfy.sh backup topic, fixed text "alerting host unreachable" |
 | `AlertDeliveryFailing` | Alertmanager's webhook notifications kept failing for 15 min (e.g. the Dell's ntfy broken while Gatus answers) | 15m | critical | ntfy.sh backup topic, "alert delivery failing"; inhibited while `AlertingHostDown` fires |
 
 Labels and annotations here carry no hostnames or addresses (`max()` drops `instance`), because the webhook body goes

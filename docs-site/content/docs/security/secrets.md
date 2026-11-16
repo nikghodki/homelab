@@ -37,11 +37,11 @@ Names only; values are never written anywhere in plaintext.
 | `secrets/canary.enc.yaml` | `canary` (must decrypt to `homelab-sops-ok`) | restore check |
 | `secrets/pki.enc.yaml` | `pki_homelab_ca_key`, `pki_web_ca_key`, `pki_nats_key`, `pki_fleet_key`, `pki_backup_key`, `pki_web_key` | `bus.yml`, `fleet.yml`, `backups.yml`, front door |
 | `secrets/observe.enc.yaml` | `grafana_admin_password`, `phoenix_admin_password`, `phoenix_secret`, `ntfy_alerts_password(_hash)`, `ntfy_alerts_token`, `ntfy_phone_password(_hash)`, `gatus_heartbeat_token`, `ntfy_sh_backup_topic_token` | `observe.yml`, `alerting.yml` |
-| `secrets/console.enc.yaml` | `pocketid_encryption_key`, `pocketid_static_api_key`, `oidc_grafana_secret`, `oidc_gatus_secret`, `oidc_phoenix_secret`, `oidc_ops_secret`, `oidc_temporal_secret`, `oidc_mlflow_secret`, `oidc_argocd_secret`, `oauth2_proxy_ops_cookie_secret`, `oauth2_proxy_status_cookie_secret` | `console.yml`, the apps' playbooks, `pocketid_sync.py` |
+| `secrets/console.enc.yaml` | `pocketid_encryption_key`, `pocketid_static_api_key`, `oidc_grafana_secret`, `oidc_phoenix_secret`, `oidc_temporal_secret`, `oidc_argocd_secret`, `oidc_edge-auth_secret`, `edge_origin_token` (the front door's token for the sign-in gates) | `console.yml`, the apps' playbooks, `pocketid_sync.py` |
 | `secrets/bus.enc.yaml` | `nats_{admin,picoclaw,hermes,operator,sys}_password` and `_hash` | `bus.yml`, `robot.yml`, Hermes's picoclaw MCP |
 | `secrets/fleet.enc.yaml` | `mosquitto_dclaw_fleet_password(_hash)`, `mosquitto_dclaw_device_1_1_1_password(_hash)`, `dclaw_fleet_api_token`, `dclaw_ota_hmac_key`, `dclaw_emergency_key`, `dclaw_audit_key_dgx1`, `dclaw_audit_key_pi`, `dclaw_device_key_1_1_1` | `fleet.yml`, `defenseclaw.yml`, `edge-connector.yml`, `collectors.yml` |
 | `secrets/jobs.enc.yaml` | `postgres_password` | `jobs.yml` |
-| `secrets/ml.enc.yaml` | `postgres_password`, `mlflow_api_password(_hash)`, `oauth2_proxy_mlflow_cookie_secret` | `ml.yml` |
+| `secrets/ml.enc.yaml` | `postgres_password`, `mlflow_api_password(_hash)` | `ml.yml` |
 | `secrets/k3s.enc.yaml` | `k3s_token` (full `K10<ca-hash>::server:<secret>` form) | `k3s.yml` |
 | `secrets/argocd.enc.yaml` | `argocd_deploy_key`, `argocd_deploy_key_pub`, `argocd_repo_url` | Argo CD bootstrap |
 | `secrets/backup.enc.yaml` | per host: `restic_password_<host>`, `rest_password_<host>`, `rest_password_hash_<host>` | `backups.yml` |

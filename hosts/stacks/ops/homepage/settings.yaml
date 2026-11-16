@@ -1,4 +1,4 @@
-# Homepage settings (plan P1.15). Served at https://ops.nghodki.ai behind oauth2-proxy.
+# Homepage settings (plan P1.15). Served at https://ops.nghodki.ai, signed in at the front door (edge-auth).
 title: Homelab
 description: nghodki.ai homelab launcher
 theme: dark

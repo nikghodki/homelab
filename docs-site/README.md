@@ -1,7 +1,7 @@
 # docs-site
 
 Documentation for the homelab fleet, built with **MkDocs Material** and served privately at
-**https://docs.nghodki.ai** (the Dell, behind oauth2-proxy and Pocket ID, `admins` only; never GitHub Pages). The pages
+**https://docs.nghodki.ai** (the Dell, signed in at the front door with Pocket ID, `admins` only; never GitHub Pages). The pages
 are plain Markdown, so they also read on GitHub. Start at [content/docs/index.md](content/docs/index.md). How it's
 built, hosted, updated and rolled back, and how to add a page: `runbooks/docs-site.md`.
 

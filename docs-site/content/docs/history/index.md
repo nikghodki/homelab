@@ -124,6 +124,7 @@ Both Sparks went down from GPU memory exhaustion around 14:46–15:00 ([incident
 | #79 | P3.3 cutover: dgx-1's Tailscale IP on the tailnet Services, k3s DNS → edge-dns, Gatus via the VIP, front-door alerts critical; `verify-cutover.sh` |
 | #80 | Retire Coolify: front-door route and DNS name dropped, docs, D27 and decision 0010 |
 | #82 | Docs site: MkDocs Material, served privately from the Dell at `docs.nghodki.ai` behind Pocket ID (`runbooks/docs-site.md`) |
+| #91, #93, #94, #95 | One sign-in proxy (decision 0011): `edge/edge-auth` (oauth2-proxy, client `edge-auth`, callback `auth.nghodki.ai`) behind the front door for docs, Homepage, Gatus' UI, MLflow; token gates on the backends; four per-app oauth2-proxies and clients removed; Homepage's host overrides to the VIP |
 
 PR numbers skipped above (#1) were not merged to `main` (unverified). Open work at the time of writing: the P3.3
 follow-ups (a check from a family device, a tailnet failover drill; `runbooks/edge.md`, "Cutover" steps 5–6).

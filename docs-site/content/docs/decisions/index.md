@@ -1,6 +1,6 @@
 ---
 title: Decisions
-description: One line for every design decision (D1–D27) and every decision record (0001–0010), with its status.
+description: One line for every design decision (D1–D27) and every decision record (0001–0011), with its status.
 ---
 
 Design decisions are in `docs/design.md` §6; later decisions are files in `decisions/` (template `0000-template.md`).
@@ -30,7 +30,7 @@ Design decisions are in `docs/design.md` §6; later decisions are files in `deci
 | D19 | Vision | not deployed | in force; `vision-service` on the Jetson disabled under D26 |
 | D20 | Tool and agent gateway | LiteLLM as MCP and A2A gateway, per-key tool permissions, `pre_mcp_call` guardrail | decided; not built (P4.2, P4.10) |
 | D21 | Simulation | Isaac Lab 3.0, Isaac Sim when needed, MuJoCo, MLflow, ONNX → TensorRT/ONNX Runtime | Isaac Lab, MuJoCo, MLflow running |
-| D22 | Sign-in | Pocket ID (passkeys), oauth2-proxy for apps without OIDC | built for 7 apps |
+| D22 | Sign-in | Pocket ID (passkeys); one oauth2-proxy (`edge-auth`, decision 0011) at the front door for apps without OIDC | built for 8 apps |
 | D23 | Single pane of glass | standalone Fleet Console at `ops.nghodki.ai`; Homepage until then; one Alertmanager; Fleet Home | Homepage and Fleet Home built; console UI design open |
 | D24 | DefenseClaw Fleet transport | dedicated Mosquitto broker on 8884, Caddy API proxy on 8971 | built |
 | D25 | HTTPS for `*.nghodki.ai` | name-constrained homelab web CA + wildcard; install from `ca.nghodki.ai` | built |
@@ -53,6 +53,7 @@ The design doc's table header says "D1–D23" in places (README, `decisions/READ
 | 0008 | Image signing and Enforce | 2026-11-15 | decided | cosign keyless from `build-sign.yml` on `main`; mlflow and ros-zenoh for amd64+arm64, packages public; MuJoCo stays local; Kyverno Enforce everything with failurePolicy Fail except kube-system, kyverno, argocd (and `edge`, kept out by 0007); `verify-images` with `mutateDigest`; new `require-image-digest`; 2 admission replicas |
 | 0009 | No services box | 2026-11-15 | decided | Services stay on the Sparks (alerting on the Dell); hard reserves and job caps instead; revisit after another crash |
 | 0010 | Retire Coolify | 2026-11-15 | decided; done | Coolify (0 apps) removed from dgx-1 with its data, SSH key, route and DNS name; nothing kept |
+| 0011 | One sign-in proxy | 2026-11-15 | decided; done | `edge/edge-auth` (oauth2-proxy, one Pocket ID client, callback `auth.nghodki.ai`, cookie for `.nghodki.ai`) behind the front door's forward auth for Homepage, docs, Gatus' UI, MLflow; backends behind token gates; 4 proxies and clients removed |
 
 ## Open questions (design §11)
 
