@@ -126,7 +126,10 @@ spec:
             requests: {cpu: 250m, memory: 1536Mi}
             limits: {cpu: "4", memory: 3Gi}
           securityContext:
+            # The image runs as root (its files are root's); no capabilities, read-only root: it writes only to /tmp
+            # (tested with the same image in Docker: migrations, workers, the admin UI)
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities: {drop: [ALL]}
           startupProbe:
             httpGet: {path: /health/liveliness, port: http}
@@ -146,11 +149,14 @@ spec:
             - {name: proxy, mountPath: /app/qwen_system_merge.py, subPath: qwen_system_merge.py, readOnly: true}
             - {name: proxy, mountPath: /app/defenseclaw_guardrail.py, subPath: defenseclaw_guardrail.py, readOnly: true}
             - {name: ca, mountPath: /ca, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
       volumes:
         - name: proxy
           configMap: {name: litellm-proxy}
         - name: ca
           emptyDir: {sizeLimit: 2Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 1Gi}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
