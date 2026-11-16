@@ -7,7 +7,7 @@
 
 Plan P3.4 (Argo CD pulls the repo with a read-only deploy key; SOPS decryption in the cluster) and the first half of
 P3.5 (Kyverno), on the k3s cluster from P3.2 (decision 0005). The Sparks are close to their memory limits from model
-work (two GPU/unified-memory OOMs took them down on 2026-11-15), the Jetson has about 3 GB free and is tainted, so
+work (GPU/unified-memory OOMs took each of them down once on 2026-11-15), the Jetson has about 3 GB free and is tainted, so
 the whole platform has to be small: budget about 2.5 GiB.
 
 ## Decision

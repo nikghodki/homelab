@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Owner | nikghodki (approves and merges) · operator: Claude Code (prepares PRs, runs checks) |
-| Status | Draft v1, 2026-11-14 |
+| Status | Draft v1, 2026-11-14; status (§2a) updated 2026-11-16 |
 | Related | [design.md](design.md), [architecture.md](architecture.md) |
 
 **Effort** is in sessions of about 2 hours, and is an estimate. **Weeks** assume a few evenings a week.
@@ -46,91 +46,105 @@ KServe pilot (parallel, optional)        ░░░░░░░░
 | Pi backup | Running → `~/backups/nikraspberry-2026-11-14/pi-full.tar.zst` on dgx-1 |
 | Pi 1 TB card | Being flashed with Raspberry Pi OS Lite (64-bit) in Raspberry Pi Imager |
 
-## 2a. Status on 2026-11-15 (evening)
+## 2a. Status on 2026-11-16
 
-Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started · 🔁 changed
+Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started · 🔁 changed · 🔄 in progress (another session)
+
+The docs site's Status page (`docs-site/content/docs/decisions/status.md`) mirrors this section.
 
 ### Phase 0
 | ID | Status | Notes |
 |---|---|---|
 | P0.1 | ✅ | Pi backup on dgx-1 |
 | P0.2 | ✅ | Fresh Pi OS on the 1 TB card, user `nikghodki-raspberry-1`, restored; same Tailscale node |
-| P0.3 | ✅ | Jetson: DefenseClaw 1.0.9 for both Hermes users (action, fail closed, `homelab` policy). Skills recovered after a scanner-PATH outage quarantined 76 of 77 (PATH drop-in now in Ansible, role `defenseclaw_gateway_env`, #45); a few stay blocked for real static findings. Skill scanner LLM judge off until the model is back |
-| P0.4 | 🔁 ✅ | Production Edge Connector 1.0.9 installed on the Pi as `edge-connector.service`, reporting to Fleet (see P1.12). picoclaw keeps its in-process hook until upstream can allow escalated calls |
-| P0.5 | 🔁 ✅ | Work-managed DefenseClaw + dcsidecar uninstalled; OSS 1.0.9 installed on dgx-1 (no agents there yet) |
+| P0.3 | ✅ | Jetson: DefenseClaw 1.0.9 for both Hermes users (action, fail closed, `homelab` policy). Skills recovered after the scanner-PATH outage (role `defenseclaw_gateway_env`, #45). Skill scanner LLM judge back on for both users (`use_llm: true`, `qwen3.8-27b`, decision 0012; checked 2026-11-16) |
+| P0.4 | 🔁 ✅ | Production Edge Connector 1.0.9 on the Pi as `edge-connector.service`, reporting to Fleet (see P1.12). picoclaw keeps its in-process hook until upstream can allow escalated calls |
+| P0.5 | 🔁 ✅ | Work-managed DefenseClaw + dcsidecar uninstalled; OSS 1.0.9 on dgx-1 |
 | P0.6 | ✅ | LiteLLM Postgres/Redis on 127.0.0.1 |
-| P0.7 | 🔁 🟡 | `nginx-gateway` fixed (missing kokoro upstream) and kept; dead LiteLLM routes still to remove |
-| P0.8 | ✅ | LiveKit key in a 0600 key file; **rotated 2026-11-15** (old key rejected, checked); new key in `secrets/voice.enc.yaml`, used by `livekit-server` and the control-center backend on the Jetson |
-| P0.9 | ✅ | DHCP reservations on the Nest Wifi Pro for dgx-1 .44, dgx-2 .36, Jetson .211, Omarchy .49, Pi .39 (Wi-Fi MACs; wired MACs after P0.11) |
-| P0.10 | ✅ | Omarchy fully updated and back on Tailscale (`nikghodki-omarchy`, tag:agent) |
+| P0.7 | ✅ | Dead LiteLLM routes removed (only live routes in `/v1/models`, checked 2026-11-16); `nginx-gateway` retired with the old front door (#88, #92; container stopped) |
+| P0.8 | ✅ | LiveKit key in a 0600 key file; rotated 2026-11-15; in SOPS (`secrets/voice.enc.yaml`) |
+| P0.9 | ✅ | DHCP reservations (Wi-Fi MACs; wired MACs after P0.11); `pi`/`raspberrypi.nghodki.ai` → .39 (#90, checked at the VIP) |
+| P0.10 | ✅ | Omarchy updated and on Tailscale (`nikghodki-omarchy`, tag:agent) |
 | P0.11 | ⬜ | Ethernet for the Sparks (you) |
-| P0.12 | ✅ | `companion-agent` retired (code removed 28 Aug); no failed user units; Jetson `nvidia-cdi-refresh` fixed (CSV mode, retry; role `jetson_cdi`) |
+| P0.12 | ✅ | `companion-agent` retired; Jetson `nvidia-cdi-refresh` fixed (role `jetson_cdi`) |
 | P0.13 | ✅ | LiteLLM 1.109.1 pinned by digest |
-| P0.14 | ⬜ | LiteLLM master + salt key rotation, after the DGXMM session |
-| P0.15 | ✅ | Profile nikhil-ghodki runs as Linux user `hermes-nikhil` with its own Hermes runtime and DefenseClaw (action, fail closed, `homelab` policy, OTLP to dgx-2). Its picoclaw MCP now reaches NATS as `hermes`. Chat test after DGXMM. runbooks/hermes-profiles.md |
-| P0.16 | ✅ | Home Assistant reverse proxy set in its UI (X-Forwarded-For, trusted 192.168.86.44 and 100.65.137.82); `ha.nghodki.ai` returns 200 |
-| P0.17 | ✅ | Keys reviewed 2026-11-15: all 13 kept by decision; narrow `hermes` and `claude-code` (all models) with the aliases in P2.0 |
+| P0.14 | ✅ | LiteLLM in Ansible; master and salt keys rotated into SOPS (#96) |
+| P0.15 | ✅ | Profile nikhil-ghodki as Linux user `hermes-nikhil` with its own Hermes and DefenseClaw. runbooks/hermes-profiles.md. Chat test of both profiles still to do (see below) |
+| P0.16 | ✅ | Home Assistant reverse-proxy settings in its UI. The trusted proxies still name dgx-1 (.44 and its Tailscale IP), from before the cutover; updating them waits on you |
+| P0.17 | ✅ | Keys reviewed 2026-11-15 |
 
 ### Phase 1
 | ID | Status | Notes |
 |---|---|---|
 | P1.1 | ✅ | `nikghodki/homelab`, hardened repo settings, squash-only |
-| P1.2 | ✅ | SOPS + age; key saved offline |
-| P1.3 | ✅ | Ansible baseline applied on all 5 hosts, idempotent; weekly Lynis on all 5 (hardening index 59–68, Fleet Home panels, #42) |
-| P1.4 | ✅ | Devices tagged; `policies/tailscale/policy.hujson` applied; checked from the Pi (bus and Fleet broker open; LiteLLM, SSH and the Fleet API blocked) |
-| P1.5 | ✅ | NATS 2.15.3 on dgx-1 (TLS, MQTT over TLS, deny-by-default users); homelab CA trusted on all hosts; picoclaw connected as `picoclaw`. End-to-end reply pending the qwen3.8 engine (busy in the DGXMM session) |
-| P1.6 | ✅ | dgx-2: VictoriaMetrics, Loki, Tempo, Grafana (19 DefenseClaw dashboards, Fleet Home, AI inventory), vmalert, Alertmanager, Gatus, ntfy; collectors + fleet-metrics on all 5 hosts; DefenseClaw OTLP; GPU (dcgm-exporter on the Sparks; thermal and power from fleet-metrics); Fleet API metrics from dgx-1 (#42); thermal and Edge alerts |
-| P1.7 | ✅ | Alerts → ntfy tested end to end (Gatus and Alertmanager) |
+| P1.2 | ✅ | SOPS + age; key saved offline (runbooks/age-key.md) |
+| P1.3 | ✅ | Ansible baseline on all 5 hosts, idempotent; weekly Lynis; hardening role (#70) |
+| P1.4 | ✅ | Tailscale tags and `policies/tailscale/policy.hujson` applied and tested |
+| P1.5 | ✅ | NATS 2.15.3 on dgx-1 (TLS, MQTT over TLS, deny-by-default users); picoclaw connected as `picoclaw`. End-to-end reply still to test |
+| P1.6 | ✅ | dgx-2: VictoriaMetrics, Loki, Tempo, Grafana, vmalert, Alertmanager; collectors + fleet-metrics on all 5 hosts; GPU and thermal metrics. Gatus and ntfy moved to the Dell (#55) |
+| P1.7 | ✅ | Alerts → ntfy end to end; alerting on the Dell with a dead man (#55, #60); Pocket ID and Argo CD checks (#111) |
 | P1.8 | ✅ | CI with hash-locked tools, unit tests, Renovate |
 | P1.9 | ✅ | GitHub Free (decisions/0001); merge only when `gh pr checks --watch` passes |
-| P1.10 | ⏸️ | Backups merged (#17), **kept off** by decision (decisions/0002) |
-| P1.11 | 🟡 | AI discovery, AIBOM (DefenseClaw nightly on the Jetson + Cisco AIBOM in CI and nightly on dgx-1, dgx-2, Jetson, Pi with the AI inventory dashboard, #46 #49 #50), OTLP + redaction, policy `homelab` in Git, release refresh of dashboards and rules. mcp-scanner now scans real tool definitions (`tools/`: picoclaw_only, homeassistant; 44 tools with pinned hashes). Org review: decisions/0003. Webhooks dropped (private receivers refused). Still to do: LLM judge via LiteLLM (after DGXMM) |
-| P1.12 | 🟡 | Fleet live: gateway on dgx-1, `fleet` stack (Mosquitto TLS + per-device ACLs, Caddy TLS API proxy; D24), Pi daemon device 1/1/1 online, signed policy v1, Fleet metrics and Edge alerts in Grafana. picoclaw stays on its in-process hook (OSS Fleet can't allow calls). Upstream issue drafts in `docs/upstream-issues/` (not posted) |
-| P1.13 | 🟡 | Pocket ID 2.19.2 at `id.nghodki.ai`, contents in Git (`identity/`, sync script with tests). On it: Grafana, Gatus, Phoenix, Temporal UI, and `ops.nghodki.ai` via oauth2-proxy (recipe in runbooks/sign-in.md). HA keeps its own login (phone app). LiteLLM UI, DGXMM UI, Open WebUI after the DGXMM session |
+| P1.10 | ⏸️ | Backups merged (#17). Decision 0002 says off, but they run (rest-server on dgx-2, nightly timers on 4 hosts): **you** decide which wins |
+| P1.11 | ✅ | AIBOM (DefenseClaw nightly + Cisco AIBOM fleet, image scans for the Jetson on dgx-2, #85), OTLP + redaction, policy `homelab` in Git, MCP tool pinning, LLM judge via LiteLLM (#96). Webhooks dropped (private receivers refused) |
+| P1.12 | 🟡 | Fleet live (gateway on dgx-1, Mosquitto TLS + ACLs, signed policy v1); the Pi's SSH tunnel retired (#89). picoclaw stays on its in-process hook (OSS Fleet can't allow calls). Upstream issue drafts not posted (you) |
+| P1.13 | 🟡 | Pocket ID 2.19.3 at `id.nghodki.ai`. Native OIDC: Grafana, Phoenix, Temporal UI, Argo CD, the LiteLLM admin UI (#104). Through the one front-door proxy `edge-auth` (decision 0011): docs, Homepage, Gatus, MLflow, DGXMM (#91–#95, #100). Open WebUI is left (family list, you). HA keeps its own login (phone app) |
 | P1.14 | ✅ | One Alertmanager for vmalert alerts; Gatus posts to ntfy directly |
-| P1.15 | ✅ | Fleet Home dashboard (home page) with GPU, thermal and Lynis panels; Homepage launcher at `ops.nghodki.ai` behind Pocket ID (#41) |
+| P1.15 | ✅ | Fleet Home dashboard; Homepage at `ops.nghodki.ai` behind edge-auth (#93) |
 
 ### Phase 2
 | ID | Status | Notes |
 |---|---|---|
-| P2.0 | ⬜ | Models and aliases (your decision) |
-| P2.4 | 🟡 | DefenseClaw guardrail plugin for LiteLLM written, tested (8 tests, CI) and loads in LiteLLM 1.109.1; enabled in the P0.14 window |
-| P2.6 | 🟡 | Phoenix on dgx-2 (`phoenix.nghodki.ai`, login on); LiteLLM to be connected in the P0.14 window |
-| P2.1-P2.3, P2.5, P2.7, P2.8 | ⬜ | DGXMM work, after the DGXMM session |
+| P2.0 | ⬜ | Models and aliases (your decision). Until then every consumer uses `qwen3.8-27b` (decision 0012) |
+| P2.4 | ✅ | DefenseClaw guardrail plugin on in LiteLLM (#96) |
+| P2.6 | 🟡 | Phoenix on dgx-2; LiteLLM sends traces (#96); agents not yet |
+| P2.1–P2.3, P2.5, P2.7, P2.8 | ⬜ | DGXMM work (DGXMM session; P2.5 pickle gap and P2.7 memory guards wait on you) |
 
 ### Phase 3
 | ID | Status | Notes |
 |---|---|---|
-| P3.1 | ✅ | D2 confirmed, then refined 2026-11-15: Jetson = etcd member + tainted worker for robot/agent/home pods (#40) |
-| P3.2–P3.9 | ⬜ | Waits on Ethernet (P0.11). Plan in architecture §3 and §4.4: Spark-to-Spark traffic on the 200 Gb/s link, interim Docker stacks and their k3s targets |
+| P3.1 | ✅ | D2 confirmed, then refined: Jetson = etcd member + tainted worker (#40) |
+| P3.2 | ✅ | k3s over Wi-Fi (#54, decision 0005): servers on both Sparks, Jetson etcd + tainted worker, Omarchy agent |
+| P3.3 | ✅ | Front door in k3s: kube-vip (VIPs .10 API, .11 edge), CoreDNS, Caddy (#72, decision 0007); cut over 2026-11-15 (#78, #79); old door stopped (#92). Failover drill: platform session |
+| P3.4 | ✅ | Argo CD + KSOPS; merge-to-deploy 178 s (#57–#59) |
+| P3.5 | ✅ | Kyverno Enforce, 6 policies, 2 admission replicas (#65, #68); `build-sign.yml` with cosign keyless (#62–#64). The signed-image acceptance case waits until the GHCR packages are public (you) |
+| P3.6 | ⬜ | Tetragon |
+| P3.7 | 🔄 | Workloads into k3s: platform session |
+| P3.8 | ⬜ | etcd/CNPG backups to SeaweedFS (after P3.7) |
+| P3.9 | ⬜ | Incident runbooks (interim notes in the docs site's Incident playbooks) |
 
 ### Phase 4
 | ID | Status | Notes |
 |---|---|---|
-| P4.1 | ⏸️ | Proposal decisions/0004: OpenBot's server needs closed CopilotKit Intelligence (macOS preview or paid). Recommended: cua + NVIDIA OpenShell on Omarchy. Decision pending (you) |
-| P4.7 | ✅ | Temporal 1.32.2 on dgx-2 (`jobs` stack, PostgreSQL), gRPC 192.168.86.36:7233 LAN-only, namespace `homelab`, UI at `temporal.nghodki.ai` behind Pocket ID (#44). k3s later |
-| P4.9 | ✅ | a2a-scanner on `agents/*/card.yaml` (fails CI on HIGH/CRITICAL; self-test with a known-bad card) and Agentic Radar for agents that opt in with `radar.yaml` (its own venv and lock: it pins rich<14). First card: `agents/hermes/card.yaml` |
+| P4.1 | ⏸️ | Proposal decisions/0004 (recommended: cua + NVIDIA OpenShell on Omarchy). Decision pending (you) |
+| P4.3 | ✅ | MCP admission from Git and the nightly tool drift check (#67); LiteLLM registration waits for P4.2 |
+| P4.7 | ✅ | Temporal 1.32.2 on dgx-2 (`jobs` stack), UI behind Pocket ID (#44) |
+| P4.9 | ✅ | a2a-scanner on agent cards and Agentic Radar in CI |
+| P4.2, P4.4–P4.6, P4.8, P4.10–P4.13 | ⬜ | |
 
 ### Phase 5
 | ID | Status | Notes |
 |---|---|---|
-| P5.1 | ✅ | ROS 2 Kilted + rmw_zenoh: router on the Jetson (container, :7447), MS200 LiDAR driver on the Pi; `/scan` at 10.07 Hz on the Jetson (bursty over Wi-Fi). runbooks/robot-ros.md (#47) |
-| P5.2 | ⬜ | Safety governor: next robotics item; the final test needs you with the robot on blocks |
+| P5.1 | ✅ | ROS 2 Kilted + rmw_zenoh; `/scan` at 10.07 Hz on the Jetson (#47) |
+| P5.2 | 🟡 | Safety governor built and deployed on the Pi with a mock sink (#53, #60); picoclaw as its own user, motion only through the governor (#73); Hermes motion through it too (#87). The on-blocks test needs you |
+| P5.3–P5.7 | ⬜ | |
 
 ### Phase 6
 | ID | Status | Notes |
 |---|---|---|
-| P6.2 | ✅ | Isaac Lab 3.0.0 (NVIDIA arm64 kit-less image) headless on dgx-2: Cartpole 487k steps/s, Anymal-D 98k steps/s (#48) |
-| P6.3 | ⏸️ | Isaac Sim 6.2.0 arm64 image exists (DGX Spark supported); not tested |
-| P6.4 | ✅ | MuJoCo Playground 0.2.0 on MJX/JAX CUDA 13: Go1 224k steps/s; jobs capped at 16 GiB (dgx-2 has a DGXMM engine loaded) (#48) |
+| P6.2 | ✅ | Isaac Lab 3.0.0 headless on dgx-2 (#48) |
+| P6.3 | ⏸️ | Isaac Sim 6.2.0 arm64 image exists; not tested |
+| P6.4 | ✅ | MuJoCo Playground 0.2.0 on dgx-2 (#48) |
+| P6.5 | ✅ | MLflow on dgx-2 behind sign-in (#52, #95); Isaac Lab and MuJoCo runs log to it (#66). A policy video is still to do |
+| P6.1, P6.6–P6.12 | ⬜ | |
 
-### After the DGXMM session
-- P0.14: rotate the LiteLLM master and salt keys into SOPS; remove dead routes (P0.7).
-- P2.4 guardrail plugin on, P2.6 LiteLLM → Phoenix, P1.11 LLM judge.
-- Skill scanner LLM judge back on for both Jetson users (`defenseclaw setup skill-scanner --use-llm`, then `skill scan all`).
-- picoclaw end-to-end reply over NATS, and the Hermes chat tests (both profiles).
-- P1.13 for LiteLLM UI, DGXMM UI and Open WebUI.
-- P2.0 models and aliases (you), then P2.1–P2.3, P2.5 (model supply chain: docs/model-supply-chain.md), P2.7, P2.8.
+### Still to do from the DGXMM/LiteLLM session list
+- Done 2026-11-15: P0.14, P0.7 dead routes, P2.4, P2.6 (LiteLLM), P1.11 judge, the skill-scanner judge on both Jetson
+  users, the LiteLLM admin UI and DGXMM UI sign-in.
+- picoclaw end-to-end reply over NATS, and the Hermes chat tests (both profiles). Both agents now have motion tools
+  (through the governor), so run these with you present or the tools disabled.
+- Open WebUI sign-in (P1.13), after you give the family list.
+- P2.0 models and aliases (you), then P2.1–P2.3, P2.5, P2.7, P2.8.
 
 ### Findings to report upstream
 Drafts in `docs/upstream-issues/` (8, not posted; post them yourself or ask).

@@ -28,4 +28,12 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [ci-scanners.md](ci-scanners.md) (what CI scans, accepted vulnerabilities with expiring ignores, shellcheck),
 [jetson-services.md](jetson-services.md) (Home Assistant and LiveKit on the Jetson: deploy, check, upgrade),
 [aibom.md](aibom.md) (Cisco AIBOM nightly inventory; the Jetson's images are scanned on dgx-2),
-[litellm.md](litellm.md) (the model gateway: keys and their rotation, routes, the DefenseClaw guardrail, Phoenix traces).
+[litellm.md](litellm.md) (the model gateway: keys and their rotation, routes, the DefenseClaw guardrail, Phoenix traces),
+[age-key.md](age-key.md) (the fleet SOPS age key: where it lives, restore, rotation),
+[build-sign.md](build-sign.md) (`build-sign.yml`: GHCR images, cosign keyless signatures, SBOM attestations),
+[edge-connector.md](edge-connector.md) (DefenseClaw Edge Connector on the Pi and the Fleet gateway on dgx-1),
+[hermes-profiles.md](hermes-profiles.md) (each Hermes profile on the Jetson as its own Linux user with its own DefenseClaw),
+[robot-ros.md](robot-ros.md) (ROS 2 with rmw_zenoh, the Zenoh router on the Jetson, the Pi's LiDAR),
+[sign-in.md](sign-in.md) (Pocket ID and the edge-auth proxy: adding an app, clients, groups),
+[temporal.md](temporal.md) (Temporal on dgx-2: the jobs stack, namespace, UI),
+[web-https.md](web-https.md) (the homelab web CA for `*.nghodki.ai`: install on a device, renew).

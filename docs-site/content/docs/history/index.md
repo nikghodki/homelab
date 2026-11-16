@@ -126,5 +126,38 @@ Both Sparks went down from GPU memory exhaustion around 14:46–15:00 ([incident
 | #82 | Docs site: MkDocs Material, served privately from the Dell at `docs.nghodki.ai` behind Pocket ID (`runbooks/docs-site.md`) |
 | #91, #93, #94, #95 | One sign-in proxy (decision 0011): `edge/edge-auth` (oauth2-proxy, client `edge-auth`, callback `auth.nghodki.ai`) behind the front door for docs, Homepage, Gatus' UI, MLflow; token gates on the backends; four per-app oauth2-proxies and clients removed; Homepage's host overrides to the VIP |
 
-PR numbers skipped above (#1) were not merged to `main` (unverified). Open work at the time of writing: the P3.3
-follow-ups (a check from a family device, a tailnet failover drill; `runbooks/edge.md`, "Cutover" steps 5–6).
+## Late evening: scanners, the old door stopped, the LiteLLM window, sign-in for the model UIs (18:56–23:00)
+
+| Commit | What |
+|---|---|
+| #81 | k3s: software TX checksums on `flannel.1` on every node (UDP from Docker to Services) |
+| #83 | CI scanners: Trivy without its secret scanner, standalone shellcheck, expiring `.trivyignore.yaml` |
+| #84 | docs site: measured merge-to-live delay |
+| #85 | Jetson: Cisco AIBOM image scans on dgx-2 by digest; Home Assistant and LiveKit in Git |
+| #86 | dcgm-exporter 4.8.4, not 4.9.0 (4.9 renames the metrics the alerts and dashboards use) |
+| #87 | Hermes robot motion through the Pi safety governor (Jetson MCP copy) |
+| #88 | Edge: model, dgxmanager and ha straight to their backends; nginx-gateway relay retired |
+| #89 | Lynis 3.1.7 upstream, Pocket ID 2.19.3, unused NFS/iperf3 on dgx-1 and the Pi's tunnel retired |
+| #90 | DNS: `pi` and `raspberrypi.nghodki.ai` → 192.168.86.39 |
+| #92 | Docs: the old front door is stopped; model plane direct in the k3s Caddy |
+| #96 | LiteLLM security window: Ansible, key rotation, guardrail, Phoenix, AIBOM LLM, default model (decision 0012) |
+| #97 | Front door: `dgxmanager.nghodki.ai` serves the DGXMM UI only |
+| #98 | Sign-in docs for edge-auth; Renovate covers the docs build; Gatus checks the status gate in-network |
+| #99 | Tool review applied note; docs-site and runbooks for the tool-review fixes |
+| #100 | Sign-in: DGXMM and the LiteLLM admin UI behind edge-auth; DGXMM off the model host |
+| #101 | Homepage: the LiteLLM tile opens the admin UI |
+| #102, #103 | Front-door access log (Caddy JSON on :80/:443) shipped to Loki; what `remote_ip` names |
+| #104 | LiteLLM admin UI: Pocket ID sign-in (client `litellm`, admins → proxy_admin); Pocket ID clients group-restricted |
+| #105 | LiteLLM spend logs (who called the API), OTel limit; scanner rescan outcomes |
+
+## 2026-11-16
+
+| Commit | What |
+|---|---|
+| #106 | LiteLLM: file attachments become text before vLLM (PDFs via pypdf) |
+| #109 | Sign-in: Grafana, Phoenix and the Temporal UI reach Pocket ID at the VIP .11 (the pinned .44 was the stopped old door) |
+| #110 | Front-door check scripts: shellcheck info notes cleared |
+| #111 | Gatus: Pocket ID (OIDC discovery) and Argo CD checks (code review #30) |
+| #112 | CI: DefenseClaw AIBOM and sim `measure.sh` test suites; runs on main are no longer cancelled (code review #56) |
+
+PR numbers skipped above (#1) were not merged to `main` (unverified). Open work: see [Status](../decisions/status.md).

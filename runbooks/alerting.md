@@ -108,8 +108,8 @@ PW=$(sops -d --extract '["ntfy_phone_password"]' secrets/observe.enc.yaml)
 printf 'user = "nikhil:%s"\n' "$PW" | curl -s -K - 'http://192.168.86.49:8085/fleet-alerts/json?poll=1&since=1h'; unset PW
 ```
 
-The Tailscale policy lets admins (the phone) reach the Dell on any port; dgx-1 and dgx-2 only reach it on 22 over
-Tailscale, so test the HTTPS URL from an admin device (phone, MacBook Air), not from a Spark.
+The Tailscale policy lets admins (the phone) reach the Dell on any port; dgx-1 reaches `tag:agent` (the Dell) on 22 and
+443 only, and dgx-2 has no Tailscale grant to it, so test the HTTPS URL from an admin device (phone, MacBook Air).
 
 Test an alert end to end: add one in Alertmanager on dgx-2
 (`docker exec observe-alertmanager-1 amtool --alertmanager.url=http://127.0.0.1:9093 alert add Test severity=warning`),

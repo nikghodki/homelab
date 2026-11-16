@@ -15,7 +15,7 @@ governor that gates motor commands (P5.2) is in [robot-safety.md](robot-safety.m
 | LiDAR node, `/scan` + `/tf_static` | Pi, user unit `ros-lidar.service` (linger on) | role `ros_lidar` |
 | Zenoh settings, session config, launch file | Pi `~/.config/homelab-ros/` | role `ros_lidar` |
 | ROS 2 CLI on the Pi: `ros2-kilted` | Pi `~/.local/bin/ros2-kilted` | role `ros_lidar` |
-| Uptime check "Zenoh router (ROS 2)", `tcp://192.168.86.211:7447` | Gatus (dgx-2), group `robot` | `playbooks/observe.yml` |
+| Uptime check "Zenoh router (ROS 2)", `tcp://192.168.86.211:7447` | Gatus (the Dell), group `robot` | `playbooks/alerting.yml` |
 
 ## Versions (2026-11-15)
 

@@ -172,12 +172,12 @@ Not moved: DGXMM and its engines (§3.2). Coolify was retired on 2026-11-15 (dec
 
 | Tag | Members | May reach |
 |---|---|---|
-| `tag:admin` | Work Mac | everything (SSH, kubectl) |
+| `group:admins` (a user group, not a tag) | your devices (phone, MacBook Air) | everything (SSH, kubectl) |
 | `tag:gpu` | dgx-1, dgx-2 | each other; `tag:control` services |
 | `tag:control` | dgx-1, dgx-2, Jetson (k3s ports) | each other |
 | `tag:agent` | Omarchy, Jetson | LiteLLM, LiteLLM MCP gateway, NATS, Phoenix (OTLP) |
 | `tag:robot` | Pi | NATS (its own subjects), Fleet broker and API on dgx-1, Zenoh router on the Jetson, the OTel collector |
-| `tag:quarantine` | (applied during incidents) | `tag:admin` only |
+| `tag:quarantine` | (applied during incidents) | nothing; reachable by `group:admins` only |
 | phone / you | your devices | the web UIs, ntfy |
 
 ### 4.3 Exposure rules
@@ -541,7 +541,7 @@ Linux x86_64 and arm64 are supported.
 
 #### Dashboards and alerts
 - All **19 DefenseClaw Grafana dashboards** are copied into our Grafana from the DefenseClaw release (provisioned from
-  `cluster/observe/grafana/dashboards/defenseclaw/`, with data sources mapped to VictoriaMetrics, Loki and Tempo):
+  `hosts/stacks/observe/grafana/dashboards/defenseclaw/`, with data sources mapped to VictoriaMetrics, Loki and Tempo):
   1. Overview
   2. Agent Activity (Live)
   3. Agent identity

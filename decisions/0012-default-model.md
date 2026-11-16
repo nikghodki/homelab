@@ -51,5 +51,6 @@ needs change.
   `qwen3.8-27b-nothink`, 2026-11-16): DefenseClaw's plugin watcher allows its LLM call only 120 s.
 - When the P2.0 aliases exist, only LiteLLM changes (an alias such as `smart` pointing at `qwen3.8-27b`), then the
   consumers move to the alias name.
-- Not changed: three disabled Hermes cron jobs (nikjetson) still name `anthropic`/`claude-sonnet-4`; set them to
-  `qwen3.8-27b` (provider custom) before re-enabling them.
+- The three disabled Hermes cron jobs (nikjetson: the two Saapaadu Haldi lunch reminders and the daily wedding
+  status report) named `anthropic`/`claude-sonnet-4`. Set to `qwen3.8-27b`, provider `custom`, on 2026-11-16 with
+  `hermes cron edit`; they stay paused (`enabled: false`). Backup: `~/.hermes/cron/jobs.json.bak-20261116-model`.

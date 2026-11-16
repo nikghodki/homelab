@@ -9,7 +9,7 @@ gets access into the network.
 
 | Document | Covers |
 |---|---|
-| [docs/design.md](docs/design.md) | Purpose, requirements, decisions D1–D23, risks, open questions |
+| [docs/design.md](docs/design.md) | Purpose, requirements, decisions D1–D27, risks, open questions |
 | [docs/architecture.md](docs/architecture.md) | Components, network, cluster, model/tool/agent planes, robotics, security, observability, operations |
 | [docs/project-plan.md](docs/project-plan.md) | Phases, tasks, acceptance checks, milestones |
 | [docs-site/](docs-site/README.md) | Operator documentation (MDX): every host, service, network path, runbook and decision, with status and known differences from the live state |
