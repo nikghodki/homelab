@@ -117,11 +117,15 @@ to stdout (the `(access_log)` snippet). The host collector on each Spark tails t
   `log_credentials` stays off). `X-Api-Key`, `Api-Key`, `X-Goog-Api-Key` and the query parameters `key`, `api_key`,
   `access_token`, `token` are replaced by the same 8-digit hash. `X-Edge-Origin` is only added on the way to the
   backend (`header_up`): the log has the client's request, so it never appears (tested with the pinned image).
-- **The client IP is not the caller's.** Both Services masquerade (`externalTrafficPolicy: Cluster` on the VIP;
-  `externalIPs` on the tailnet Service, where `Local` isn't allowed), so `remote_ip` is the pod network's address on
-  the Spark that took the connection (`10.42.x.1` same node, `10.42.x.0` the other one). Use `api_key_hash` and
-  `User-Agent` to tell callers apart. Keeping the real IP needs `Local` on LoadBalancer Services for both paths
-  (and then a Spark's IP only reaches its own pod): not done.
+- **`remote_ip` is a pod-network address, not the client's IP.** Both Services masquerade
+  (`externalTrafficPolicy: Cluster` on the VIP; `externalIPs` on the tailnet Service, where `Local` isn't allowed):
+  the node whose kube-proxy took the connection appears as `10.42.<n>.0` (to the other Spark's pod) or `10.42.<n>.1`
+  (to its own pod). Fleet hosts that are k3s nodes catch the door's IPs in their **own** kube-proxy, so for them it
+  names the caller: `10.42.1.x` dgx-1, `10.42.0.x` dgx-2, `10.42.2.x` Jetson, `10.42.3.x` Dell
+  (`kubectl get nodes -o custom-columns=N:.metadata.name,C:.spec.podCIDR`). Any other client (Mac, phone, over the
+  tailnet or the LAN) shows the Spark that received it; tell those apart by `api_key_hash` and `User-Agent`. The
+  real IP would need `Local` on LoadBalancer Services for both paths (then a Spark's IP reaches only its own pod):
+  not done.
 
 Who called `/v1/` in the last hour, by key and by source address (Grafana → Explore → Loki):
 
