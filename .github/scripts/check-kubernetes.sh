@@ -33,14 +33,16 @@ chmod 644 "$fixture/bad-pod.yaml"
 out=$(kyverno apply policies/kyverno --resource /fixture/bad-pod.yaml 2>&1 || true)
 echo "$out"
 if grep -qi 'parsing error' <<<"$out"; then echo "::error::a Kyverno policy failed to parse"; exit 1; fi
-policies=$(grep -l '^kind: ValidatingPolicy' policies/kyverno/*.yaml | wc -l)
+# restrict-ephemeral-containers matches only the pods/ephemeralcontainers subresource, not a pod: checked below
+policies=$(grep -l '^kind: ValidatingPolicy' policies/kyverno/*.yaml | grep -vc restrict-ephemeral-containers)
 failed=$(grep -c '^policy .* -> resource default/Pod/bad-pod failed' <<<"$out" || true)
 if [ "$failed" -ne "$policies" ]; then
   echo "::error::bad-pod fixture should fail all $policies policies, failed $failed"; exit 1
 fi
-# `kubectl debug` adds containers through pods/ephemeralcontainers (code review #10): a pod whose only bad container is
-# an ephemeral one must still fail every image and privilege policy (the CLI checks the CEL; the subresource match
-# itself was tested live, runbooks/kyverno.md).
+# `kubectl debug` adds containers through pods/ephemeralcontainers (code review #10). The pod policies' CEL covers
+# ephemeral containers (a pod whose only bad container is an ephemeral one fails all four), and
+# restrict-ephemeral-containers.yaml matches the subresource itself (admission only; tested live, runbooks/kyverno.md)
+# with the same registry list as restrict-registries.yaml.
 cat > "$fixture/bad-debug.yaml" <<'POD'
 apiVersion: v1
 kind: Pod
@@ -62,8 +64,14 @@ out=$(kyverno apply policies/kyverno/disallow-latest-tag.yaml policies/kyverno/d
 echo "$out"
 failed=$(grep -c '^policy .* -> resource default/Pod/bad-debug failed' <<<"$out" || true)
 if [ "$failed" -ne 4 ]; then echo "::error::bad-debug (ephemeral container) should fail 4 policies, failed $failed"; exit 1; fi
-for f in disallow-latest-tag disallow-privileged require-image-digest restrict-registries verify-images; do
-  grep -q 'resources: \[pods, pods/ephemeralcontainers\]' "policies/kyverno/$f.yaml" \
-    || { echo "::error::$f.yaml must match pods/ephemeralcontainers"; exit 1; }
-done
+grep -q 'resources: \[pods/ephemeralcontainers\]' policies/kyverno/restrict-ephemeral-containers.yaml \
+  || { echo "::error::restrict-ephemeral-containers.yaml must match pods/ephemeralcontainers"; exit 1; }
+python3 - <<'PYCHK'
+import re, sys
+lists = [re.search(r"- name: allowed\n      expression: >-\n(.*?)\n    - name:", open(f).read(), re.S).group(1)
+         for f in ("policies/kyverno/restrict-registries.yaml", "policies/kyverno/restrict-ephemeral-containers.yaml")]
+if lists[0] != lists[1]:
+    print("::error::the registry lists in restrict-registries.yaml and restrict-ephemeral-containers.yaml differ")
+    sys.exit(1)
+PYCHK
 kyverno apply policies/kyverno --resource cluster/ --policy-report

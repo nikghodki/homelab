@@ -1,0 +1,76 @@
+# Ephemeral containers (`kubectl debug`) arrive through the pods/ephemeralcontainers subresource, which the pod policies
+# don't match: their background scans can't list a subresource, and a policy that matches one is "not ready for
+# reporting" (Argo CD then shows kyverno-policies Degraded). So the same checks for ephemeral containers live here,
+# admission only (code review #10). Enforce. The registry list must equal restrict-registries.yaml's (CI checks).
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: restrict-ephemeral-containers
+  annotations:
+    policies.kyverno.io/title: Ephemeral containers follow the image and privilege rules
+    policies.kyverno.io/description: >-
+      kubectl debug containers: an allowed registry, pinned by digest (or a ghcr.io/nikghodki/ tag), not :latest, not
+      privileged. Outside kube-system, kyverno, argocd and cnpg-system.
+spec:
+  validationActions: [Deny]
+  failurePolicy: Fail
+  evaluation:
+    background: {enabled: false}
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kyverno, argocd, cnpg-system]
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [UPDATE]
+        resources: [pods/ephemeralcontainers]
+  variables:
+    - name: allowed
+      expression: >-
+        [
+          'ghcr.io/nikghodki/',
+          'docker.io/rancher/',
+          'quay.io/argoproj/',
+          'ecr-public.aws.com/docker/library/redis:',
+          'public.ecr.aws/docker/library/redis:',
+          'quay.io/viaductoss/ksops:',
+          'reg.kyverno.io/kyverno/',
+          'ghcr.io/kyverno/',
+          'ghcr.io/cloudnative-pg/',
+          'ghcr.io/kube-vip/kube-vip:',
+          'docker.io/library/caddy:',
+          'registry.k8s.io/kube-state-metrics/kube-state-metrics:',
+          'quay.io/oauth2-proxy/oauth2-proxy:',
+          'ghcr.io/open-webui/open-webui:',
+          'docker.io/grafana/mcp-grafana:',
+          'quay.io/containers/kubernetes_mcp_server:',
+          'ghcr.io/argoproj-labs/mcp-for-argocd:'
+        ]
+    - name: ephemeral
+      expression: "has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : []"
+    - name: normalized
+      expression: >-
+        variables.ephemeral.map(c, c.image).map(i,
+          (i.split('/').size() > 1 && (i.split('/')[0].contains('.') || i.split('/')[0].contains(':')
+            || i.split('/')[0] == 'localhost'))
+          ? i
+          : (i.split('/').size() > 1 ? 'docker.io/' + i : 'docker.io/library/' + i))
+  validations:
+    - expression: variables.normalized.all(i, variables.allowed.exists(p, i.startsWith(p)))
+      messageExpression: >-
+        'ephemeral containers from registries that are not allowed: '
+        + variables.normalized.filter(i, !variables.allowed.exists(p, i.startsWith(p))).join(', ')
+    - expression: >-
+        variables.ephemeral.all(c, c.image.startsWith('ghcr.io/nikghodki/') || c.image.contains('@sha256:'))
+      message: ephemeral containers must be pinned by digest (image@sha256:...)
+    - expression: >-
+        variables.ephemeral.all(c, c.image.contains('@')
+          || (c.image.lastIndexOf(':') > c.image.lastIndexOf('/') && !c.image.endsWith(':latest')))
+      message: ephemeral containers need a tag that isn't latest, or a digest
+    - expression: >-
+        variables.ephemeral.all(c, !has(c.securityContext) || !has(c.securityContext.privileged)
+          || !c.securityContext.privileged)
+      message: privileged ephemeral containers are not allowed
