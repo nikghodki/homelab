@@ -33,6 +33,7 @@ phoenix            edge
 temporal           edge
 mlflow             edge
 argocd             edge
+ops-agent          edge
 
 # Not HTTP: NATS (4222/8883) and the DefenseClaw Fleet broker/API (8884/8971) on dgx-1, restic on dgx-2.
 nats               dgx-1

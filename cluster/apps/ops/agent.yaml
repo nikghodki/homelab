@@ -1,0 +1,307 @@
+# The ops agent itself (decision 0013): ops-ingest, ops-worker, ops-portal, one image (agents/ops-agent, signed by
+# build-sign.yml). Shadow mode: no credential here can change anything outside the agent's own database.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ops-agent
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-ingest
+  labels: {app.kubernetes.io/name: ops-ingest, app.kubernetes.io/part-of: ops-agent}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: ops-ingest}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: ops-ingest, app.kubernetes.io/part-of: ops-agent, ops.nghodki.ai/role: agent}
+    spec:
+      # Kubernetes Warning events and Argo CD app history: the read-only identity (no Secrets, no exec)
+      serviceAccountName: ops-agent-read
+      nodeSelector: {nghodki.ai/role: gpu}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector: {matchLabels: {app.kubernetes.io/name: ops-ingest}}
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: ingest
+          image: ghcr.io/nikghodki/ops-agent:0.1.1
+          args: [ingest]
+          env:
+            - name: OPS_DB_DSN
+              valueFrom: {secretKeyRef: {name: ops-db-app, key: uri}}
+            - {name: TEMPORAL_TLS_DIR, value: /etc/ops-agent/temporal}
+            - {name: INGEST_TOKEN_FILE, value: /etc/ops-agent/secrets/ingest-token}
+            - {name: LLM_KEY_FILE, value: /etc/ops-agent/secrets/litellm-key}
+            - {name: NTFY_TOKEN_FILE, value: /etc/ops-agent/secrets/ntfy-token}
+            - {name: HEARTBEAT_TOKEN_FILE, value: /etc/ops-agent/secrets/heartbeat-token}
+            - {name: ORIGIN_TOKEN_FILE, value: /etc/ops-agent/secrets/origin-token}
+            - {name: MCP_TOKEN_DIR, value: /etc/ops-agent/mcp}
+            - {name: OPSRO_KEY_FILE, value: /etc/ops-agent/ssh/id_ed25519}
+            - {name: OPSRO_KNOWN_HOSTS, value: /etc/ops-agent/known_hosts/known_hosts}
+            - {name: DEPLOY_KEY_FILE, value: /etc/ops-agent/git/deploy-key}
+            - {name: MODE_FILE, value: /etc/ops-agent/mode/mode.yaml}
+            - {name: HEARTBEAT_URL, value: "http://192.168.86.49:8081/api/v1/endpoints/ops-agent_ops-agent-heartbeat/external"}
+            - {name: HOME, value: /var/lib/ops-agent}
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: metrics, containerPort: 9100}
+          resources:
+            requests: {cpu: 20m, memory: 96Mi}
+            limits: {cpu: 500m, memory: 384Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 30
+            failureThreshold: 4
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/ops-agent}
+            - {name: tmp, mountPath: /tmp}
+            - {name: temporal, mountPath: /etc/ops-agent/temporal, readOnly: true}
+            - {name: secrets, mountPath: /etc/ops-agent/secrets, readOnly: true}
+            - {name: git, mountPath: /etc/ops-agent/git, readOnly: true}
+            - {name: known-hosts, mountPath: /etc/ops-agent/known_hosts, readOnly: true}
+            - {name: mode, mountPath: /etc/ops-agent/mode, readOnly: true}
+      volumes:
+        - {name: data, emptyDir: {sizeLimit: 512Mi}}
+        - {name: tmp, emptyDir: {sizeLimit: 64Mi}}
+        - name: temporal
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: temporal-ca.crt, path: ca.crt}, {key: temporal-tls.crt, path: tls.crt}, {key: temporal-tls.key, path: tls.key}]
+        - name: secrets
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: ingest-token, path: ingest-token}, {key: litellm-key, path: litellm-key}, {key: ntfy-token, path: ntfy-token},
+                    {key: heartbeat-token, path: heartbeat-token}, {key: origin-token, path: origin-token}]
+        - name: git
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: deploy-key, path: deploy-key}]
+        - name: known-hosts
+          configMap:
+            name: ops-known-hosts
+            items: [{key: known_hosts, path: known_hosts}]
+        - name: mode
+          configMap: {name: ops-mode}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-worker
+  labels: {app.kubernetes.io/name: ops-worker, app.kubernetes.io/part-of: ops-agent}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: ops-worker}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: ops-worker, app.kubernetes.io/part-of: ops-agent, ops.nghodki.ai/role: agent}
+    spec:
+      serviceAccountName: ops-agent
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector: {matchLabels: {app.kubernetes.io/name: ops-worker}}
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: worker
+          image: ghcr.io/nikghodki/ops-agent:0.1.1
+          args: [worker]
+          env:
+            - name: OPS_DB_DSN
+              valueFrom: {secretKeyRef: {name: ops-db-app, key: uri}}
+            - {name: TEMPORAL_TLS_DIR, value: /etc/ops-agent/temporal}
+            - {name: INGEST_TOKEN_FILE, value: /etc/ops-agent/secrets/ingest-token}
+            - {name: LLM_KEY_FILE, value: /etc/ops-agent/secrets/litellm-key}
+            - {name: NTFY_TOKEN_FILE, value: /etc/ops-agent/secrets/ntfy-token}
+            - {name: HEARTBEAT_TOKEN_FILE, value: /etc/ops-agent/secrets/heartbeat-token}
+            - {name: ORIGIN_TOKEN_FILE, value: /etc/ops-agent/secrets/origin-token}
+            - {name: MCP_TOKEN_DIR, value: /etc/ops-agent/mcp}
+            - {name: OPSRO_KEY_FILE, value: /etc/ops-agent/ssh/id_ed25519}
+            - {name: OPSRO_KNOWN_HOSTS, value: /etc/ops-agent/known_hosts/known_hosts}
+            - {name: DEPLOY_KEY_FILE, value: /etc/ops-agent/git/deploy-key}
+            - {name: MODE_FILE, value: /etc/ops-agent/mode/mode.yaml}
+            - {name: HEARTBEAT_URL, value: "http://192.168.86.49:8081/api/v1/endpoints/ops-agent_ops-agent-heartbeat/external"}
+            - {name: HOME, value: /var/lib/ops-agent}
+          ports:
+            - {name: metrics, containerPort: 9100}
+          resources:
+            requests: {cpu: 20m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/ops-agent}
+            - {name: tmp, mountPath: /tmp}
+            - {name: temporal, mountPath: /etc/ops-agent/temporal, readOnly: true}
+            - {name: secrets, mountPath: /etc/ops-agent/secrets, readOnly: true}
+            - {name: mcp, mountPath: /etc/ops-agent/mcp, readOnly: true}
+            - {name: ssh, mountPath: /etc/ops-agent/ssh, readOnly: true}
+            - {name: known-hosts, mountPath: /etc/ops-agent/known_hosts, readOnly: true}
+            - {name: mode, mountPath: /etc/ops-agent/mode, readOnly: true}
+      volumes:
+        - {name: data, emptyDir: {sizeLimit: 256Mi}}
+        - {name: tmp, emptyDir: {sizeLimit: 64Mi}}
+        - name: temporal
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: temporal-ca.crt, path: ca.crt}, {key: temporal-tls.crt, path: tls.crt}, {key: temporal-tls.key, path: tls.key}]
+        - name: secrets
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: litellm-key, path: litellm-key}, {key: ntfy-token, path: ntfy-token}, {key: heartbeat-token, path: heartbeat-token}]
+        - name: mcp
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: mcp-grafana-auth, path: mcp-grafana}, {key: mcp-argocd-auth, path: mcp-argocd}]
+        - name: ssh
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: opsro-ssh-key, path: id_ed25519}]
+        - name: known-hosts
+          configMap:
+            name: ops-known-hosts
+            items: [{key: known_hosts, path: known_hosts}]
+        - name: mode
+          configMap: {name: ops-mode}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-portal
+  labels: {app.kubernetes.io/name: ops-portal, app.kubernetes.io/part-of: ops-agent}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: ops-portal}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: ops-portal, app.kubernetes.io/part-of: ops-agent, ops.nghodki.ai/role: agent}
+    spec:
+      serviceAccountName: ops-agent
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector: {matchLabels: {app.kubernetes.io/name: ops-portal}}
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: portal
+          image: ghcr.io/nikghodki/ops-agent:0.1.1
+          args: [portal]
+          env:
+            - name: OPS_DB_DSN
+              valueFrom: {secretKeyRef: {name: ops-db-app, key: uri}}
+            - {name: ORIGIN_TOKEN_FILE, value: /etc/ops-agent/secrets/origin-token}
+            - {name: MODE_FILE, value: /etc/ops-agent/mode/mode.yaml}
+          ports:
+            - {name: http, containerPort: 8080}
+          resources:
+            requests: {cpu: 10m, memory: 80Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: secrets, mountPath: /etc/ops-agent/secrets, readOnly: true}
+            - {name: mode, mountPath: /etc/ops-agent/mode, readOnly: true}
+      volumes:
+        - {name: tmp, emptyDir: {sizeLimit: 16Mi}}
+        - name: secrets
+          secret:
+            secretName: ops-agent
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
+            items: [{key: origin-token, path: origin-token}]
+        - name: mode
+          configMap: {name: ops-mode}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ops-portal
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app.kubernetes.io/name: ops-portal}}
+---
+# Fixed ClusterIPs (cluster/README.md): the front door calls the portal by address (no cluster DNS on its path);
+# Alertmanager (Docker on dgx-2) posts to ingest and VictoriaMetrics scrapes ingest and worker.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ops-portal-ip
+spec:
+  clusterIP: 10.43.0.140
+  selector: {app.kubernetes.io/name: ops-portal}
+  ports:
+    - {name: http, port: 8080, targetPort: http, protocol: TCP}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ops-ingest-ip
+spec:
+  clusterIP: 10.43.0.141
+  selector: {app.kubernetes.io/name: ops-ingest}
+  ports:
+    - {name: http, port: 8080, targetPort: http, protocol: TCP}
+    - {name: metrics, port: 9100, targetPort: metrics, protocol: TCP}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ops-worker-metrics
+spec:
+  clusterIP: 10.43.0.142
+  selector: {app.kubernetes.io/name: ops-worker}
+  ports:
+    - {name: metrics, port: 9100, targetPort: metrics, protocol: TCP}

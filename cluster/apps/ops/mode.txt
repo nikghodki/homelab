@@ -1,0 +1,4 @@
+# (YAML; a .txt name so the manifest checks skip it. Mounted as mode.yaml.)
+# The ops agent's kill switch in Git (design §11.1, runbooks/ops-agent.md). The effective mode is the stricter of
+# this file and the portal's Stop switch. shadow = watch, investigate, report; stopped = nothing at all.
+mode: shadow

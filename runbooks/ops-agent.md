@@ -3,6 +3,108 @@
 The ambient operations agent ([design](../docs/ambient-agent-design.md), [decision 0013](../decisions/0013-ambient-ops-agent.md)).
 Each section below is self-contained; other parts of the agent add their own.
 
+**Mode: shadow (S1).** It watches, investigates with read-only tools and the local model, writes RCAs and
+postmortems into its own database, and notifies on its own ntfy topic. It has **no write access anywhere**: no
+GitHub write, no restarts, no syncs, no silences. Promotion past shadow (PRs, then live actions) waits for your review.
+
+| Piece | Where |
+|---|---|
+| Code | `agents/ops-agent` (one image, `ghcr.io/nikghodki/ops-agent`, built and signed by `build-sign.yml`) |
+| Workloads | `cluster/apps/ops` (Argo CD app `ops`): `ops-ingest` (2), `ops-worker` (2), `ops-portal` (2), the read-only MCP servers, CNPG `ops-db` (2 instances) |
+| Cluster reader | ClusterRole `ops-agent-read` (`cluster/platform/ops-agent-rbac`, app `ops-agent-rbac`): get/list/watch, no Secrets, no exec |
+| Portal | **https://ops-agent.nghodki.ai** (front-door sign-in, `admins`): Feed, Incident, Replay, Audit, Stop |
+| Workflows | Temporal on dgx-2, namespace `ops-agent`, client certificate `ops-agent.crt` (writer on that namespace only; runbooks/temporal.md) |
+| Model | LiteLLM key `ops-agent`: `qwen3.8-27b` and `-nothink` only, 30 rpm, 150k tpm, 2 in flight; the agent's own budget: 1 M tokens/day, 150k and 25 tool calls per incident, 2 investigations at once |
+| Notifications | ntfy topic **`ops-agent`** (user `ops-agent` may only write; `nikhil` reads) |
+| Kill switch | the portal's **Stop** button, or `mode: stopped` in `cluster/apps/ops/mode.txt` (the stricter one wins) |
+| Watchers | Gatus group `ops-agent` (portal, portal health, ingest, worker heartbeat); vmalert `ops-agent.yml` |
+| Credentials | `cluster/apps/ops/ops-agent.enc.yaml` (KSOPS): LiteLLM key, Grafana Viewer token, Argo CD readonly token, MCP server tokens, Temporal cert, opsro key, deploy key, ntfy token, heartbeat token, ingest token, the front door's origin token. Sources in `secrets/{litellm,observe,argocd,pki,ops-agent}.enc.yaml` |
+
+### What it watches
+
+- **Alertmanager**: a receiver `ops-agent` at the top of the route tree with `continue: true`, so every existing
+  ntfy route sees the same alerts as before. Alerts labelled `ops_agent_only` (`GatusEndpointFailing`, which would
+  duplicate Gatus' own ntfy alerts) stop at the `null` receiver after it. Alertmanager runs with
+  `receiver-name-in-metrics`, and `AlertDeliveryFailing` ignores receiver `ops-agent`: the agent being down never
+  pages through the public ntfy.sh fallback.
+- **Gatus** results through VictoriaMetrics (`GatusEndpointFailing`, `for: 3m`).
+- **Kubernetes Warning events** (BackOff, OOMKilled, FailedScheduling, FailedMount, repeated Unhealthy, Kyverno
+  PolicyViolation), watched by one ingest replica at a time (Postgres advisory lock).
+- **Changes**: merges to `main` (a read-only clone with the deploy key `ops-agent`) and Argo CD syncs; an incident
+  within 20 minutes after a change to the same component is tagged `during-change`.
+- **CI**: GitHub Actions runs through the public API (the repo is public; without a token a private repo turns the
+  poller off). Failures with 0 steps are classed `infra` (billing, runner), the rest `check`. Reported only.
+
+Correlation: one open incident per key; a host that is down collects every event on it; more than 10 new events in
+5 minutes is one storm incident; an alert that fires more than 5 times an hour becomes one "flapping" item.
+
+### Investigation
+
+First look (fixed queries per class, `agents/ops-agent/ops_agent/playbooks/first_look.yaml`) -> recall (runbook
+search, past incidents) -> the model with the read-only tools (metrics, logs, k3s, Argo CD, `ops-ro` host commands, CI,
+runbooks, past incidents, changes) -> RCA with cited evidence (uncited claims are removed) and a second look. Every
+tool result is redacted, capped, stored as an evidence item (E1, E2, ...) with a Grafana/Argo CD/GitHub link where
+there is one, and fenced as data. When the model is down or the budget is used up, the RCA is the evidence without
+analysis (decision 0013 Q6: fixed queries only, no cloud model).
+
+### Notifications (decision 0013 Q9, Q10)
+
+| What | When |
+|---|---|
+| Family-facing incident (Home Assistant, Open WebUI, DNS, the front door) | at once, urgent, also in quiet hours |
+| Critical RCA ready | at once (high); in quiet hours 22:30-07:30 held until 07:30 |
+| Everything else | in the 08:00 digest |
+
+Buttons: **Open** (the portal), **Snooze 1 h** and **Dismiss** (`/ntfy-action/<token>`, a random token per message
+for one incident; they only make the agent quieter). Never an Approve button.
+
+**On the phone**: in the ntfy app, add topic `ops-agent` on the same server as `fleet-alerts`
+(`https://nikghodki-omarchy-1.tail1cb707.ts.net`, user `nikhil`).
+
+### Stop
+
+Portal -> **Stop**: the workers cancel every running incident workflow, stop polling Temporal (no new
+investigations, no model calls, no SSH), ingest keeps recording events without starting workflows, and the heartbeat
+reports "agent stopped". **Resume** in the portal (type `resume`). From Git: `mode: stopped` in
+`cluster/apps/ops/mode.txt`, merge (the pods roll with the new ConfigMap). Last resort:
+`kubectl -n ops scale deploy ops-worker ops-ingest --replicas 0` (Argo CD scales them back unless you stop its sync).
+
+### Replay (A0)
+
+`agents/ops-agent/ops_agent/replay/`: the gold set (`gold.yaml`, seven past incidents with their expected RCAs) and
+the harness. It runs on dgx-1 against the agent's database (`10.43.0.143`) and the MCP servers on their fixed
+ClusterIPs, with the clock set back to each incident (metrics and logs stop there, the runbooks are the commit that was
+on `main` then, live-only tools answer from recorded output):
+
+```bash
+~/homelab-wt/.tools/ops-env.sh python -m ops_agent replay run --engine own-loop      # or --engine holmesgpt
+~/homelab-wt/.tools/ops-env.sh python -m ops_agent replay show <run>                 # RCA next to the gold
+~/homelab-wt/.tools/ops-env.sh python -m ops_agent replay score <run> G1 --root-cause yes --correct 4 --total 5
+```
+
+(`ops-env.sh` puts the agent's credentials in a private temp dir for the duration of the command.) Results: the
+portal's Replay page and the design's §11.5.
+
+### Troubleshooting
+
+- No incidents although alerts fire: `kubectl -n ops logs deploy/ops-ingest`; Alertmanager's
+  `alertmanager_notifications_failed_total{receiver_name="ops-agent"}`; Gatus `ops-ingest`.
+- Incidents stay "open" without an RCA: the worker isn't polling (portal mode STOPPED, or
+  `kubectl -n ops logs deploy/ops-worker`), Temporal unreachable (certificate, runbooks/temporal.md), or the budget
+  is used up (header of the portal).
+- RCAs say "evidence collected, no model analysis": the model plane was down or answered 5xx (the loop retries
+  three times), or DefenseClaw refused a prompt built from the evidence (the RCA notes say so).
+- Portal 403 "Use https://ops-agent.nghodki.ai": the request didn't come through the front door, or the origin token
+  differs (rotate it with the others: runbooks/sign-in.md, then update `origin-token` in `ops-agent.enc.yaml`).
+
+### Rotate
+
+LiteLLM key (runbooks/litellm.md "Rotating a virtual key"), Grafana token (Grafana -> Service accounts -> ops-agent),
+Argo CD token (runbooks/argocd.md), Temporal certificate (`hosts/files/pki/temporal/issue.sh client ops-agent
+ns:ops-agent:writer`), opsro key (below), deploy key (`gh repo deploy-key`), ntfy token and heartbeat token
+(`secrets/observe.enc.yaml`, then `playbooks/alerting.yml`): each time also update `cluster/apps/ops/ops-agent.enc.yaml`
+and merge. Every 90 days.
+
 ## Host access (opsro)
 
 The agent reads hosts through one SSH user, `opsro`, on all five hosts (dgx-1, dgx-2, Jetson, the Dell, the Pi),

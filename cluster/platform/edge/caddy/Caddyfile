@@ -374,6 +374,24 @@
 		}
 	}
 
+	# The ops agent's portal (decision 0013, runbooks/ops-agent.md), in k3s on its fixed ClusterIP. Signed in (admins).
+	# Without a session only /healthz (Gatus) and /ntfy-action/* (ntfy's Snooze/Dismiss buttons: a random per-message
+	# token for one incident, and they can only make the agent quieter, never approve anything; Q9).
+	@opsagent host ops-agent.nghodki.ai
+	handle @opsagent {
+		@opsagent_machine path /healthz /ntfy-action/*
+		handle @opsagent_machine {
+			@plain protocol http
+			redir @plain https://{host}{uri} 308
+			reverse_proxy 10.43.0.140:8080 {
+				header_up X-Edge-Origin {env.EDGE_ORIGIN_TOKEN}
+			}
+		}
+		handle {
+			import signed_in 10.43.0.140:8080 admins
+		}
+	}
+
 	# Anything else (the front door by IP, an unknown name): the model plane, as nginx-gateway's default server did.
 	handle {
 		import model_plane

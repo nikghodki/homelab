@@ -1,0 +1,10 @@
+# Host keys the ops agent's SSH client trusts (opsro on the five hosts, github.com for the read-only clone).
+# Hosts: ssh-keyscan from dgx-1 on the LAN, each key checked against dgx-1's known_hosts; github.com: api.github.com/meta.
+192.168.86.44 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM96vL9Uytdm2lNGtmfDtpOApRJZnRjsr70r+deB/5VJ
+192.168.86.36 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOF2joJDozkqdQBEAySsNI9d1hPZJ+x5yFhnrR+jlMaZ
+192.168.86.211 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAw7g8Z9mEERV5RftbKGNKlJoKK9eLr9vT50fKwzjQAH
+192.168.86.49 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINph0MLOxATY/PWAkIr22Tvr6sAaKeMLfSq4yWgk3abE
+192.168.86.39 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHjXpATDIwIXfT8knuxAbIGfos57oXpfeRUCuGTQmlfd
+github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=

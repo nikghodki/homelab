@@ -60,9 +60,9 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 | 10.43.0.111:8000 | `kyverno/kyverno-reports-host` | VictoriaMetrics |
 | 10.43.0.120:8080 | `kube-system/kube-state-metrics-host` | VictoriaMetrics |
 | 10.43.0.130:8080 | `open-webui/open-webui` | edge-caddy (`webui.nghodki.ai`) |
-| 10.43.0.140:8080 | `ops/ops-portal-ip` (reserved) | edge-caddy (`ops-agent.nghodki.ai`) |
-| 10.43.0.141:8080, :9100 | `ops/ops-ingest-ip` (reserved) | Alertmanager (webhook), VictoriaMetrics |
-| 10.43.0.142:9100 | `ops/ops-worker-metrics` (reserved) | VictoriaMetrics |
+| 10.43.0.140:8080 | `ops/ops-portal-ip` | edge-caddy (`ops-agent.nghodki.ai`) |
+| 10.43.0.141:8080, :9100 | `ops/ops-ingest-ip` | Alertmanager (webhook), VictoriaMetrics |
+| 10.43.0.142:9100 | `ops/ops-worker-metrics` | VictoriaMetrics |
 | 10.43.0.143:5432 | `ops/ops-db-host` | the ops agent's replay harness on dgx-1 (runbooks/ops-agent.md) |
 | 10.43.0.144:8000, 10.43.0.145:8080, 10.43.0.146:3000 | `ops/mcp-grafana`, `ops/mcp-kubernetes`, `ops/mcp-argocd` | the ops agent and its replay harness |
 | 10.43.0.150:4000 | `litellm/litellm` | edge-caddy (`model.nghodki.ai` /v1, `litellm-admin`), Open WebUI, DGXMM's route sync (Docker on dgx-1), the ops agent |

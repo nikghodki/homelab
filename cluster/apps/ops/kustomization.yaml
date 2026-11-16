@@ -8,9 +8,16 @@ resources:
   - database.yaml
   - mcp-servers.yaml
   - networkpolicies.yaml
+  - agent.yaml
 generators:
   - secret-generator.yaml
 configMapGenerator:
+  - name: ops-mode
+    files:
+      - mode.yaml=mode.txt
+  - name: ops-known-hosts
+    files:
+      - known_hosts
   - name: mcp-kubernetes
     files:
       - mcp-kubernetes.toml
