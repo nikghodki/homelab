@@ -105,3 +105,55 @@ def test_image_falls_back_to_copied_app_dirs(run, monkeypatch):
     doc = json.loads(next(state.glob("h-*.json")).read_text())
     assert doc["targets"]["container:litellm"]["method"] == "docker-cp-fallback"
     assert ("img:1", True) in calls
+
+
+def set_cfg(tmp_path, **extra):
+    cfg = tmp_path / "targets.json"
+    cfg.write_text(json.dumps({**json.loads(cfg.read_text()), **extra}))
+
+
+def test_low_memory_skips_image_targets_only(run, tmp_path, monkeypatch):
+    go, state = run
+    set_cfg(tmp_path, image_min_mem_gib=20)
+    monkeypatch.setattr(fleet, "mem_available_gib", lambda: 12.5)
+    monkeypatch.setattr(fleet, "image_of", lambda c: pytest.fail("a skipped image must not be touched"))
+    rc, lines = go()
+    assert rc == 0  # a skip is not an error
+    skip, summary = lines
+    assert skip == {"event": "aibom.skipped", "host": "h", "target": "container:litellm",
+                    "reason": "skipped: low memory", "mem_available_gib": 12.5, "need_gib": 20.0}
+    assert summary["skipped"] == ["container:litellm"] and summary["errors"] == []
+    assert summary["targets"] == {"a": 2}
+    doc = json.loads(next(state.glob("h-*.json")).read_text())
+    assert doc["targets"]["container:litellm"]["status"] == "skipped"
+
+
+def test_per_container_threshold_and_enough_memory(run, tmp_path, monkeypatch):
+    go, _ = run
+    set_cfg(tmp_path, image_min_mem_gib=20, image_min_mem_gib_by_container={"litellm": 40})
+    monkeypatch.setattr(fleet, "mem_available_gib", lambda: 41.0)
+    rc, lines = go()
+    assert rc == 0 and lines[0]["skipped"] == [] and lines[0]["targets"]["container:litellm"] == 1
+    monkeypatch.setattr(fleet, "mem_available_gib", lambda: 39.0)
+    rc, lines = go()
+    assert lines[0]["event"] == "aibom.skipped" and lines[0]["need_gib"] == 40.0
+
+
+def test_skipped_target_is_compared_with_its_last_real_scan(run, tmp_path, monkeypatch):
+    go, state = run
+    day = datetime.date.today()
+    go()  # scanned: becomes "3 days ago"
+    next(state.glob("h-*.json")).rename(state / f"h-{(day - datetime.timedelta(days=3)).isoformat()}.json")
+    set_cfg(tmp_path, image_min_mem_gib=20)
+    monkeypatch.setattr(fleet, "mem_available_gib", lambda: 5.0)
+    rc, lines = go()  # skipped: becomes "yesterday"
+    assert lines[1]["removed"] == 0 and lines[1]["added"] == 0
+    (state / f"h-{day.isoformat()}.json").rename(state / f"h-{(day - datetime.timedelta(days=1)).isoformat()}.json")
+    monkeypatch.setattr(fleet, "mem_available_gib", lambda: 64.0)
+    rc, lines = go()  # scanned again: nothing new, although yesterday had no report for it
+    (summary,) = lines
+    assert summary["added"] == 0 and summary["removed"] == 0 and summary["skipped"] == []
+
+
+def test_mem_available_reads_proc_meminfo():
+    assert fleet.mem_available_gib() > 0

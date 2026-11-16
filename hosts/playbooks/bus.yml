@@ -17,6 +17,7 @@
     nats_admin_password_hash: "{{ bus_secrets.nats_admin_password_hash }}"
     nats_picoclaw_password_hash: "{{ bus_secrets.nats_picoclaw_password_hash }}"
     nats_hermes_password_hash: "{{ bus_secrets.nats_hermes_password_hash }}"
+    nats_operator_password_hash: "{{ bus_secrets.nats_operator_password_hash }}"
     nats_sys_password_hash: "{{ bus_secrets.nats_sys_password_hash }}"
     pki_nats_key: "{{ pki_secrets.pki_nats_key }}"
   roles:
@@ -24,3 +25,13 @@
       vars:
         compose_stack_name: bus
         compose_stack_src: "{{ playbook_dir }}/../stacks/bus"
+
+# safety-reset / safety-estop for the human, as NATS user operator (runbooks/robot-safety.md)
+- name: Operator safety CLI
+  hosts: bus
+  become: true
+  tasks:
+    - name: CLI
+      ansible.builtin.include_role:
+        name: safety_governor
+        tasks_from: operator_cli

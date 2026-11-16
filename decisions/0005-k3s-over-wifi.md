@@ -37,8 +37,11 @@ Build k3s now, before P0.11 (runbooks/k3s.md):
   Assistant, LiveKit, Zenoh, DefenseClaw). k3s + containerd take about 430 MB RSS there. The kubelet reserves
   4 GiB for the system and 768 MiB for k3s, so pods get about 2.3 GiB allocatable, and it evicts pods when available
   memory is under 300 MiB, before the OOM killer reaches the host's own services.
-- **Omarchy is a laptop.** When it sleeps, its node goes NotReady and its pods are evicted after 5 minutes. Only
-  workloads that tolerate that should go there (light workers; Temporal workers resume on their own).
+- **Omarchy is a laptop, but it no longer sleeps.** Since 2026-11-15 it runs the alerting path (Gatus, ntfy) and is
+  kept always on (role `always_on`, PR #55: no suspend on idle or lid close; runbooks/alerting.md). If it does go
+  down (power, Wi-Fi, a crash), its node goes NotReady and its pods are evicted after 5 minutes, and dgx-2's
+  `AlertingHostDown` reaches the phone through ntfy.sh. Still prefer workloads that tolerate a lost node there
+  (light workers; Temporal workers resume on their own).
 - **Two etcd members would not be enough.** If the Jetson ever has to leave, a 2-member etcd can't survive losing
   either Spark. Don't run that way for long.
 

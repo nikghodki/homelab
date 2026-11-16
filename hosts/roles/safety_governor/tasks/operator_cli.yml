@@ -1,0 +1,91 @@
+---
+# safety-reset and safety-estop as the NATS user operator on a host without the robot's RoboStack env (dgx-1):
+# the CLI module from robots/safety in a small venv. Included from playbooks/bus.yml. runbooks/robot-safety.md
+- name: Load bus secrets from SOPS
+  community.sops.load_vars:
+    file: "{{ playbook_dir }}/../../secrets/bus.enc.yaml"
+    name: safety_governor_cli_secrets
+  no_log: true
+  delegate_to: localhost
+  become: false
+
+- name: Operator NATS credentials (root only)
+  become: true
+  block:
+    - name: Folder
+      ansible.builtin.file:
+        path: "{{ safety_governor_operator_credentials | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+    - name: Credentials
+      ansible.builtin.copy:
+        content: "{{ {'user': 'operator', 'password': safety_governor_cli_secrets.nats_operator_password} | to_json }}\n"
+        dest: "{{ safety_governor_operator_credentials }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+- name: CLI venv, code, config and commands
+  become: true
+  become_user: "{{ safety_governor_cli_user }}"
+  block:
+    - name: Folders
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ safety_governor_cli_dir }}/safety_governor"
+        - "{{ safety_governor_cli_home }}/.local/bin"
+
+    - name: Hash-locked requirements
+      ansible.builtin.copy:
+        src: requirements-cli.txt
+        dest: "{{ safety_governor_cli_dir }}/requirements.txt"
+        mode: "0644"
+      register: safety_governor_cli_lock
+
+    - name: Is the venv there?
+      ansible.builtin.stat:
+        path: "{{ safety_governor_cli_dir }}/venv/bin/python"
+      register: safety_governor_cli_venv
+
+    - name: Install nats-py in the venv
+      ansible.builtin.pip:
+        requirements: "{{ safety_governor_cli_dir }}/requirements.txt"
+        virtualenv: "{{ safety_governor_cli_dir }}/venv"
+        virtualenv_command: /usr/bin/python3 -m venv
+        extra_args: --require-hashes --no-deps
+      when: safety_governor_cli_lock is changed or not safety_governor_cli_venv.stat.exists
+
+    - name: CLI module
+      ansible.builtin.copy:
+        src: "{{ safety_governor_src }}/governor/safety_governor/{{ item }}"
+        dest: "{{ safety_governor_cli_dir }}/safety_governor/{{ item }}"
+        mode: "0644"
+      loop: [__init__.py, estop_cli.py]
+
+    - name: NATS settings (the governor's subjects)
+      ansible.builtin.copy:
+        content: "{{ {'nats': safety_governor_cli_nats} | to_nice_json(indent=2) }}\n"
+        dest: "{{ safety_governor_cli_dir }}/cli.json"
+        mode: "0644"
+
+    - name: Reset and e-stop commands
+      ansible.builtin.template:
+        src: safety-operator-cli.j2
+        dest: "{{ safety_governor_cli_home }}/.local/bin/{{ item.name }}"
+        mode: "0755"
+      loop:
+        - {name: safety-reset, action: reset}
+        - {name: safety-estop, action: ""}
+      loop_control: {label: "{{ item.name }}"}
+      vars:
+        safety_governor_cli_name: "{{ item.name }}"
+        safety_governor_cli_action: "{{ item.action }}"
+        safety_governor_cli_python: "{{ safety_governor_cli_dir }}/venv/bin/python"
+        safety_governor_cli_pythonpath: "{{ safety_governor_cli_dir }}"
+        safety_governor_cli_config: "{{ safety_governor_cli_dir }}/cli.json"

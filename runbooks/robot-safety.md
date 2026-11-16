@@ -42,7 +42,7 @@ server were left untouched):
  /cmd_vel_in (Twist) ─┐                                    ┌─> sink: mock (default) | http_velocity → car /velocity
  /scan (LaserScan) ───┤   safety_governor (rclpy node)     │         | ros_cmd_vel → /cmd_vel
  /safety/estop Bool ──┤   core.Governor (pure Python):     ├─> /safety/status (std_msgs/String, JSON, 2 Hz)
- /safety/reset Bool ──┤   e-stop > scan > heartbeat >      ├─> NATS robot.pi.safety.status (JSON, 1 Hz + on change)
+ /safety/reset (off) ─┤   e-stop > scan > heartbeat >      ├─> NATS robot.pi.safety.status (JSON, 1 Hz + on change)
  /safety/heartbeat ───┤   command timeout > ceiling >      ├─> journal, SYSLOG_IDENTIFIER=safety-governor → Loki
  NATS robot.pi.safety.estop / .reset, robot.pi.cmd.heartbeat ┘ └─> 127.0.0.1:9113/metrics → host collector → VictoriaMetrics
 ```
@@ -67,9 +67,21 @@ server were left untouched):
   robot's own body) are ignored. `lidar_yaw_deg` turns the LiDAR's angle 0 into the robot's forward
   (0 as mounted now; check it on blocks).
 - **E-stop latch:** `/safety/estop` `true` or *any* message on `robot.pi.safety.estop` latches it.
-  `/safety/estop false` does **not** clear it. Only `/safety/reset` `true` or `robot.pi.safety.reset` with
-  payload `RESET` clears it, and commands received before the reset are dropped, so the robot doesn't
-  move until a fresh command arrives.
+  `/safety/estop false` does **not** clear it. Only `robot.pi.safety.reset` with payload `RESET` clears
+  it, and commands received before the reset are dropped, so the robot doesn't move until a fresh command
+  arrives.
+- **Reset is human-only** (2026-11-15). Agents may latch the e-stop, never clear it:
+  - NATS: `picoclaw` and `hermes` have a `deny` on `robot.pi.safety.reset` (and `robot.pi.safety.test.reset`);
+    the server refuses the publish (`Publish Violation` in `docker logs bus-nats-1` on dgx-1, a
+    `permissions violation` error to the client) and the message never reaches the governor. They keep
+    `robot.pi.safety.estop`. Only the NATS user `operator` (and `admin`) may publish the reset subject; the
+    `safety-reset` command uses it. The governor can't see who published, so the NATS permissions are the check.
+  - ROS: `/safety/reset` is **off** (`ros.reset_enabled: false`, role variable
+    `safety_governor_ros_reset_enabled`), because any node on the Zenoh network could publish it. The
+    governor still listens and logs each attempt (`INTERVENTION kind=reset_refused ... reset from ros refused`).
+    The pure core enforces it too: `Governor(config, reset_sources={"nats"})` refuses any other source.
+  - Limit: picoclaw runs as the Pi's login user, which has passwordless sudo, so it could read the root-only
+    operator file or stop the governor. Fully human-only needs picoclaw under its own unprivileged user (follow-up).
 - **Fail safe:** zero is sent to the sink at 10 Hz in every non-moving state; on exit the node sends zero
   once more. If the node is down, nothing calls the car, and the firmware's 500 ms deadman stops it. The
   watchdogs don't latch: they clear when inputs come back.
@@ -78,7 +90,7 @@ server were left untouched):
   (5 Hz is a good rate). No heartbeat, no motion.
 - **Transport:** ROS goes over Zenoh in client mode through the Jetson's router (runbooks/robot-ros.md),
   so if the Jetson or Wi-Fi drops, `/scan` and the heartbeats stop and the governor stops within 1–2 s.
-  NATS (as user `picoclaw`) is only for e-stop, reset, heartbeat and status; losing NATS doesn't stop
+  NATS (as user `picoclaw`) is only for e-stop, reset (received), heartbeat and status; losing NATS doesn't stop
   the robot (the other watchdogs do), but a NATS e-stop can't arrive then. Use the ROS e-stop as well.
 
 ## Files and config on the Pi
@@ -89,13 +101,15 @@ server were left untouched):
 | Code | `~/.local/lib/safety-governor/safety_governor/` |
 | Config (rendered from `limits.yaml` + role vars) | `~/.config/safety-governor/governor.json` |
 | NATS credentials (picoclaw, from SOPS `secrets/bus.enc.yaml`) | `~/.config/safety-governor/nats-credentials.json` (0600; dir 0700) |
-| E-stop CLI | `~/.local/bin/safety-estop` |
+| E-stop CLI | `~/.local/bin/safety-estop` (as picoclaw) |
+| Reset CLI | `~/.local/bin/safety-reset` (as operator; also on dgx-1) |
+| NATS credentials (operator, from SOPS `nats_operator_password`) | `/etc/safety-operator/nats-operator.json` (root, 0600; dir 0700), Pi and dgx-1 |
 | Integration test | `~/.local/lib/safety-governor/run-integration-test` |
 | nats-py | `nats-py 2.14.0` (conda-forge) in env `ros2_kilted`, pinned by the role |
 
 Role variables (`hosts/roles/safety_governor/defaults/main.yml`): `safety_governor_sink` (`mock`),
 `safety_governor_real_sink_enabled` (`false`), `safety_governor_http_url` (empty),
-`safety_governor_limit_overrides` (`{}`). To change a limit, edit `robots/safety/limits.yaml` (while the
+`safety_governor_limit_overrides` (`{}`), `safety_governor_ros_reset_enabled` (`false`). To change a limit, edit `robots/safety/limits.yaml` (while the
 robot is docked), open a PR, and run the playbook. The node refuses unknown keys and limits that
 contradict each other (a cap above the ceiling, for example).
 
@@ -108,28 +122,37 @@ ansible-playbook playbooks/robot.yml --limit pi
 
 ## E-stop
 
-One line, from the Pi (NATS, as picoclaw):
+One line, from the Pi (NATS, as picoclaw) or dgx-1 (NATS, as operator):
 
 ```bash
 safety-estop                 # latch; prints the governor's status (state "estop")
-safety-estop reset           # clear (sends RESET)
 safety-estop status
+safety-reset                 # clear (RESET as operator; exits 0 once the governor reports it clear)
 ```
 
-From the Pi or the Jetson (ROS; works without NATS):
+`safety-reset` reads the operator password with `sudo -n cat /etc/safety-operator/nats-operator.json` and
+passes it on stdin (`estop_cli --credentials -`), never on a command line. On the Pi, `safety-estop reset`
+runs `safety-reset`. On dgx-1 both commands are in `~/.local/bin`, with nats-py in
+`~/.local/share/safety-cli/venv` (hash-locked, `roles/safety_governor/files/requirements-cli.txt`), installed by
+`playbooks/bus.yml` (play "Operator safety CLI", `tasks/operator_cli.yml`).
+
+From the Pi or the Jetson (ROS; works without NATS). Latching only: a ROS reset is refused.
 
 ```bash
 ros2-kilted topic pub --once /safety/estop std_msgs/msg/Bool "{data: true}"
-ros2-kilted topic pub --once /safety/reset std_msgs/msg/Bool "{data: true}"
 ```
 
 From any NATS client with `robot.pi.>` publish rights (picoclaw, hermes; homelab CA):
 `nats pub robot.pi.safety.estop stop --server tls://nats.nghodki.ai:4222 --tlsca homelab-ca.crt --user picoclaw --password …`.
-Any payload latches. Reset needs the exact payload `RESET` on `robot.pi.safety.reset`.
+Any payload latches. Reset needs the exact payload `RESET` on `robot.pi.safety.reset`, as `operator`.
 
-Note: every account that may publish `robot.pi.>` (picoclaw, hermes) may also *reset*. To make reset
-human-only, tighten the NATS permissions in `hosts/stacks/bus/nats/` (deny `robot.pi.safety.reset` to
-the agent accounts and give it a separate operator user). That's a follow-up.
+Rotate the operator password: new value and bcrypt hash (`$2a$`, cost 10, python `bcrypt` in the Ansible venv)
+in `secrets/bus.enc.yaml` (`sops set --value-stdin`), then `playbooks/bus.yml` (NATS restarts for a moment;
+clients reconnect) and `playbooks/robot.yml --limit pi`.
+
+Check (mock sink only), 2026-11-15: e-stop as picoclaw latched; RESET as picoclaw and as hermes refused
+(`Publish Violation`, still latched); `safety-reset` on dgx-1 and on the Pi cleared it; the integration test's
+ROS reset was refused (22/22 checks).
 
 ## Status, logs and alerts
 
@@ -186,7 +209,7 @@ the ground** for the whole test.
    (`pgrep -fa cmd_vel_bridge` on the Pi: nothing).
 4. On the Pi: `systemctl --user is-active ros-lidar safety-governor` → both `active`;
    `safety-estop status` → `"sink": {"kind": "mock", "real": false}`.
-5. Run the integration test once: `~/.local/lib/safety-governor/run-integration-test` → `20/20 checks passed`.
+5. Run the integration test once: `~/.local/lib/safety-governor/run-integration-test` → `22/22 checks passed`.
 
 ### Enable the real sink, only for this test
 
@@ -214,8 +237,8 @@ Open two terminals on the Pi. In both: `export PATH=$HOME/.local/bin:$PATH`.
 2. Another shell: `safety-estop`. **Expect:** the wheels stop within 0.2 s; status `estop`, `latched by nats`;
    journal `INTERVENTION kind=estop`. The command in B keeps running, the wheels stay still.
 3. `ros2-kilted topic pub --once /safety/estop std_msgs/msg/Bool "{data: false}"`. **Expect:** still stopped.
-4. `safety-estop reset`. **Expect:** the wheels turn again (B is still sending fresh commands).
-5. Repeat 2–4 with the ROS e-stop (`/safety/estop true`, then `/safety/reset true`). Same result.
+4. `safety-reset`. **Expect:** the wheels turn again (B is still sending fresh commands).
+5. Repeat 2–4 with the ROS e-stop (`/safety/estop true`, then `safety-reset`; `/safety/reset true` is refused). Same result.
 6. Stop B (Ctrl-C). **Expect:** the wheels stop within 0.5 s (command timeout).
 
 ### Check 2: speed cap

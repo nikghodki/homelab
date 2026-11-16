@@ -34,8 +34,11 @@ JSON per host and night, compares it with the previous night and logs:
 
 - `{"event": "aibom", "total", "counts" (per type), "targets" (per dir/image), "added", "removed", "errors", ...}`
 - `{"event": "aibom.new" | "aibom.removed", "target", "type", "name", "file"}`, at most 50 per direction and night.
+- `{"event": "aibom.skipped", "target", "reason": "skipped: low memory", "mem_available_gib", "need_gib"}` (memory guard, below).
 
-A target that fails is reported in `errors` (the unit exits 1) and is not counted as "removed".
+A target that fails is reported in `errors` (the unit exits 1) and is not counted as "removed". A skipped target is
+not an error (exit 0, listed in `skipped`), and each target is compared with its last real scan, so a skipped night
+doesn't show its components as removed and then added again.
 
 Containers use AIBOM's container mode (`--container-extraction-tier docker`: `docker save` to find the app dirs,
 then create + cp). dgx-2's Docker uses the containerd image store, which drops compressed layers after unpacking,
@@ -43,8 +46,31 @@ so `docker save` fails there; the job then copies the image's working dir, `/app
 created (never started) container and scans that folder (`"method": "docker-cp-fallback"` in the JSON).
 
 The unit runs as root (to read every user's code and reach the Docker socket) but read-only: only
-`CAP_DAC_READ_SEARCH`, `ProtectSystem=strict`, `ProtectHome=read-only`, its own `/tmp`, `Nice=19`, idle I/O,
-`MemoryMax` per host (dgx-1 16G for the Open WebUI image, which takes about 25 min and 13 GB; Jetson 3G; Pi 1500M).
+`CAP_DAC_READ_SEARCH`, `ProtectSystem=strict`, `ProtectHome=read-only`, its own `/tmp`, `Nice=19`, idle I/O
+(`IOSchedulingClass=idle`), `MemoryMax` per host (Sparks 6G, `group_vars/sparks.yml`; Jetson 3G; Pi 1500M; default 4G)
+and `OOMPolicy=continue` (a target killed at the cap is that target's error; the rest of the run goes on).
+
+### Memory guard on the Sparks
+
+A loaded model can use most of a Spark's unified (CPU+GPU) memory; both Sparks crashed from memory exhaustion on
+2026-11-15, and the job used to be allowed 16G. Now:
+
+- `MemoryMax=6G` for the whole job on dgx-1 and dgx-2.
+- Before each **image** target, the job reads `MemAvailable` from `/proc/meminfo`. Under
+  `cisco_aibom_image_min_mem_gib` (Sparks: 20; default 0 = off) the image is skipped and the job logs
+  `aibom.skipped` / `skipped: low memory` to the journal (→ Loki). Per-container thresholds:
+  `cisco_aibom_image_min_mem_gib_by_container: {open-webui: 40}`. Code dirs are always scanned (small, no Docker).
+- Open WebUI fits in 6G, so it has no special threshold. Measured 2026-11-15 with the 6G cap: whole run 16 min,
+  Open WebUI image (4.1 GB) the largest part; cgroup peak 5.3G including page cache, which the cap reclaims; anonymous
+  memory peaked at 4.4 GiB. The old "13 GB" was not a hard need. If a later Open WebUI grows past 6G, the target
+  fails alone (`OOMPolicy=continue`); then set `{open-webui: 40}` and raise `cisco_aibom_memory_max` only for that
+  case, or drop the image and scan its app dirs (the docker-cp fallback is lighter).
+
+```bash
+# what tonight's guard would see / what it did
+grep MemAvailable /proc/meminfo
+sudo journalctl -t cisco-aibom --since today -o cat | grep -E '"aibom.skipped"|"event": "aibom"'
+```
 Each Hermes checkout on the Jetson is about 8,000 Python files and takes over an hour on the Orin, so the Jetson
 starts at 01:30 with a 3 h limit per target.
 

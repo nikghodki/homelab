@@ -24,7 +24,22 @@ safety_governor_real_sink_enabled: false
 safety_governor_http_url: ""   # the car, e.g. http://192.168.86.x (roboclaw.local does not resolve)
 
 safety_governor_nats_url: tls://nats.nghodki.ai:4222
+# Clearing the e-stop is for humans only (runbooks/robot-safety.md): over NATS only the operator user may publish
+# robot.pi.safety.reset (safety-reset reads its password from this root-only file). Reset over ROS
+# (/safety/reset) is refused unless this is true: any node on the Zenoh network could publish it.
+safety_governor_ros_reset_enabled: false
+safety_governor_operator_credentials: /etc/safety-operator/nats-operator.json
 safety_governor_nats_ca: /usr/local/share/ca-certificates/homelab-ca.crt
+# Operator CLI on other hosts (tasks/operator_cli.yml, dgx-1)
+safety_governor_cli_user: "{{ ansible_user }}"
+safety_governor_cli_home: "/home/{{ safety_governor_cli_user }}"
+safety_governor_cli_dir: "{{ safety_governor_cli_home }}/.local/share/safety-cli"
+safety_governor_cli_nats:
+  url: "{{ safety_governor_nats_url }}"
+  ca_file: "{{ safety_governor_nats_ca }}"
+  estop_subject: robot.pi.safety.estop
+  reset_subject: robot.pi.safety.reset
+  status_subject: robot.pi.safety.status
 safety_governor_metrics_port: 9113   # 127.0.0.1 only; scraped by the host collector
 safety_governor_control_rate_hz: 10
 safety_governor_status_rate_hz: 2

@@ -1,0 +1,21 @@
+# Dead man for the alerting host (runbooks/alerting.md). Gatus and ntfy run on the Dell, so when the Dell is down
+# nothing it hosts can say so. dgx-2 scrapes the Dell's Gatus (job "gatus"); when that scrape fails for 15 min,
+# Alertmanager sends this to the backup receiver (public ntfy.sh, random topic in SOPS), not to the Dell's ntfy.
+# Labels and annotations are kept free of hostnames and addresses: the whole webhook body goes to ntfy.sh.
+groups:
+  - name: alerting-host
+    rules:
+      - alert: AlertingHostDown
+        expr: max(up{job="gatus"}) < 1 or absent(up{job="gatus"})
+        for: 15m
+        labels: {severity: critical}
+        annotations:
+          summary: alerting host unreachable
+      # Alertmanager's own deliveries (the Dell's ntfy and the Gatus heartbeat) keep failing, e.g. ntfy broken
+      # while Gatus still answers. Inhibited by AlertingHostDown.
+      - alert: AlertDeliveryFailing
+        expr: sum(increase(alertmanager_notifications_failed_total{integration="webhook"}[15m])) > 0
+        for: 15m
+        labels: {severity: critical}
+        annotations:
+          summary: alert delivery failing

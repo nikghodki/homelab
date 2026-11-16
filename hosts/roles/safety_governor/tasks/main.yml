@@ -34,6 +34,25 @@
   delegate_to: localhost
   become: false
 
+- name: Operator NATS credentials for safety-reset (root only)
+  become: true
+  block:
+    - name: Folder
+      ansible.builtin.file:
+        path: "{{ safety_governor_operator_credentials | dirname }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+    - name: Credentials
+      ansible.builtin.copy:
+        content: "{{ {'user': 'operator', 'password': safety_governor_secrets.nats_operator_password} | to_json }}\n"
+        dest: "{{ safety_governor_operator_credentials }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
 - name: Env, code, config and unit
   become: true
   become_user: "{{ safety_governor_user }}"
@@ -113,6 +132,18 @@
         - {src: safety-estop.j2, dest: "{{ safety_governor_home }}/.local/bin/safety-estop", mode: "0755"}
       loop_control: {label: "{{ item.dest | basename }}"}
       notify: Restart safety-governor
+
+    - name: Reset command (as operator)
+      ansible.builtin.template:
+        src: safety-operator-cli.j2
+        dest: "{{ safety_governor_home }}/.local/bin/safety-reset"
+        mode: "0755"
+      vars:
+        safety_governor_cli_name: safety-reset
+        safety_governor_cli_action: reset
+        safety_governor_cli_python: "{{ safety_governor_micromamba }} run -p {{ safety_governor_env }} python"
+        safety_governor_cli_pythonpath: "{{ safety_governor_code_dir }}"
+        safety_governor_cli_config: "{{ safety_governor_config_dir }}/governor.json"
 
     - name: Service is enabled and running
       ansible.builtin.systemd_service:
