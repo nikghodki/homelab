@@ -75,6 +75,11 @@ in the account's `~/.hermes/config.yaml`:
   its MQTT credentials; HTTP with the `Authorization` header from Hermes' config, `${HA_TOKEN}` read from
   `~/.hermes/.env`, never logged), then one `mcp-drift.tool` line per changed, added or removed tool and one
   `mcp-drift` line per server (`status: ok|drift|error`, counts).
+- a server with `drift_check.<name>.forbidden_source` (a file and a regex): one `mcp-drift.source` line with
+  `change: forbidden_call` and the line numbers if the server's own file matches, counted as drift (an unreadable
+  file is an error). For `picoclaw_only` it is any direct call to the car's motion API, Nav2 or follow-me, which would
+  bypass the robot's safety governor (runbooks/robot-safety.md, "Hermes (Jetson)"). The per-server line carries
+  `forbidden_lines`.
 - one `mcp-drift.run` line per account (`status`, `checked`, `drift`, `unapproved`, `errors`).
 
 Exit 0 = ok, 1 = drift or unapproved (unit still succeeds), 2 = a server could not be checked (unit fails).
@@ -89,6 +94,10 @@ python3 ~/.local/bin/mcp-drift --no-logger
 
 First run, 2026-11-15: no drift. `nikjetson`: homeassistant 24/24 tools ok. `hermes-nikhil`: homeassistant 24/24,
 picoclaw_only 20/20 ok. A test copy with one tampered hash reported `battery_status` changed and exited 1.
+
+2026-11-15, after the governed Hermes copy (10 picoclaw_only tool definitions changed, reviewed in the PR): run from the
+branch as hermes-nikhil, picoclaw_only 20/20 ok, `forbidden_lines: 0` (the saved original matches on 8 lines).
+homeassistant reported one changed tool (`media_player__HassSetVolumeRelative`), unrelated: re-export it after review.
 
 ### When it reports drift
 

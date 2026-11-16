@@ -61,3 +61,9 @@ safety_governor_motion_bridge:
 safety_governor_mcp_user: picoclaw
 safety_governor_mcp_node: /var/lib/picoclaw/bin/node
 safety_governor_mcp_server: /var/lib/picoclaw/roboclaw/mcp-server/picoclaw-hardware-mcp.js
+# Hermes' motion path test (run-hermes-motion-integration-test) builds the Jetson's patched MCP copy (role
+# hermes_robot_mcp) from the login user's original roboclaw MCP folder, with that role's patch, and checks its hashes.
+safety_governor_hermes_mcp_role: "{{ playbook_dir }}/../roles/hermes_robot_mcp"
+safety_governor_hermes_mcp_defaults: "{{ lookup('ansible.builtin.file', safety_governor_hermes_mcp_role ~ '/defaults/main.yml') | from_yaml }}"
+safety_governor_hermes_mcp_src_dir: "{{ safety_governor_home }}/workspace/roboclaw/mcp-server"
+safety_governor_hermes_mcp_node: "{{ safety_governor_home }}/.local/bin/node"

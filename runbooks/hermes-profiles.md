@@ -20,6 +20,14 @@ redaction.
   parent folders, rX on `mcp-server`); nothing else in nikjetson's home is readable. It uses Hermes' bundled Node
   (`/usr/bin/node` is gone since the JP7 reflash) and NATS as user `hermes` (`~/.picoclaw-nats-credentials`, 0600,
   from `secrets/bus.enc.yaml`).
+- **Robot motion goes through the Pi's safety governor** (since 2026-11-15, role `hermes_robot_mcp`, playbook
+  `robot.yml`; runbooks/robot-safety.md, "Hermes (Jetson)"). `picoclaw-hardware-mcp.js` is patched: its motion tools
+  (`drive`, `turn`, `explore`, `go_to_room`, `follow_nearest`, `map_room`) send a structured request to picoclaw over
+  MQTT/NATS instead of calling the car, `stop` latches the governor's e-stop over NATS (`robot.pi.safety.estop`; a human
+  clears it with `safety-reset`) and calls the car's `/stop`, and Nav2/follow-me are disabled. The file has no direct
+  `/drive`, `/turn` or `/velocity` call (checked by the role and by the nightly drift check). The original is
+  `picoclaw-hardware-mcp.js.pre-governor`. The role restarts this profile's `hermes-gateway` when it changes the file;
+  after the change Hermes logged `picoclaw_only` with 2 tools and no MCP errors.
 - WhatsApp was never paired for this profile.
 - DefenseClaw can't scan its MCP servers (local/private by design; a path launcher isn't allowlisted). They're kept
   with a warning, the same as on the main gateway; admission and the nightly drift check are in
@@ -30,7 +38,7 @@ redaction.
 | Profile | MCP servers |
 |---|---|
 | main (`nikjetson`) | `homeassistant` |
-| nikhil-ghodki (`hermes-nikhil`) | `homeassistant`, `picoclaw_only` (tools include-list: `send_to_picoclaw_agent`, `check_picoclaw_agent_connection`) |
+| nikhil-ghodki (`hermes-nikhil`) | `homeassistant`, `picoclaw_only` (tools include-list: `send_to_picoclaw_agent`, `check_picoclaw_agent_connection`; the server's motion tools go through picoclaw and the governor either way) |
 
 Only servers in `policies/defenseclaw/mcp-servers.yaml` are approved (runbooks/mcp-admission.md).
 

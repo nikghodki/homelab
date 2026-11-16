@@ -9,9 +9,12 @@ without any agent or LLM, an **e-stop** (latched), **speed caps**, an **obstacle
 enabled only for the on-blocks test below.
 
 picoclaw (the robot's agent) runs as its own unprivileged user `picoclaw`, and its motion tools go through
-the governor (via the motion bridge); see [picoclaw](#picoclaw-own-user-motion-through-the-governor).
+the governor (via the motion bridge); see [picoclaw](#picoclaw-own-user-motion-through-the-governor). Hermes'
+motion tools (Jetson) ask picoclaw to move over MQTT/NATS, so they go through the governor too; see
+[Hermes](#hermes-jetson-motion-through-picoclaw). **Every agent motion path is governed**; what is left is
+the car's firmware, which takes motion commands from anyone on the LAN (gap 2 below).
 
-## How the robot is driven (updated 2026-11-15, motion path governed)
+## How the robot is driven (updated 2026-11-15, all agent motion paths governed)
 
 The car is an ESP32 with its own HTTP API (`firmware/roboclaw_firmware.ino` in the roboclaw project, not on
 these hosts). Endpoints used: `POST /drive {direction, speed 0-255, duration_ms, avoid}`, `POST /turn
@@ -22,6 +25,7 @@ for 500 ms, and does its own ultrasonic and IR-edge avoidance on forward `/drive
 | Path | Who | How it reaches the motors | Through the governor? |
 |---|---|---|---|
 | 1 | picoclaw (system unit `picoclaw`, user `picoclaw`) | MCP server `picoclaw-hardware` (stdio, Pi `/var/lib/picoclaw/roboclaw/mcp-server/picoclaw-hardware-mcp.js`): tools `drive`, `turn`, `explore`, `go_to_room`, `follow_nearest`, `map_room` → motion bridge socket `/run/robot-motion/motion.sock` → `/cmd_vel_in` + `/safety/heartbeat`. `stop` latches the governor's e-stop and calls the car's `/stop`. `status`, `get_sensors`, `horn`, `scan_surroundings` still call the car's HTTP API (no motion). `navigate_to`, `explore_frontier` (Nav2) and `follow_start` (vision-ai follow-me) are disabled: they would drive around the governor | **Yes** (since 2026-11-15) |
+| 1b | Hermes (Jetson, profile hermes-nikhil) | MCP server `picoclaw_only` (stdio, Jetson `/home/nikjetson/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js`, patched by role `hermes_robot_mcp`): `drive`, `turn`, `explore`, `go_to_room`, `follow_nearest`, `map_room` send one structured request to picoclaw over MQTT/NATS (as user `hermes`, the topic of `send_to_picoclaw_agent`) → picoclaw's own tools → path 1. `send_to_picoclaw_agent` (free text) ends in picoclaw's tools too. `stop` latches the governor's e-stop over NATS (`robot.pi.safety.estop`) and calls the car's `/stop`. `navigate_to`, `explore_frontier`, `follow_start` are disabled. No `/drive`, `/turn` or `/velocity` call is left in the file (role and nightly drift check) | **Yes** (since 2026-11-15) |
 | 2 | Nav2 (later, P5.3) | `/cmd_vel` → `cmd_vel_bridge` (Pi `~/workspace/roboclaw/ros2-nav`, Humble env `ros2_nav`, **not running**) → `POST /velocity` | **No** (it listens on `/cmd_vel`) |
 | 3 | Jetson control-center backend | `POST /stop` only | n/a (stop only) |
 | 4 | the governor | sink `http_velocity` (`POST /velocity`) or `ros_cmd_vel` (`/cmd_vel`) | it *is* the governor |
@@ -31,19 +35,23 @@ the moment either. Nothing on the Pi drives the motors directly (no serial or GP
 
 **Gaps that must be closed before the robot drives on its own:**
 1. ~~Point the MCP server's motion tools at the governor~~ Done 2026-11-15 (motion bridge, below).
-2. Give the car's firmware one caller: only the governor's address (or a shared token) may call
-   `/drive`, `/turn` and `/velocity`. Until then anything on the LAN can bypass the governor, including
-   picoclaw's own `exec`/`web_fetch` tools (e.g. `curl http://<car>/drive`): the MCP server no longer
-   calls them, but the agent's network access isn't filtered.
+2. **Open: the car's firmware accepts motion from anyone on the LAN.** Give it one caller: only the governor's
+   address (or a shared token) may call `/drive`, `/turn` and `/velocity`. Until then anything on the LAN can
+   bypass the governor, including the agents' own shell or web tools (picoclaw's `exec`/`web_fetch`, Hermes'
+   terminal on the Jetson, e.g. `curl http://<car>/drive`): no MCP server calls them any more, but the agents'
+   network access isn't filtered. This is the only motion path left that isn't governed.
 3. When Nav2 arrives, it publishes `/cmd_vel_in`, not `/cmd_vel`; don't run `cmd_vel_bridge` next to the
    governor's `http_velocity` sink. Then re-enable `navigate_to`/`explore_frontier` in the MCP patch.
-4. The Jetson has its own copy of the same MCP server (`tools/picoclaw_only`, for Hermes), still with the
-   direct `/drive`/`/turn` calls. Hermes' `tools.include` only exposes `send_to_picoclaw_agent` and
-   `check_picoclaw_agent_connection`, but that is a client-side filter.
+4. ~~The Jetson's copy of the MCP server (`tools/picoclaw_only`, for Hermes) still calls `/drive`/`/turn`~~
+   Done 2026-11-15: its motion tools go to picoclaw ([Hermes](#hermes-jetson-motion-through-picoclaw)). Hermes'
+   `tools.include` (`send_to_picoclaw_agent`, `check_picoclaw_agent_connection`) is unchanged; it is no longer
+   the only thing between Hermes and the car's motion API.
 
 ## Architecture
 
 ```
+ Hermes MCP drive/turn/... ─MQTT/NATS─> picoclaw agent ─┐   Hermes MCP stop ─> NATS robot.pi.safety.estop
+                                                       v
  picoclaw MCP drive/turn/... ─> /run/robot-motion/motion.sock ─> robot-motion-bridge ─> /cmd_vel_in + /safety/heartbeat
 
  /cmd_vel_in (Twist) ─┐                                    ┌─> sink: mock (default) | http_velocity → car /velocity
@@ -199,6 +207,58 @@ chmod 0775 ~                                     # only if something needs the o
 The role stops and disables the old user unit on every run, so don't run `robot.yml` after a rollback until this
 change is reverted in the repo. Nothing was deleted: the old files and unit are still in the login home.
 
+## Hermes (Jetson), motion through picoclaw
+
+Playbook `hosts/playbooks/robot.yml` (play "Hermes robot MCP (motion via PicoClaw)", role `hermes_robot_mcp`, host
+`jetson`). Hermes' profile hermes-nikhil runs nikjetson's copy of the same MCP server as `picoclaw_only`
+(runbooks/hermes-profiles.md). The roboclaw folder isn't a git repository, so the change is the patch
+`hosts/roles/hermes_robot_mcp/files/picoclaw-hardware-mcp.hermes.patch`, like picoclaw's on the Pi.
+
+**Why through picoclaw (option A), not a governed API on the Pi (option B).** Hermes already reaches picoclaw: the
+MCP server is connected to NATS' MQTT port as user `hermes`, which may publish `/.picoclaw.>` and `robot.>`, and
+picoclaw's tools already go through the governor. Option A needs no new service, port, credential or NATS
+permission. Option B would need a new authenticated listener on the Pi, and the Tailscale/LAN policy only lets the
+robot talk to dgx-1. With A there is one motion path into the robot (picoclaw's MCP server → motion bridge →
+governor), and one place to audit it (`journalctl -t robot-motion-bridge`).
+
+**What the patched copy does.**
+- `drive`, `turn`, `explore`, `go_to_room`, `follow_nearest`, `map_room`: one message on `/picoclaw/robot/hermes/request`
+  (the topic `send_to_picoclaw_agent` uses), first line `[hermes-motion v1] {"tool": ..., "arguments": {...}}`, then an
+  instruction to call that tool once and answer `{"ok": true, "result": ...}` or `{"ok": false, "error": ...}`. A reply
+  with `ok: false` (refused, blocked by the governor, e-stop) is a tool error; no answer within 120 s is an error too.
+  picoclaw runs the move with its governed tools, so the caps, the obstacle stop, the watchdogs and the e-stop apply.
+- `stop`: publishes on MQTT `robot/pi/safety/estop` = NATS `robot.pi.safety.estop` (latched; **clearing needs
+  `safety-reset`, a human**) and calls the car's `/stop`. It doesn't wait for picoclaw or its model.
+- `navigate_to`, `explore_frontier` (Nav2) and `follow_start` (vision-ai follow-me) are disabled, as on the Pi.
+- `status`, `get_sensors`, `horn`, `scan_surroundings`, `find_path` still call the car's HTTP API (no motion).
+- The original is kept as `picoclaw-hardware-mcp.js.pre-governor`. The launch is unchanged (same Node, same path), so
+  the DefenseClaw registry entry is too; the 10 changed tool definitions are in `tools/picoclaw_only`.
+
+**Guards.** The role refuses a file that is neither the reviewed original nor the patched file (sha256 in
+`roles/hermes_robot_mcp/defaults`), fails if `grep -E` finds a direct motion call after patching, and checks the
+patched sha256. The pattern lives in `policies/defenseclaw/mcp-servers.yaml` (`drift_check.picoclaw_only.forbidden_source`):
+any `"/drive"`, `"/turn"`, `"/velocity"` or `"/follow/start"` string, `ros2 action send_goal /` or `ros2 launch explore_lite`.
+The nightly mcp-drift check applies the same pattern to the live file (`mcp-drift.source`, `change: forbidden_call`;
+runbooks/mcp-admission.md), and CI checks that the patch removes every match (`hosts/roles/mcp_drift/files/tests`).
+It is a tripwire against reverts and copy-paste, not a proof: nikjetson owns the file and can edit it (the hash
+changes the tool definitions only if the descriptions change), and gap 2 above is still open.
+
+When the role changes the file, its handler restarts `hermes-gateway` of hermes-nikhil (Hermes starts MCP servers
+only at start). After the change (2026-11-15): Hermes' log `MCP server 'picoclaw_only' (stdio): registered 2 tool(s)`,
+`mcp-stderr.log` `motion via PicoClaw + safety governor, e-stop: robot/pi/safety/estop`; a check on the bus with the
+test topic `robot/pi/safety/test/estop` as `hermes` arrived as NATS `robot.pi.safety.test.estop` (the deployed governor
+listens only on `robot.pi.safety.estop`).
+
+**Rollback** (Hermes' copy back to direct HTTP motion; the include list still hides those tools):
+```bash
+# on the Jetson, as nikjetson
+cp -a ~/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js.pre-governor ~/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js
+setfacl -m u:hermes-nikhil:r ~/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js
+sudo -u hermes-nikhil XDG_RUNTIME_DIR=/run/user/$(id -u hermes-nikhil) systemctl --user restart hermes-gateway
+```
+Then revert the tool hashes in `tools/picoclaw_only` (or the nightly drift check reports 10 changed tools and a
+forbidden call), and don't run `robot.yml` on the Jetson until the role is reverted too.
+
 ## E-stop
 
 One line, from the Pi (NATS, as picoclaw) or dgx-1 (NATS, as operator):
@@ -279,6 +339,18 @@ ROS reset was refused (22/22 checks).
   that the car never got `/drive`, `/turn` or `/velocity`, and that nothing exceeded the caps. 15 checks, about 30 s.
   2026-11-15: 15/15 (car saw only `/status` and `/stop`); the governor test 22/22. The `zenoh ... Unknown token` errors
   printed at the end are rmw_zenoh shutdown noise. Bridge unit tests: CI (`robots/safety/motion_bridge/tests`).
+- **Hermes' motion path on the Pi** (mock sink only): `~/.local/lib/safety-governor/run-hermes-motion-integration-test`.
+  The same domain-73 harness (test governor and bridge, fake `/scan`), plus: Hermes' MCP copy built from the login
+  user's original roboclaw MCP folder with role `hermes_robot_mcp`'s patch (the sha256 must equal the Jetson's), a
+  minimal MQTT broker on 127.0.0.1 in place of NATS' MQTT port (no real broker, no credentials), a stand-in for the
+  picoclaw agent without its model (it runs Hermes' structured request with picoclaw's real MCP server as `picoclaw`;
+  it also hands the test e-stop topic to the governor as `/safety/estop`, which is what NATS does in production), and
+  one fake car per MCP server. Checks: Hermes `drive` forward at 255 → mock sink vx 0.2 (the cap), ends with the call;
+  `turn`; strafe refused; obstacle blocked; Nav2/follow-me refused without reaching picoclaw; `stop` → e-stop on the
+  e-stop topic, governor latched, car `/stop`; `drive` during the e-stop blocked; no `/drive`, `/turn`, `/velocity` at
+  either car (Hermes' car saw only `/stop`); nothing above the caps. 15 checks, about 30 s. 2026-11-15: 15/15; the
+  governor test 22/22 and the motion test 15/15 again after redeploying. The model's own handling of the request (does
+  picoclaw call the tool it is asked to) is not covered: the test has no LLM.
 
 ## "Robot on blocks" test (for you)
 
@@ -299,7 +371,8 @@ the ground** for the whole test.
    `systemctl is-active robot-motion-bridge` → `active`;
    `safety-estop status` → `"sink": {"kind": "mock", "real": false}`.
 5. Run the integration tests once: `~/.local/lib/safety-governor/run-integration-test` → `22/22 checks passed`;
-   `~/.local/lib/safety-governor/run-motion-integration-test` → `15/15 checks passed`.
+   `~/.local/lib/safety-governor/run-motion-integration-test` → `15/15 checks passed`;
+   `~/.local/lib/safety-governor/run-hermes-motion-integration-test` → `15/15 checks passed`.
 
 ### Enable the real sink, only for this test
 

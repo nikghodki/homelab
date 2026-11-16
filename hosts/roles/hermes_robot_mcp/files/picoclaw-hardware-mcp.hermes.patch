@@ -1,0 +1,376 @@
+--- a/picoclaw-hardware-mcp.js
++++ b/picoclaw-hardware-mcp.js
+@@ -15,6 +15,15 @@
+  *   ROBOCLAW_API   base URL of the car          (default http://roboclaw.local)
+  *   VISION_PI_API  base URL of this Pi's vision-ai (default http://localhost:8100)
+  *   ROS2_NAV_DIR   path to the ros2-nav workspace (default ~/workspace/roboclaw/ros2-nav)
++ *   PICOCLAW_ESTOP_TOPIC  MQTT topic of the safety governor's e-stop (default robot/pi/safety/estop,
++ *                         the NATS subject robot.pi.safety.estop)
++ *
++ * Hermes' copy (Jetson), patched by homelab Ansible (role hermes_robot_mcp, runbooks/robot-safety.md):
++ * nothing here drives the car. drive, turn and the task tools built on them are sent to the PicoClaw
++ * agent on the Pi over MQTT/NATS (the same topic as send_to_picoclaw_agent), and PicoClaw runs them with
++ * its own MCP tools, which go through the robot's safety governor (e-stop, speed caps, LiDAR obstacle
++ * stop, watchdogs). stop latches the governor's e-stop over NATS and also calls the car's /stop. Tools
++ * that would drive around the governor (Nav2, vision-ai follow-me) are disabled.
+  */
+ 
+ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+@@ -38,6 +47,11 @@
+ const PICOCLAW_TOPIC_PREFIX = "/picoclaw";
+ const PICOCLAW_AGENT_ID = "robot";
+ const MQTT_CLIENT_ID = "hermes"; // Client ID for topic construction
++// The governor latches on any message here; only a human (NATS user operator) can clear it.
++const ESTOP_TOPIC = process.env.PICOCLAW_ESTOP_TOPIC || "robot/pi/safety/estop";
++const MOTION_TIMEOUT_S = 120;
++const GOVERNOR_ONLY = "disabled: it would drive the car around the robot's safety governor " +
++  "(homelab runbooks/robot-safety.md). It comes back once its motion goes through the governor.";
+ 
+ // Read MQTT password from credentials file
+ let MQTT_PASSWORD;
+@@ -236,20 +250,53 @@
+   return best;
+ }
+ 
+-const turnWait = (deg) => deg * MS_PER_DEGREE + 350;
+-const driveWait = (ms) => ms + 350;
++// ---------------------------------------------------------------------------
++// Motion: only through PicoClaw on the Pi, whose MCP tools go through the safety governor
++// ---------------------------------------------------------------------------
++// One structured request per call, on the same MQTT topic as send_to_picoclaw_agent. The first line is
++// machine-readable; the rest tells PicoClaw what to do with it.
++function motionMessage(toolName, args) {
++  const clean = Object.fromEntries(Object.entries(args || {}).filter(([, v]) => v !== undefined));
++  return `[hermes-motion v1] ${JSON.stringify({ tool: toolName, arguments: clean })}\n` +
++    `Hermes asks you to move the robot. Call your own \`${toolName}\` tool exactly once with exactly these ` +
++    "arguments; it goes through the robot's safety governor. Don't call any other motion tool and don't retry. " +
++    'Reply with one line of JSON only: {"ok": true, "result": <the tool result>} or {"ok": false, "error": "<why>"}.';
++}
+ 
+-async function doTurn(direction, degrees) {
+-  if (degrees < 8) return { skipped: true, degrees };
+-  const r = await post("/turn", { direction, degrees });
+-  await sleep(turnWait(degrees));
+-  return r;
++function parseReply(text) {
++  const s = String(text ?? "");
++  const start = s.indexOf("{");
++  const end = s.lastIndexOf("}");
++  if (start < 0 || end <= start) return null;
++  try { return JSON.parse(s.slice(start, end + 1)); } catch { return null; }
++}
++
++async function viaPicoclaw(toolName, args, timeoutSeconds = MOTION_TIMEOUT_S) {
++  const r = await askPicoclaw(motionMessage(toolName, args), timeoutSeconds);
++  if (r.status === "timeout") {
++    throw new Error(`PicoClaw did not answer the ${toolName} request within ${timeoutSeconds}s ` +
++      "(the safety governor stops the robot when a move ends or its heartbeat stops)");
++  }
++  const reply = parseReply(r.response);
++  if (reply && reply.ok === false) {
++    throw new Error(`PicoClaw/safety governor refused ${toolName}: ${typeof reply.error === "string" ? reply.error : JSON.stringify(reply)}`);
++  }
++  return { via: "picoclaw (safety governor)", tool: toolName, ...(reply ? { result: reply.result ?? reply } : { response: r.response }) };
+ }
+ 
+-async function driveChunk(speed, ms) {
+-  const r = await post("/drive", { direction: "forward", speed, duration_ms: ms, avoid: true });
+-  await sleep(driveWait(ms));
+-  return r;
++// Latch the governor's e-stop over NATS (MQTT topic robot/pi/safety/estop). Any payload latches.
++function publishEstop() {
++  return new Promise((resolve, reject) => {
++    if (!mqttConnected || !mqttClient) {
++      reject(new Error("not connected to MQTT/NATS"));
++      return;
++    }
++    const payload = JSON.stringify({ source: "hermes", tool: "stop", at: new Date().toISOString() });
++    mqttClient.publish(ESTOP_TOPIC, payload, { qos: 1 }, (err) => {
++      if (err) reject(new Error(`e-stop publish failed: ${err.message}`));
++      else resolve({ latched_via: ESTOP_TOPIC });
++    });
++  });
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -270,9 +317,18 @@
+   tool(async () => get("/sensors")));
+ 
+ server.registerTool("stop",
+-  { title: "Stop", description: "Emergency stop — halt all motion immediately.",
++  { title: "Stop",
++    description: "Emergency stop — halt all motion immediately. Latches the robot's safety governor e-stop over NATS (a person must run safety-reset before the robot can move again), then calls the car's own stop endpoint.",
+     inputSchema: {} },
+-  tool(async () => post("/stop")));
++  tool(async () => {
++    const out = {};
++    try { out.governor = await publishEstop(); } catch (e) { out.governor = { error: e.message }; }
++    try { out.car = await post("/stop"); } catch (e) { out.car = { error: e.message }; }
++    if (out.governor.error && out.car.error) {
++      throw new Error(`stop failed on both paths: governor: ${out.governor.error}; car: ${out.car.error}`);
++    }
++    return out;
++  }));
+ 
+ server.registerTool("horn",
+   { title: "Horn", description: "Sound the buzzer (e.g. when a person is in the way).",
+@@ -281,23 +337,23 @@
+   tool(async ({ duration_ms }) => post("/horn", duration_ms ? { duration_ms } : {})));
+ 
+ server.registerTool("drive",
+-  { title: "Drive", description: "Move in a direction. Forward motion gets firmware obstacle avoidance + edge protection when avoid=true (default).",
++  { title: "Drive", description: "Move in a direction for a while. Sent to the PicoClaw agent on the Pi, which drives through the robot's safety governor (speed caps, LiDAR obstacle stop, e-stop). A refused or blocked move is an error. Strafing is not supported.",
+     inputSchema: {
+       direction: z.enum(["forward","backward","strafe_left","strafe_right","spin_left","spin_right"]),
+       speed: z.number().int().min(0).max(255).optional().describe("0-255 (default 180)."),
+       duration_ms: z.number().int().min(0).max(10000).optional()
+-        .describe("Move this long then stop; omit for open-ended (deadman stops it)."),
+-      avoid: z.boolean().optional().describe("Obstacle/edge avoidance for forward motion (default true)."),
++        .describe("Move this long then stop (default 1000)."),
++      avoid: z.boolean().optional().describe("Ignored: the safety governor's LiDAR obstacle stop is always on."),
+     } },
+-  tool(async (a) => post("/drive", a)));
++  tool(async ({ direction, speed, duration_ms }) => viaPicoclaw("drive", { direction, speed, duration_ms })));
+ 
+ server.registerTool("turn",
+-  { title: "Turn", description: "Rotate in place by degrees (open-loop, approximate).",
++  { title: "Turn", description: "Rotate in place by degrees (open-loop, approximate). Sent to the PicoClaw agent on the Pi, which turns through the robot's safety governor.",
+     inputSchema: {
+       direction: z.enum(["spin_left","spin_right"]),
+       degrees: z.number().int().min(1).max(360),
+     } },
+-  tool(async (a) => post("/turn", a)));
++  tool(async ({ direction, degrees }) => viaPicoclaw("turn", { direction, degrees })));
+ 
+ server.registerTool("scan_surroundings",
+   { title: "Scan", description: "Sweep the ultrasonic pan head and return distance at each angle.",
+@@ -320,174 +376,63 @@
+ 
+ server.registerTool("map_room",
+   { title: "Map the room",
+-    description: "Rotate in place and ultrasonic-sweep to build a coarse 360° distance map, flagging open directions. Approximate.",
++    description: "Rotate in place and ultrasonic-sweep to build a coarse 360° distance map, flagging open directions. Approximate. Run by the PicoClaw agent on the Pi, through the robot's safety governor.",
+     inputSchema: { bins: z.number().int().min(8).max(72).optional().describe("Map resolution in sectors (default 24 = 15°).") } },
+-  tool(async ({ bins = 24 }) => {
+-    const sectorDeg = 360 / bins;
+-    const dist = new Array(bins).fill(Infinity);
+-    const HEADINGS = [0, 90, 180, 270];
+-    let heading = 0;
+-    for (const target of HEADINGS) {
+-      if (target !== heading) { await doTurn("spin_left", 90); heading = target; }
+-      const readings = await sweep();
+-      for (const r of readings) {
+-        if (r.distance_cm == null) continue;
+-        let off = r.angle - 90;
+-        if (!HIGHER_ANGLE_IS_LEFT) off = -off;
+-        const bearing = ((heading + off) % 360 + 360) % 360;
+-        const b = Math.floor(bearing / sectorDeg) % bins;
+-        dist[b] = Math.min(dist[b], r.distance_cm);
+-      }
+-    }
+-    await doTurn("spin_left", 90);
+-    const map = dist.map((d, i) => ({ bearing_deg: Math.round(i * sectorDeg), distance_cm: Number.isFinite(d) ? Math.round(d) : null }));
+-    const isOpen = map.map((m) => m.distance_cm == null || m.distance_cm >= OPEN_CM);
+-    const openings = [];
+-    let i = 0;
+-    while (i < bins) {
+-      if (!isOpen[i]) { i++; continue; }
+-      let len = 0;
+-      while (len < bins && isOpen[(i + len) % bins]) len++;
+-      openings.push({ center_bearing_deg: Math.round((((i + len / 2) % bins) * sectorDeg) % 360), width_deg: Math.round(len * sectorDeg) });
+-      i += len;
+-    }
+-    const nearest = map.reduce((m, c) => (c.distance_cm != null && (!m || c.distance_cm < m.distance_cm) ? c : m), null);
+-    return { sectors: bins, sector_deg: Math.round(sectorDeg), map, openings, nearest_obstacle: nearest };
+-  }));
++  tool(async ({ bins }) => viaPicoclaw("map_room", { bins })));
+ 
+ server.registerTool("go_to_room",
+   { title: "Go to a room",
+-    description: "Best-effort navigation toward and through the largest opening (doorway). Time-boxed. No metric/named-room navigation.",
++    description: "Best-effort navigation toward and through the largest opening (doorway). Time-boxed. No metric/named-room navigation. Run by the PicoClaw agent on the Pi, through the robot's safety governor.",
+     inputSchema: {
+       max_seconds: z.number().int().min(2).max(120).optional().describe("Time budget (default 25)."),
+       speed: z.number().int().min(60).max(255).optional().describe("Drive speed (default 170)."),
+     } },
+-  tool(async ({ max_seconds = 25, speed = 170 }) => {
+-    const STEP_MS = 800;
+-    const deadline = Date.now() + max_seconds * 1000;
+-    const log = [];
+-    let openStreak = 0;
+-    while (Date.now() < deadline) {
+-      const readings = await sweep();
+-      const best = clearest(readings);
+-      const turn = angleToTurn(best.angle);
+-      if (turn.degrees >= 12) { await doTurn(turn.direction, turn.degrees); log.push({ turn }); }
+-      await driveChunk(speed, STEP_MS);
+-      const st = await get("/status");
+-      log.push({ heading_to: best, distance_cm: best.distance_cm, status: st });
+-      openStreak = openness(best.distance_cm) >= OPEN_CM ? openStreak + 1 : 0;
+-      if (openStreak >= 2) { log.push({ note: "entered an open area" }); break; }
+-    }
+-    await post("/stop");
+-    return { done: true, steps: log.length, log };
+-  }));
++  tool(async ({ max_seconds, speed }) => viaPicoclaw("go_to_room", { max_seconds, speed })));
+ 
+ server.registerTool("explore",
+   { title: "Explore",
+-    description: "Roam autonomously for a while using firmware obstacle/edge avoidance. Time-boxed.",
++    description: "Roam autonomously for a while. Time-boxed. Run by the PicoClaw agent on the Pi, through the robot's safety governor (LiDAR obstacle stop, speed caps).",
+     inputSchema: {
+       max_seconds: z.number().int().min(2).max(120).optional().describe("Time budget (default 20)."),
+       speed: z.number().int().min(60).max(255).optional().describe("Drive speed (default 160)."),
+     } },
+-  tool(async ({ max_seconds = 20, speed = 160 }) => {
+-    const deadline = Date.now() + max_seconds * 1000;
+-    const log = [];
+-    while (Date.now() < deadline) {
+-      await driveChunk(speed, 1000);
+-      const st = await get("/status");
+-      log.push(st);
+-      if (st.blocked || st.recovering || openness(st.distance_cm) < OPEN_CM / 2) {
+-        const best = clearest(await sweep());
+-        const turn = angleToTurn(best.angle);
+-        if (turn.degrees >= 12) { await doTurn(turn.direction, turn.degrees); log.push({ turn }); }
+-      }
+-    }
+-    await post("/stop");
+-    return { done: true, log };
+-  }));
++  tool(async ({ max_seconds, speed }) => viaPicoclaw("explore", { max_seconds, speed })));
+ 
+ server.registerTool("follow_nearest",
+   { title: "Follow the nearest thing",
+-    description: "Track the NEAREST object by ultrasonic: center it, hold a target distance. Runs a few correction cycles then returns.",
++    description: "Track the NEAREST object by ultrasonic: center it, hold a target distance. Runs a few correction cycles then returns. Run by the PicoClaw agent on the Pi, through the robot's safety governor.",
+     inputSchema: {
+       target_cm: z.number().int().min(15).max(120).optional().describe("Distance to hold (default 40)."),
+       max_seconds: z.number().int().min(2).max(60).optional().describe("How long this call follows (default 8)."),
+       speed: z.number().int().min(60).max(255).optional().describe("Move speed (default 150)."),
+     } },
+-  tool(async ({ target_cm = 40, max_seconds = 8, speed = 150 }) => {
+-    const deadline = Date.now() + max_seconds * 1000;
+-    const TOL = 12;
+-    const log = [];
+-    let lost = 0;
+-    while (Date.now() < deadline) {
+-      const readings = await sweep();
+-      let target = null;
+-      for (const r of readings) {
+-        if (r.distance_cm == null) continue;
+-        if (!target || r.distance_cm < target.distance_cm) target = r;
+-      }
+-      if (!target || target.distance_cm > 200) {
+-        lost++; log.push({ note: "no target in range" });
+-        if (lost >= 2) break;
+-        continue;
+-      }
+-      lost = 0;
+-      const turn = angleToTurn(target.angle);
+-      if (turn.degrees >= 12) await doTurn(turn.direction, turn.degrees);
+-      let action = "hold";
+-      if (target.distance_cm > target_cm + TOL) { await driveChunk(speed, 500); action = "advance"; }
+-      else if (target.distance_cm < target_cm - TOL) { await post("/drive", { direction: "backward", speed, duration_ms: 400 }); await sleep(driveWait(400)); action = "back off"; }
+-      log.push({ target, turn, action });
+-    }
+-    await post("/stop");
+-    return { done: true, target_cm, log };
+-  }));
++  tool(async ({ target_cm, max_seconds, speed }) => viaPicoclaw("follow_nearest", { target_cm, max_seconds, speed })));
+ 
+ // ---- ROS2 nav: goal dispatch -----------------------------------------------
+ 
+ server.registerTool("navigate_to",
+   { title: "Navigate to a pose",
+-    description: "Drive to a map-frame (x, y, yaw) goal via Nav2's NavigateToPose action. Requires the navigation stack (ros2-nav/launch/navigation.launch.py) already running with a previously-saved map -- this tool does not start it.",
++    description: "DISABLED until Nav2 drives through the safety governor. Drive to a map-frame (x, y, yaw) goal via Nav2's NavigateToPose action. Requires the navigation stack (ros2-nav/launch/navigation.launch.py) already running with a previously-saved map -- this tool does not start it.",
+     inputSchema: {
+       x: z.number().describe("Target x position, meters, map frame."),
+       y: z.number().describe("Target y position, meters, map frame."),
+       yaw_deg: z.number().min(-180).max(180).optional().describe("Target heading, degrees (default 0)."),
+       timeout_ms: z.number().int().min(5000).max(300000).optional().describe(`Max time to wait for the goal to finish (default ${NAV_GOAL_TIMEOUT_MS}).`),
+     } },
+-  tool(async ({ x, y, yaw_deg = 0, timeout_ms = NAV_GOAL_TIMEOUT_MS }) => {
+-    const yawRad = (yaw_deg * Math.PI) / 180;
+-    const qz = Math.sin(yawRad / 2);
+-    const qw = Math.cos(yawRad / 2);
+-    const goalYaml = `{pose: {header: {frame_id: 'map'}, pose: {position: {x: ${x}, y: ${y}, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: ${qz}, w: ${qw}}}}}`;
+-    const { code, timedOut, stdout, stderr } = await runRos2Shell(
+-      `ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose "${goalYaml}"`,
+-      timeout_ms
+-    );
+-    if (timedOut) {
+-      throw new Error(
+-        `navigate_to timed out after ${timeout_ms}ms without completing -- goal may still be running server-side. ` +
+-        `stdout tail: ${stdout.slice(-500)}`
+-      );
+-    }
+-    if (code !== 0) throw new Error(`ros2 action send_goal exited ${code}: ${(stderr || stdout).slice(-1000)}`);
+-    return { done: true, x, y, yaw_deg, output: stdout.slice(-2000) };
+-  }));
++  tool(async () => { throw new Error(`navigate_to ${GOVERNOR_ONLY}`); }));
+ 
+ server.registerTool("explore_frontier",
+   { title: "Autonomously explore",
+-    description: "Launch explore_lite for a bounded time to autonomously map unexplored space, then stop it. Requires the navigation/mapping stack already running.",
++    description: "DISABLED until Nav2 drives through the safety governor. Launch explore_lite for a bounded time to autonomously map unexplored space, then stop it. Requires the navigation/mapping stack already running.",
+     inputSchema: { max_seconds: z.number().int().min(10).max(300).optional().describe("How long to explore before stopping (default 60).") } },
+-  tool(async ({ max_seconds = 60 }) => {
+-    const { timedOut, stdout, stderr } = await runRos2Shell(`ros2 launch explore_lite explore.launch.py use_sim_time:=false`, max_seconds * 1000);
+-    return { done: true, max_seconds, stopped_by_timeout: timedOut, output: stdout.slice(-2000), stderr_tail: stderr.slice(-500) };
+-  }));
++  tool(async () => { throw new Error(`explore_frontier ${GOVERNOR_ONLY}`); }));
+ 
+ // ---- Pi's own vision-ai: follow/enroll/battery (same-host now) ------------
+ 
+ server.registerTool("follow_start",
+-  { title: "Start following", description: "Begin following the enrolled person using the Pi's camera. Fails if no face is enrolled yet.",
++  { title: "Start following", description: "DISABLED: vision-ai's follow-me drives the car itself, around the safety governor. Begin following the enrolled person using the Pi's camera.",
+     inputSchema: {} },
+-  tool(async () => piPost("/follow/start")));
++  tool(async () => { throw new Error(`follow_start ${GOVERNOR_ONLY}`); }));
+ 
+ server.registerTool("follow_stop",
+   { title: "Stop following", description: "Stop the active follow-me session and halt the robot.",
+@@ -506,14 +451,8 @@
+ 
+ // ---- PicoClaw agent: MQTT messaging ----------------------------------------
+ 
+-server.registerTool("send_to_picoclaw_agent",
+-  { title: "Send message to PicoClaw agent",
+-    description: "Send a message to the PicoClaw AI agent running on this Pi and wait for a response. Use this to ask PicoClaw to control the robot, answer questions, or perform tasks. PicoClaw has access to all the robot control tools via its own MCP server.",
+-    inputSchema: {
+-      message: z.string().min(1).describe("The message to send to PicoClaw agent"),
+-      timeout_seconds: z.number().int().min(5).max(120).optional().describe("How long to wait for response (default 60 seconds)"),
+-    } },
+-  tool(async ({ message, timeout_seconds = 60 }) => {
++// Send one message to PicoClaw and wait for its answer (send_to_picoclaw_agent and the motion tools).
++async function askPicoclaw(message, timeout_seconds = 60) {
+     console.error(`[send_to_picoclaw_agent] Called with message: "${message.substring(0, 50)}..."`);
+     console.error(`[send_to_picoclaw_agent] mqttConnected=${mqttConnected}, mqttClient=${!!mqttClient}`);
+ 
+@@ -575,7 +514,16 @@
+         }
+       });
+     });
+-  }));
++}
++
++server.registerTool("send_to_picoclaw_agent",
++  { title: "Send message to PicoClaw agent",
++    description: "Send a message to the PicoClaw AI agent running on this Pi and wait for a response. Use this to ask PicoClaw to control the robot, answer questions, or perform tasks. PicoClaw has access to all the robot control tools via its own MCP server.",
++    inputSchema: {
++      message: z.string().min(1).describe("The message to send to PicoClaw agent"),
++      timeout_seconds: z.number().int().min(5).max(120).optional().describe("How long to wait for response (default 60 seconds)"),
++    } },
++  tool(async ({ message, timeout_seconds = 60 }) => askPicoclaw(message, timeout_seconds)));
+ 
+ server.registerTool("check_picoclaw_agent_connection",
+   { title: "Check PicoClaw agent connection",
+@@ -602,4 +550,4 @@
+ 
+ const transport = new StdioServerTransport();
+ await server.connect(transport);
+-console.error(`picoclaw-hardware MCP server ready (car: ${CAR_API}, vision-ai: ${PI_API})`);
++console.error(`picoclaw-hardware MCP server ready (car: ${CAR_API}, motion via PicoClaw + safety governor, e-stop: ${ESTOP_TOPIC}, vision-ai: ${PI_API})`);

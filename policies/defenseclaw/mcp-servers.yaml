@@ -39,3 +39,10 @@ drift_check:
     env:
       MQTT_CREDS_FILE: /nonexistent
       MQTT_BROKER: mqtt://127.0.0.1:1
+    # Hermes' copy must not drive the car itself: every move goes to PicoClaw and through the robot's safety
+    # governor (runbooks/robot-safety.md). mcp-drift fails the server if its file matches this (nightly), and role
+    # hermes_robot_mcp fails its run (grep -E). Python re / ERE syntax; the role's patch removes all matches.
+    forbidden_source:
+      file: /home/nikjetson/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js
+      pattern: '["''`]/(drive|turn|velocity|follow/start)["''`]|ros2 action send_goal /|ros2 launch explore_lite'
+      reason: direct call to the car's motion API, Nav2 or vision-ai follow-me (around the safety governor)
