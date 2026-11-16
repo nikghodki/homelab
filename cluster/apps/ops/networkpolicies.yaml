@@ -216,8 +216,10 @@ spec:
       ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
     - to: [{ipBlock: {cidr: 192.168.86.36/32}}, {ipBlock: {cidr: 172.16.0.0/12}}]
       ports: [{port: 7233, protocol: TCP}]
-    # LiteLLM on dgx-1 (direct cable; on dgx-1 itself Docker's DNAT comes first)
-    - to: [{ipBlock: {cidr: 10.100.136.1/32}}, {ipBlock: {cidr: 172.16.0.0/12}}]
+    # LiteLLM in k3s (10.43.0.150, runbooks/litellm.md; its policy admits ops pods labelled ops.nghodki.ai/role=agent)
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: litellm}}
+          podSelector: {matchLabels: {app.kubernetes.io/name: litellm}}
       ports: [{port: 4000, protocol: TCP}]
     # ntfy and the Gatus heartbeat on the Dell
     - to: [{ipBlock: {cidr: 192.168.86.49/32}}]
