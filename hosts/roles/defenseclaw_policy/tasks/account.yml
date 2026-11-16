@@ -39,3 +39,37 @@
           ansible.builtin.command: "{{ defenseclaw_policy_cli }} policy validate"
           changed_when: false
           check_mode: false
+
+        # The Git file holds only the settings it manages; the rest of asset_policy (for example a skill block
+        # list written by `defenseclaw skill block`) is kept. One write through DefenseClaw's config writer, which
+        # validates it and has the gateway reload it.
+        - name: MCP admission from Git (asset_policy)
+          when: defenseclaw_policy_mcp_admission | bool
+          vars:
+            defenseclaw_policy_mcp_want: "{{ (lookup('ansible.builtin.file', defenseclaw_policy_mcp_src) | from_yaml).asset_policy }}"
+          block:
+            - name: Current asset_policy
+              ansible.builtin.command: "{{ defenseclaw_policy_cli }} config get asset_policy --format json"
+              register: defenseclaw_policy_asset_now
+              changed_when: false
+              check_mode: false
+
+            - name: Merge the approved MCP servers and admission settings
+              vars:
+                defenseclaw_policy_asset_cur: "{{ defenseclaw_policy_asset_now.stdout | from_json }}"
+                defenseclaw_policy_asset_new: "{{ defenseclaw_policy_asset_cur | combine(defenseclaw_policy_mcp_want, recursive=True) }}"
+              ansible.builtin.command:
+                argv:
+                  - "{{ defenseclaw_policy_cli }}"
+                  - config
+                  - set
+                  - --json
+                  - asset_policy
+                  - "{{ defenseclaw_policy_asset_new | to_json }}"
+              when: defenseclaw_policy_asset_new != defenseclaw_policy_asset_cur
+              changed_when: true
+
+            - name: Validate the config
+              ansible.builtin.command: "{{ defenseclaw_policy_cli }} config validate"
+              changed_when: false
+              check_mode: false

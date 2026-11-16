@@ -34,7 +34,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Nightly **Cisco AIBOM** of each host's agent code and AI container images (role `cisco_aibom`, runbooks/aibom.md). Deterministic scanners only, no LLM. Full JSON per host in `/var/lib/cisco-aibom` (30 days). The bottom panel is DefenseClaw's own AIBOM on the Jetson (what Hermes has connected)."
+        "content": "Nightly **Cisco AIBOM** of each host's agent code and AI container images (role `cisco_aibom`, runbooks/aibom.md). Deterministic scanners only, no LLM. Full JSON per host in `/var/lib/cisco-aibom` (30 days). The bottom panel is DefenseClaw's own AIBOM on the Jetson (what Hermes has connected). **MCP drift** (Jetson, role `mcp_drift`, runbooks/mcp-admission.md): nightly `tools/list` of each approved MCP server compared with the pinned `tools/<server>/tools.sha256`, and Hermes' configured servers compared with `policies/defenseclaw/mcp-servers.yaml`."
       }
     },
     {
@@ -328,6 +328,151 @@
             "uid": "defenseclaw-loki"
           },
           "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 9,
+      "title": "MCP drift findings, last 2 days",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "description": "Changed, added or removed tools and unapproved MCP servers. Anything above 0: read the log panel and runbooks/mcp-admission.md.",
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 6,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "range": false,
+          "expr": "sum(count_over_time({host_name=~\".+\"} |= \"mcp-drift\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"mcp-drift\" | line_format \"{{.msg}}\" | json event=\"event\", account=\"account\", server=\"server\", status=\"status\", tool=\"tool\", change=\"change\" | event=~\"mcp-drift.tool|mcp-drift.server\" [2d])) or vector(0)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "instant",
+          "instant": true,
+          "range": false,
+          "expr": "sum(count_over_time({host_name=~\".+\"} |= \"mcp-drift\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"mcp-drift\" | line_format \"{{.msg}}\" | json event=\"event\", account=\"account\", server=\"server\", status=\"status\", tool=\"tool\", change=\"change\" | event=\"mcp-drift.run\" [2d])) or vector(0)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Findings"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Runs"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 10,
+      "title": "MCP drift (Jetson, mcp-drift): runs, servers and findings",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "defenseclaw-loki"
+      },
+      "description": "",
+      "gridPos": {
+        "x": 6,
+        "y": 35,
+        "w": 18,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "defenseclaw-loki"
+          },
+          "queryType": "range",
+          "expr": "{host_name=~\".+\"} |= \"mcp-drift\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"mcp-drift\" | line_format \"{{.msg}}\" | json event=\"event\", account=\"account\", server=\"server\", status=\"status\", tool=\"tool\", change=\"change\""
         }
       ],
       "options": {

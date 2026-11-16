@@ -3,3 +3,7 @@ defenseclaw_policy_name: homelab
 defenseclaw_policy_src: "{{ playbook_dir }}/../../policies/defenseclaw/{{ defenseclaw_policy_name }}.yaml"
 # Accounts with a per-user DefenseClaw install. Empty means the Ansible login user only.
 defenseclaw_policy_users: []
+# MCP admission (plan P4.3): merge `asset_policy` from this file into each account's config.yaml. Off by default;
+# on only where every MCP server the agents use is listed there (host_vars/jetson.yml).
+defenseclaw_policy_mcp_admission: false
+defenseclaw_policy_mcp_src: "{{ playbook_dir }}/../../policies/defenseclaw/mcp-servers.yaml"
