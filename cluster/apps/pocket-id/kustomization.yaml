@@ -1,0 +1,10 @@
+# Pocket ID, the passkey sign-in for every app (https://id.nghodki.ai, runbooks/sign-in.md). Moved from Docker on dgx-2
+# (hosts/stacks/console, kept stopped as the fallback) in P3.7. Namespace console (architecture §3.1).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: console
+resources:
+  - namespace.yaml
+  - pocket-id.yaml
+generators:
+  - secret-generator.yaml

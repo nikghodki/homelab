@@ -68,6 +68,7 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 | 10.43.0.150:4000 | `litellm/litellm` | edge-caddy (`model.nghodki.ai` /v1, `litellm-admin`), Open WebUI, DGXMM's route sync (Docker on dgx-1), the ops agent |
 | 10.43.0.151:5432 | `data/litellm-db-host` (CNPG primary) | the LiteLLM pods, the usage exporter on dgx-1 |
 | 10.43.0.152:6379 | `litellm/litellm-redis` | the LiteLLM pods |
+| 10.43.0.155:1411 | `console/pocket-id` | edge-caddy (`id.nghodki.ai`) |
 
 Pick the next free address here and add a row. If the pods behind one have a NetworkPolicy, allow the hosts
 (`argocd/extras/host-scrape-netpol.yaml`). The in-cluster Caddy uses these addresses too (Argo CD, edge-auth), never Service names: the front door must keep
