@@ -35,8 +35,9 @@ jobs:
       - name: Trivy scan of every pinned image
         run: |
           mkdir -p reports "$RUNNER_TEMP/trivy-cache"
-          # every image@sha256 reference in workflows and cluster manifests
-          grep -rhoE '[a-z0-9][a-z0-9./_-]*:[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}' .github cluster 2>/dev/null | sort -u > reports/images.txt || true
+          # every image@sha256 reference in workflows, cluster manifests and the hosts' stacks and roles (the images
+          # that actually run). Not robots/: the Isaac Lab base is too big for a hosted runner.
+          grep -rhoE '[a-z0-9][a-z0-9./_-]*:[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}' .github cluster hosts 2>/dev/null | sort -u > reports/images.txt || true
           trivy() { docker run --rm -v "$RUNNER_TEMP/trivy-cache:/cache" "$TRIVY_IMAGE" "$@"; }
           # one vulnerability DB download for all images (each scan used to fetch its own)
           trivy image --cache-dir /cache --download-db-only --no-progress
