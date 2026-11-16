@@ -160,6 +160,23 @@ kubectl apply -f ~/homelab/cluster/bootstrap/apps/root.yaml
 
 Tested 2026-11-15: admin login answered 200, and the undo restored `admin.enabled: false` and automated sync in 10 s.
 
+## Read-only API account `ops-agent` (decision 0013)
+
+The ops agent's `mcp-for-argocd` reads apps, history, diffs and resource trees with a local account: `accounts.ops-agent:
+apiKey` (no login) and `g, ops-agent, role:readonly` in `values.yaml`. Its token is minted without a browser session
+through core mode (the CLI talks to the cluster with the kubeconfig), and goes straight into SOPS:
+
+```bash
+export KUBECONFIG=~/.kube/config
+argocd account generate-token --core -n argocd --account ops-agent --id ops-agent-mcp --expires-in 2160h \
+  | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().strip()))' \
+  | sops set --value-stdin secrets/argocd.enc.yaml '["ops_agent_token"]'
+```
+
+Then copy it into the ops app's KSOPS Secret (`cluster/apps/ops/`), merge. Rotate every 90 days the same way with a
+new `--id`, then `argocd account delete-token --core -n argocd --account ops-agent <old id>`. Check: the token can
+`GET /api/v1/applications` and gets 403 on a sync.
+
 ## Upgrade
 
 Bump `targetRevision` (chart version) in `cluster/bootstrap/apps/argocd.yaml` after reading the chart's and Argo

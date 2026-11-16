@@ -23,6 +23,8 @@ configs:
     exec.enabled: false
     statusbadge.enabled: false
     users.anonymous.enabled: false
+    # Ops agent (decision 0013): a local API-token account, read-only (role:readonly below); used by mcp-for-argocd.
+    accounts.ops-agent: apiKey
     # GitHub can't reach home (design D15), so no webhook: Argo CD polls the repo every 2 minutes.
     timeout.reconciliation: 120s
     # KSOPS (kustomize exec plugin) decrypts SOPS files in the repo-server.
@@ -60,6 +62,7 @@ configs:
     policy.default: ""
     policy.csv: |
       g, admins, role:admin
+      g, ops-agent, role:readonly
     scopes: "[groups]"
   secret:
     createSecret: true
