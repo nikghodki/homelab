@@ -10,7 +10,7 @@ in the namespaces Kyverno's webhooks see; violations are refused at admission an
 | Version | Kyverno **v1.20.0**, Helm chart `kyverno` **3.10.0** (`cluster/bootstrap/apps/kyverno.yaml`); CI uses kyverno-cli v1.20.0 |
 | Values | `cluster/platform/kyverno/values.yaml` |
 | Runs | namespace **`kyverno`**, Sparks only. **Admission controller: 2 replicas, one per Spark** (topology spread `DoNotSchedule` on hostname, PDB `minAvailable: 1`). Reports controller: 1 replica (background scans, PolicyReports). Background and cleanup controllers off |
-| Webhooks | `failurePolicy: Fail` (each policy sets it; `forceFailurePolicyIgnore` is off). The webhooks' `namespaceSelector` (`config.webhooks`) leaves out **`kube-system`, `kyverno`, `argocd`** and, until P3.3 is merged, **`edge`**: those are never blocked, even with Kyverno dead. Background scans still report on them |
+| Webhooks | `failurePolicy: Fail` (each policy sets it; `forceFailurePolicyIgnore` is off). The webhooks' `namespaceSelector` (`config.webhooks`) leaves out **`kube-system`, `kyverno`, `argocd`** and **`edge`** (the front door, decision 0007): those are never blocked, even with Kyverno dead. Background scans still report on them |
 | Policies | `policies/kyverno/*.yaml`, app `kyverno-policies`: five `ValidatingPolicy` (CEL) and one `ImageValidatingPolicy` |
 | Metrics | admission `10.43.0.110:8000` (ClientIP affinity: one replica at a time), reports `10.43.0.111:8000` (VictoriaMetrics on dgx-2) |
 | Alerts | `hosts/stacks/observe/vmalert/rules/gitops.yml`: `KyvernoAdmissionDown` (critical, 5 min), `KyvernoAdmissionDegraded` (< 2 replicas, needs kube-state-metrics), `KyvernoRejectionsSpike` (> 5 refusals in 15 min), `KyvernoWebhookErrors` (5xx), `KyvernoAdmissionSlow` (p99 > 8 s) |
@@ -29,7 +29,7 @@ All match Pods; the `ValidatingPolicy` ones also check Deployments, StatefulSets
 | `disallow-privileged` | Enforce | no `privileged` container, no `hostNetwork`/`hostPID`/`hostIPC` | **allowlist**: `kube-system` (k3s add-ons, kube-vip: hostNetwork + NET_ADMIN/NET_RAW), `kyverno`, `cnpg-system` |
 | `require-resource-limits` | Enforce | every container and init container has cpu and memory **requests and limits** | **`kube-system`**: k3s's `coredns` (no cpu limit) and `local-path-provisioner` (none) come from k3s's packaged manifests, not a HelmChart, so there's no HelmChartConfig to set them and edits under `/var/lib/rancher/k3s/server/manifests` are overwritten when k3s restarts |
 
-"Webhook-excluded namespaces" = `kube-system`, `kyverno`, `argocd`, `edge` (until P3.3 merges). Everything else
+"Webhook-excluded namespaces" = `kube-system`, `kyverno`, `argocd`, `edge`. Everything else
 (`default`, `smoke`, `cnpg-system`, and every new namespace from `cluster/apps`) is enforced.
 
 **Allowed registries** (`restrict-registries`): `ghcr.io/nikghodki/`, `docker.io/rancher/` (k3s), `quay.io/argoproj/`,
@@ -44,10 +44,10 @@ Kyverno CLI on every PR (`.github/scripts/check-kubernetes.sh`): a pod that brea
 `cluster/` is checked. Before merging a new workload, check it the same way against the live policies:
 `kyverno apply policies/kyverno --resource <manifests>`.
 
-**TODO (P3.3):** when `p3.3-edge-in-cluster` is merged, take `edge` out of `config.webhooks` in
-`cluster/platform/kyverno/values.yaml`. Its pods (edge-caddy, edge-dns) passed every policy on 2026-11-15
-(`kyverno apply` on the live objects) once the three P3.3 registries above are allowed; re-check them, then merge.
-With `edge` enforced, edge-caddy and edge-dns can only be recreated while a Kyverno replica is up.
+**`edge` stays out of the webhooks (P3.3, decision 0007).** With `edge` enforced, edge-caddy and edge-dns could only
+be recreated while a Kyverno replica is up, and the front door must survive a dead Kyverno, like Argo CD. Its pods
+pass every policy (`kyverno apply` on the live pods, 2026-11-15: 33 pass, 0 fail), and background scans keep
+reporting on them; check new `edge` manifests with `kyverno apply` before merging.
 
 ## Private images
 

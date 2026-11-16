@@ -26,6 +26,9 @@ spec:
       priorityClassName: system-node-critical
       nodeSelector: {nghodki.ai/role: gpu}
       terminationGracePeriodSeconds: 10
+      # Root: Kubernetes grants added capabilities only to uid 0 (no ambient capabilities for other users).
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
       containers:
         - name: kube-vip
           image: ghcr.io/kube-vip/kube-vip:v1.3.1@sha256:1962f9daf226503f7e6b107f595cb28b7917fd2d0113957075e19a3e5a6c1e33
@@ -56,6 +59,7 @@ spec:
             limits: {cpu: 250m, memory: 128Mi}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               add: [NET_ADMIN, NET_RAW]
               drop: [ALL]

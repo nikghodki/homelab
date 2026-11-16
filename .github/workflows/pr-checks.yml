@@ -85,7 +85,8 @@ jobs:
       - name: Trivy (vulnerabilities, misconfigurations, secrets)
         run: >
           docker run --rm -v "$PWD:/src:ro" "$TRIVY_IMAGE" fs
-          --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress /src
+          --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress
+          --ignorefile /src/.trivyignore.yaml /src
 
   kubernetes:
     name: Kubernetes manifests

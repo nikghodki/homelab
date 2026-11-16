@@ -31,6 +31,9 @@ The `argocd` kube context on dgx-1 is the admin context with namespace `argocd`
 | `kyverno-policies` | platform | `policies/kyverno` |
 | `cnpg-operator` | platform | chart cloudnative-pg |
 | `cluster-dns` | platform | `cluster/platform/cluster-dns` (CoreDNS zone for `*.nghodki.ai`) |
+| `kube-vip` | platform | `cluster/platform/kube-vip` (API VIP 192.168.86.10, edge VIP 192.168.86.11; runbooks/edge.md) |
+| `edge` | platform | `cluster/platform/edge` (the front door: CoreDNS + Caddy; runbooks/edge.md) |
+| `kube-state-metrics` | platform | `cluster/platform/kube-state-metrics` (readiness metrics for vmalert) |
 | `smoke` | apps | `cluster/apps/_smoke` (SOPS canary) |
 
 All have automated sync with prune and selfHeal, and retries. Only `smoke` has the resources finalizer: deleting
