@@ -16,11 +16,11 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 | Security | The car's HTTP API accepts anyone on the LAN (including picoclaw's own `exec`/`web_fetch` and the Jetson's MCP copy); picoclaw's MCP motion tools are governed since #73 | [picoclaw gaps](../agents/picoclaw.md) |
 | Security | The age key is in the cluster and decrypts everything | a cluster-only key (decision 0006) |
 | Security / availability | Kyverno Enforces with failurePolicy Fail: if both admission replicas are down (both Sparks), new pods in enforced namespaces are refused; our own images are refused until the GHCR packages are public | break-glass B; make the packages public |
-| Security | LiteLLM guardrail not enabled; DefenseClaw judge off; no webhooks | after the DGXMM session |
+| Security | No DefenseClaw webhooks (they refuse private receivers). The LiteLLM guardrail and the DefenseClaw judges are on since 2026-11-15 (decision 0012) | alerts come from metrics and logs instead |
 | Security | SSH password authentication still enabled | after every admin path has a key |
 | Recovery | Backups conflict with decision 0002; no off-site copy; no restore test | user decision |
 | Recovery | Pocket ID, Temporal, MLflow, Grafana data live in Docker volumes that the backups don't cover | add dumps |
-| Ops | LiteLLM, Open WebUI, HA, Hermes are hand-run: not in Ansible or Argo CD; Renovate can't see them | P3.7, P4.5 |
+| Ops | Open WebUI and Hermes are hand-run: not in Ansible or Argo CD; Renovate can't see them. LiteLLM (#96) and Home Assistant (#85) are in Git | P3.7, P4.5 |
 | Ops | No incident runbooks yet (P3.9) | [Incident playbooks](../operations/incidents.md) |
 | Ops | The Dell is weak (2 cores, 8 GB, HDD) | decision 0009 |
 | Robot | Not driving autonomously: mock sink; on-blocks test pending | P5.2 final test |

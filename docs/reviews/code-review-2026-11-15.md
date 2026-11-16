@@ -298,6 +298,21 @@ Each fix is a separate commit. "Old code" means the test was run against the pre
 - **#44, #46**: dead fleet-metrics knobs (export or delete).
 - Add the two new test suites to `pr-checks.yml` once #72 has merged.
 
+## Follow-ups after the review (2026-11-16)
+
+Items that were *deferred: in flight* and have since been done, or found fixed:
+
+| # | State |
+|---|---|
+| 11 | Fixed by #72: kube-state-metrics is deployed and scraped; `kube_deployment_status_replicas_available` has the `kyverno-admission-controller` series (2 replicas), so `KyvernoAdmissionDegraded` can fire |
+| 30 | Fixed in #111: Gatus checks Pocket ID (OIDC discovery and issuer) and Argo CD through the front door. `ca.nghodki.ai` was already covered by `edge Caddy (VIP)`; rest-server waits for the backups decision (0002) |
+| 56 | Fixed in #112: `cancel-in-progress` only for pull requests (`cache: pip` not added) |
+| Implementation report 4, 5 | Fixed in #112: the DefenseClaw AIBOM and `robots/sim` suites run in `unit-tests` |
+
+Still open and not a decision: #10 and #27 (Kyverno and its chart: the platform session's area), #22 (needs the
+DefenseClaw CLI to validate an inactive policy), #24 (the remaining Renovate managers), #25 (linger), #29 (runtime
+config checks in CI), #51, #57, and the small "deferred: other" items (#41, #45, #47, #48, #49, #52, #54, #58).
+
 ## Process notes
 
 - Everything ran on dgx-1. No host, DGXMM, LiteLLM, model, k3s or front-door change was made, and nothing was deployed.
