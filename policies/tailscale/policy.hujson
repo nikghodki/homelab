@@ -29,14 +29,14 @@
     // You: everything.
     {"src": ["group:admins"], "dst": ["*"], "ip": ["*"]},
 
-    // Family and guests: the web front door on dgx-1 (*.nghodki.ai: Home Assistant, Open WebUI, LiteLLM ...) and DNS.
-    {"src": ["group:family", "group:guests"], "dst": ["dgx-1"], "ip": ["tcp:80", "tcp:443", "tcp:53", "udp:53"]},
+    // Family and guests: the web front door and DNS, on both Sparks (in-cluster front door, decision 0007).
+    {"src": ["group:family", "group:guests"], "dst": ["dgx-1", "dgx-2"], "ip": ["tcp:80", "tcp:443", "tcp:53", "udp:53"]},
 
     // Control plane and GPU nodes talk to each other freely (k3s, etcd, NATS, model sync).
     {"src": ["tag:gpu", "tag:control"], "dst": ["tag:gpu", "tag:control"], "ip": ["*"]},
 
-    // Every fleet device: DNS + web front door on dgx-1, telemetry and backups on dgx-2.
-    {"src": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "dst": ["dgx-1"],
+    // Every fleet device: DNS + web front door on both Sparks; telemetry and backups on dgx-2.
+    {"src": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "dst": ["dgx-1", "dgx-2"],
      "ip": ["tcp:53", "udp:53", "tcp:80", "tcp:443"]},
     {"src": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "dst": ["dgx-2"],
      "ip": ["tcp:4317-4320", "tcp:8000"]},
@@ -59,8 +59,8 @@
 
   "tests": [
     {"src": "nikghodki@gmail.com",   "accept": ["dgx-2:22", "dgx-1:4000"]},
-    {"src": "vilasghodki@gmail.com", "accept": ["dgx-1:443", "dgx-1:80"], "deny": ["dgx-1:22", "dgx-2:3000", "dgx-1:5432"]},
-    {"src": "ameyaraul@gmail.com",   "accept": ["dgx-1:443"], "deny": ["dgx-1:22", "dgx-1:8883", "dgx-2:22"]},
+    {"src": "vilasghodki@gmail.com", "accept": ["dgx-1:443", "dgx-1:80", "dgx-2:443", "dgx-2:53"], "deny": ["dgx-1:22", "dgx-2:22", "dgx-2:3000", "dgx-1:5432"]},
+    {"src": "ameyaraul@gmail.com",   "accept": ["dgx-1:443", "dgx-2:443"], "deny": ["dgx-1:22", "dgx-1:8883", "dgx-2:22", "dgx-2:6006"]},
     {"src": "tag:robot",             "accept": ["dgx-1:8883", "dgx-1:8884", "dgx-2:4319"], "deny": ["dgx-1:4000", "dgx-1:22", "dgx-1:8971", "dgx-2:3000"]},
     {"src": "tag:agent",             "accept": ["dgx-1:4000", "dgx-1:8883"], "deny": ["dgx-2:22"]},
     {"src": "dgx-1",                 "accept": ["tag:agent:443", "tag:robot:22"], "deny": ["tag:robot:443"]},
