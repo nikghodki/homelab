@@ -1,0 +1,5 @@
+# Managed by homelab Ansible (roles/hardening). Protocols nothing in the homelab uses.
+{% for mod in hardening_disabled_modules %}
+blacklist {{ mod }}
+install {{ mod }} /bin/false
+{% endfor %}

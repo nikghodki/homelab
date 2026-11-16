@@ -1,0 +1,55 @@
+# Low-risk host hardening from the Lynis suggestions (runbooks/hardening.md).
+# Never add ip_forward, conf.*.forwarding, rp_filter or net.bridge.* here: k3s, flannel, Docker and
+# Tailscale own them (the role refuses to template them).
+hardening_sysctl:
+  # Filesystem link/FIFO protections in sticky world-writable folders
+  fs.protected_hardlinks: 1
+  fs.protected_symlinks: 1
+  fs.protected_fifos: 2
+  fs.protected_regular: 2
+  # No core dumps from setuid programs (apport and systemd-coredump would set 2)
+  fs.suid_dumpable: 0
+  kernel.core_uses_pid: 1
+  # Kernel info leaks. kptr_restrict stays 1 (root keeps symbols for perf/bpftrace), not 2.
+  kernel.dmesg_restrict: 1
+  kernel.kptr_restrict: 1
+  # Unprivileged users can't autoload TTY line disciplines (root services such as hciuart still can)
+  dev.tty.ldisc_autoload: 0
+  net.ipv4.tcp_syncookies: 1
+  # Ignore ICMP redirects and source-routed packets. On forwarding hosts the kernel already requires
+  # both conf/all and conf/<if> to accept redirects, so conf/all=0 just makes that explicit.
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv6.conf.all.accept_redirects: 0
+  net.ipv6.conf.default.accept_redirects: 0
+  net.ipv4.conf.all.accept_source_route: 0
+  net.ipv4.conf.default.accept_source_route: 0
+  net.ipv4.conf.all.log_martians: 1
+  net.ipv4.conf.default.log_martians: 1
+# Only where the Yama LSM is built in (the Pi kernel has none)
+hardening_ptrace_scope: 1
+# Hosts that forward packets (k3s nodes: Sparks, Jetson, Dell) keep sending ICMP redirects.
+# Set false on hosts that never route (the Pi); the role checks ip_forward agrees.
+hardening_router: true
+hardening_non_router_sysctl:
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.default.send_redirects: 0
+# Kernel modules for protocols nothing here uses
+hardening_disabled_modules: [dccp, sctp, rds, tipc]
+# sshd additions on top of roles/base (keep TCP and agent forwarding: the admin tunnels and agents use them)
+hardening_ssh_log_level: VERBOSE
+# Several agents open many short SSH sessions from dgx-1: keep pre-auth throttling generous (default 10:30:100)
+hardening_ssh_max_startups: "30:50:100"
+# login.defs: rounds/cost for passwords set by chpasswd/newusers. No password ageing, no umask change.
+hardening_login_defs:
+  SHA_CRYPT_MIN_ROUNDS: "65536"
+  SHA_CRYPT_MAX_ROUNDS: "65536"
+  YESCRYPT_COST_FACTOR: "7"
+hardening_banner: |
+  Authorised access only. This is a private system; activity is logged and monitored.
+  Disconnect now if you are not an authorised user.
+# Debian family: package-integrity and patch-audit tools (no services)
+hardening_debian_packages: [debsums, apt-show-versions]
+# UFW hosts with a `limit` rule on 22/tcp (the Dell): source IPs allowed ahead of it, so the
+# agents' bursts of short SSH sessions from dgx-1 aren't rate-limited. The limit stays for everyone else.
+hardening_ufw_ssh_allow: []  # - {src: 192.168.86.44, comment: dgx-1 automation}

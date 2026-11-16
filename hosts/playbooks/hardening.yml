@@ -1,0 +1,7 @@
+# Lynis-driven host hardening (runbooks/hardening.md). Always --check --diff first, then one host (dgx-2).
+# Pending security updates, opt-in: --tags all,security_updates
+- name: Hardening
+  hosts: all
+  become: true
+  roles:
+    - role: hardening

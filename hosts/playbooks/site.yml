@@ -4,6 +4,7 @@
   become: true
   roles:
     - role: base
+    - role: hardening
     - role: tailscale
     - role: fleet_metrics
 

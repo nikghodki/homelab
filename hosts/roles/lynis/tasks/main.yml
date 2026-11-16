@@ -11,6 +11,14 @@
     group: root
     mode: "0755"
 
+- name: Custom profile with the documented exceptions
+  ansible.builtin.template:
+    src: custom.prf.j2
+    dest: /etc/lynis/custom.prf
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Service and timer units
   ansible.builtin.template:
     src: "{{ item }}.j2"

@@ -2,3 +2,7 @@
 # which the host collector ships to Loki.
 lynis_on_calendar: "Sun *-*-* 03:30:00"
 lynis_randomized_delay: 30min
+# Documented exceptions (runbooks/hardening.md), rendered into /etc/lynis/custom.prf.
+# Each entry needs a reason; set per host in host_vars.
+lynis_skip_tests: []         # - {id: PKGS-7388, reason: "..."}
+lynis_promisc_interfaces: [] # - {name: usb0, reason: "..."}
