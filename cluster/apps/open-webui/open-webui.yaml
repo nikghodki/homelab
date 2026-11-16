@@ -164,6 +164,14 @@ spec:
         - ipBlock: {cidr: 172.23.0.0/16}
       ports:
         - {port: 4000, protocol: TCP}
+    # LiteLLM in k3s (litellm/litellm, ClusterIP 10.43.0.150, DNATed to the pods before the policy check)
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: litellm}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: litellm}
+      ports:
+        - {port: 4000, protocol: TCP}
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

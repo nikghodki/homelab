@@ -1,0 +1,105 @@
+# Who may talk to what in namespace litellm. k3s enforces NetworkPolicies (kube-router); kubelet probes come from the
+# node and are allowed by it. Host traffic through a ClusterIP is masqueraded to the node's cni0 (10.42.N.1) or flannel
+# (10.42.N.0) address, which no pod has: 10.42.0.0/31 is dgx-2, 10.42.1.0/31 dgx-1.
+#
+# LiteLLM in: the front door's Caddy, Open WebUI, the ops agent, and host processes on the Sparks (DGXMM's route sync
+# in Docker on dgx-1, the old loopback callers through the transition relay).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: litellm}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: edge}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: edge-caddy}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: open-webui}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: open-webui}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ops}
+          podSelector:
+            matchLabels: {ops.nghodki.ai/role: agent}
+        - ipBlock: {cidr: 10.42.0.0/31}
+        - ipBlock: {cidr: 10.42.1.0/31}
+      ports:
+        - {port: 4000, protocol: TCP}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports:
+        - {port: 53, protocol: UDP}
+        - {port: 53, protocol: TCP}
+    # its database (the ClusterIP is DNATed to the pod before the policy sees the packet)
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: data}
+          podSelector:
+            matchLabels: {cnpg.io/cluster: litellm-db}
+      ports:
+        - {port: 5432, protocol: TCP}
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: litellm-redis}
+      ports:
+        - {port: 6379, protocol: TCP}
+    # dgx-1's relays (hosts/stacks/litellm-bridges): DGXMM's on-demand gateway (:8091) and DefenseClaw (:18970). On
+    # dgx-1 itself Docker DNATs the published :8091 to the relay's container (network `gateway`, 172.23.0.0/16)
+    # before the policy sees the packet.
+    - to:
+        - ipBlock: {cidr: 10.100.136.1/32}
+      ports:
+        - {port: 8091, protocol: TCP}
+        - {port: 18970, protocol: TCP}
+    - to:
+        - ipBlock: {cidr: 172.23.0.0/16}
+      ports:
+        - {port: 8091, protocol: TCP}
+    # Phoenix on dgx-2 (Docker, published :6006); a pod on dgx-2 meets Docker's DNAT first (its bridge, 172.16.0.0/12)
+    - to:
+        - ipBlock: {cidr: 192.168.86.36/32}
+        - ipBlock: {cidr: 172.16.0.0/12}
+      ports:
+        - {port: 6006, protocol: TCP}
+    # Pocket ID through the front door (the VIP is DNATed to a Caddy pod first)
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: edge}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: edge-caddy}
+        - ipBlock: {cidr: 192.168.86.11/32}
+      ports:
+        - {port: 443, protocol: TCP}
+    # the internet over HTTPS (LiteLLM's model price list at start); not the LAN, the tailnet or the cluster
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16]
+      ports:
+        - {port: 443, protocol: TCP}
+---
+# Redis: only the LiteLLM pods; it calls nothing.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm-redis
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: litellm-redis}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: litellm}
+      ports:
+        - {port: 6379, protocol: TCP}
+  egress: []

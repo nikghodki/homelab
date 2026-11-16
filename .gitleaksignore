@@ -1,0 +1,3 @@
+# False positive (generic-api-key) on the ops-agent-code branch: the "key" is the LiteLLM key alias name
+# defenseclaw-jetson-judge in a sentence of the replay gold set, not a key. Full-history scans see every branch.
+2450230960d3ff5407b8c756de9415962c48fc03:agents/ops-agent/ops_agent/replay/gold.yaml:generic-api-key:249

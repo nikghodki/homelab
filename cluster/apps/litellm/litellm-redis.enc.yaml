@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: litellm-redis
+    namespace: litellm
+type: Opaque
+stringData:
+    redis.conf: ENC[AES256_GCM,data:pXi6hbw3bChNTe132Hf9W3INWlFNDPjSMnjI71gv8iUY+KNFvS04QAL36PMJPnT4DKpDxLAQt26l9JfPDWXdIZ5jKQM4Rhrl+pbYxyDUvFSMFeluxVsTMYzDawzX1e+ghzjIpMhHiDSpKuOuhfknY55oDK4H3QQafSagjjWJ1Ws4xYnMq6CTw2ZsWFmvEu1nfHy2TaWxLg==,iv:F1uKjZnoI4m6XcBNJ7MLH0CBHDicG8GAUqKqYv3IYWI=,tag:2AbuYT4MLSmlsL4aRs2FnQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBacERmSGNSdTFDT0dNd1VZ
+            VnBKcmhHY0NEOFZ5Tkg5RmZ6RnZGVmN6SEQ4ClRKTFJRVi9EbXozaE1ibS8zejlH
+            Ymd2TXVScGlqd1I4c1Jkc0pLa2Q5bzgKLS0tIEtKVW1TSklwUjNPSEFQbS9NVTNV
+            OVdyWTlQMlZoWkhVeGQzZE45TTIrWHcKx/VWLgq7t0GU8cZiFOMDOrLa8ioyKD57
+            cpdV/oO0Y8h/Tw1HPVOWvbt84lb5dMIAQmQ5vrem0rlOxLJVMt2EyQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T22:02:31Z"
+    mac: ENC[AES256_GCM,data:4VTk2JoKc1//IeU0g347NvejeL1VRjcHUzSG4yKyNebDuN2ZB0KOjPDFcCjD/YytbezBf5hpUJoMNqw4QttKur084tjgNclof7nGCpXNxIh4MgSFTgz9FmofqLHXxDiX/AD3KImA+E0R/2ADJQi7QDGV2HB9m14SLVi7GJ9mZFE=,iv:KnBsVPfP6eZhMeJgzEmfqBqFcXODTiveT4NjZJHmXWw=,tag:VB057lxkXlHz03J5habawA==,type:str]
+    version: 3.13.3

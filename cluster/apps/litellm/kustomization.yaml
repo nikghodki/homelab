@@ -1,0 +1,21 @@
+# LiteLLM, the model gateway (plan P3.7, runbooks/litellm.md "In k3s"). Moved from Docker on dgx-1 (hosts/stacks/litellm,
+# kept stopped as the fallback). Its database is the CNPG cluster data/litellm-db (cluster/apps/data).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: litellm
+resources:
+  - namespace.yaml
+  - litellm.yaml
+  - redis.yaml
+  - networkpolicies.yaml
+generators:
+  - secret-generator.yaml
+# The proxy's config, request hook and guardrail (one copy, also used by the stopped Docker copy's playbook) and the
+# homelab web CA (Pocket ID's certificate, for the admin UI's SSO). A change rolls the pods (hashed name).
+configMapGenerator:
+  - name: litellm-proxy
+    files:
+      - proxy/config.yaml
+      - proxy/qwen_system_merge.py
+      - proxy/defenseclaw_guardrail.py
+      - proxy/web-ca.crt

@@ -222,11 +222,11 @@ jobs:
         working-directory: hosts/files/fleet-metrics
         run: python -m pytest -q
       - name: DefenseClaw LiteLLM guardrail
-        working-directory: hosts/files/litellm
-        run: PYTHONPATH=. python -m pytest -q tests
+        working-directory: cluster/apps/litellm/proxy
+        run: PYTHONPATH=. python -m pytest -q tests/test_defenseclaw_guardrail.py
       - name: LiteLLM request hook (system merge, file attachments as text)
-        working-directory: hosts/stacks/litellm/litellm-proxy
-        run: PYTHONPATH=. python -m pytest -q tests
+        working-directory: cluster/apps/litellm/proxy
+        run: PYTHONPATH=. python -m pytest -q tests/test_documents_to_text.py
       - name: DefenseClaw fleet policy
         working-directory: policies/defenseclaw
         run: python -m pytest -q tests

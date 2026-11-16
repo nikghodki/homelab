@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: litellm-db-app
+    namespace: data
+type: kubernetes.io/basic-auth
+stringData:
+    username: ENC[AES256_GCM,data:L1Yd320eJQ==,iv:BEMIKbMA6ArWKvfVpzD4niKxb0xKrhDoOrC1uzIwMt4=,tag:7xVb4TtAc0Mg23Uuu56jig==,type:str]
+    password: ENC[AES256_GCM,data:kGOf3Lm6ZLYpUuadLxzlQotl7nBWdOrTtODmVV9Itx+DLTLH+1sw5q8Dvg==,iv:ViyCShclq4X5NokUrz1lKiF5eRxNo9PAe2n8rBPUc8U=,tag:HEnMJiZfhNon4mDkclvEeg==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1c1FVN3ByNzh4dVpsdEJy
+            cXd5Q2tpdVZNdlVzQ1BpaXd5cXpueG1nMUc4CkU1ajVHT21TMWFWbTlDVFNCK2cw
+            NlM3K3RGbk1zem9PNjdtNDVzQWpveUkKLS0tIEVVUG5GSHJGMmRWUWx6dHpVaFVB
+            SVBFRFpESTZCQ3lMV01xWG5vQm1lZGcKs4cNVLGi3QeYIqwVLxf6YwML2PQYJL4F
+            0Yo/VEFnfSHDEiVjs3f6OF156CVsxkOtLCZbzmg8+irwrVg9qzJ0sA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T22:02:31Z"
+    mac: ENC[AES256_GCM,data:oYX1CQcCuQ0BxSLq5MktCXEzTEr2SxdqCyeKdh7aqELrZ7hSTwm+khM/BYFWYYOW2qP9Wd1ngQ901Lt0Lcw3g1puKgSnexQesWCCo6DekeGpNQ8spwq0h4XG2VQuLKA/CD0ffUwp9omO4bM8MzKpY8CgKgiHXoQj22NDw32IL3s=,iv:L4dnW1rKO25BQH2Z+BbCH8GkmUKdSanJRSFsstIN3ys=,tag:NqcqUOz689JwkWnHOuaOnQ==,type:str]
+    version: 3.13.3
