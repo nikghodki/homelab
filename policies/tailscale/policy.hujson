@@ -49,6 +49,8 @@
 
     // Ansible / admin automation from dgx-1 to every device.
     {"src": ["dgx-1"], "dst": ["tag:gpu", "tag:control", "tag:home", "tag:agent", "tag:robot"], "ip": ["tcp:22"]},
+    // dgx-1 checks the Dell's alerting endpoint (ntfy over Tailscale HTTPS, runbooks/alerting.md).
+    {"src": ["dgx-1"], "dst": ["tag:agent"], "ip": ["tcp:443"]},
   ],
 
   "ssh": [
@@ -61,5 +63,6 @@
     {"src": "ameyaraul@gmail.com",   "accept": ["dgx-1:443"], "deny": ["dgx-1:22", "dgx-1:8883", "dgx-2:22"]},
     {"src": "tag:robot",             "accept": ["dgx-1:8883", "dgx-1:8884", "dgx-2:4319"], "deny": ["dgx-1:4000", "dgx-1:22", "dgx-1:8971", "dgx-2:3000"]},
     {"src": "tag:agent",             "accept": ["dgx-1:4000", "dgx-1:8883"], "deny": ["dgx-2:22"]},
+    {"src": "dgx-1",                 "accept": ["tag:agent:443", "tag:robot:22"], "deny": ["tag:robot:443"]},
   ],
 }
