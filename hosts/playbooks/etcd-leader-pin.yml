@@ -1,0 +1,6 @@
+# Keep the etcd leader on a Spark (runbooks/k3s.md, "etcd leader"). Always --check --diff first.
+- name: Etcd leader pin
+  hosts: sparks
+  become: true
+  roles:
+    - role: etcd_leader_pin

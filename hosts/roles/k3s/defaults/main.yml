@@ -24,6 +24,10 @@ k3s_secrets_encryption: true
 k3s_node_labels: []
 k3s_node_taints: []
 k3s_kubelet_args: []
+# Extra embedded-etcd flags (servers), e.g. [election-timeout=10000]; k3s's defaults are heartbeat 500 ms, election 5 s
+k3s_etcd_args: []
+# Extra kube-controller-manager flags (servers with a control plane), e.g. [node-monitor-grace-period=20s]
+k3s_kube_controller_manager_args: []
 # Join token, from secrets/k3s.enc.yaml (loaded by playbooks/k3s.yml)
 k3s_token: ""
 

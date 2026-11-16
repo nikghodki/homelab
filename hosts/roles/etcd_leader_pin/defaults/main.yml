@@ -1,0 +1,17 @@
+---
+# Keep the etcd leader on a Spark (runbooks/k3s.md, "etcd leader"). The Jetson's member is on Wi-Fi: when it leads,
+# every write waits on its Wi-Fi, and a member catching up after a restart stalled the API for >5 s, long enough for
+# k3s on dgx-2 and the Jetson to lose their controllers' leader leases and exit (failover drill, 2026-11-16).
+etcd_leader_pin_version: v3.7.1
+etcd_leader_pin_sha256:
+  aarch64: d7e25e08f694b6ed7792fc7b7a891fe2c3f3d3dccfe2f3bfdb1547b0eb75b6da
+etcd_leader_pin_arch: "{{ {'aarch64': 'arm64', 'x86_64': 'amd64'}[ansible_facts['architecture']] }}"
+etcd_leader_pin_tarball: "etcd-{{ etcd_leader_pin_version }}-linux-{{ etcd_leader_pin_arch }}"
+# Client URLs of the members that may lead, in order of preference; the leader is moved to the first healthy one
+# only when it is none of these.
+etcd_leader_pin_prefer: [https://10.100.136.2:2379, https://10.100.136.1:2379]
+etcd_leader_pin_members: [https://10.100.136.2:2379, https://10.100.136.1:2379, https://192.168.86.211:2379]
+# A target further behind the leader than this (raft index) is not healthy enough to take over.
+etcd_leader_pin_max_lag: 1000
+etcd_leader_pin_interval: 20s
+etcd_leader_pin_script: /usr/local/sbin/etcd-leader-pin

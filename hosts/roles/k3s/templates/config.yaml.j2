@@ -30,6 +30,18 @@ disable:
   - {{ d }}
 {% endfor %}
 secrets-encryption: {{ k3s_secrets_encryption | bool | lower }}
+{% if k3s_etcd_args %}
+etcd-arg:
+{% for a in k3s_etcd_args %}
+  - "{{ a }}"
+{% endfor %}
+{% endif %}
+{% if k3s_kube_controller_manager_args and not k3s_etcd_only %}
+kube-controller-manager-arg:
+{% for a in k3s_kube_controller_manager_args %}
+  - "{{ a }}"
+{% endfor %}
+{% endif %}
 write-kubeconfig-mode: "0600"
 {% endif %}
 {% if k3s_node_labels %}

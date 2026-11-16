@@ -78,6 +78,34 @@ Quorum is 2 of 3. Losing one member of any kind is fine. Losing a Spark **and** 
 running pods and all Docker services keep running. A GPU/unified-memory OOM can take a Spark down (it happened on
 2026-11-15), so don't take the Jetson out of etcd casually.
 
+## etcd leader
+
+The leader should be a Spark: both are on the cable, the Jetson is on Wi-Fi. With the Jetson leading, every write
+waits on its Wi-Fi (requests of 0.3–1.4 s), and when a member came back after an outage the API stalled for more than
+5 s: k3s on dgx-2 and on the Jetson lost their controllers' leader leases and exited (systemd restarted them), and
+kube-vip on dgx-2 dropped both VIPs for ~10 s (failover drill, 2026-11-16, [edge.md](edge.md#failover-drill)). Two
+things keep it on a Spark:
+
+- **The Jetson's election timeout is 10 s** (`k3s_etcd_args: [election-timeout=10000]` in `host_vars/jetson.yml`;
+  the Sparks keep k3s's 5 s). After a Spark dies, the other Spark always calls the election first.
+- **`etcd-leader-pin.timer` on both Sparks** (role `etcd_leader_pin`, `playbooks/etcd-leader-pin.yml`, imported by
+  `k3s.yml`) covers what the timeout can't: a graceful stop of the leader (k3s restart, upgrade) hands leadership to
+  any member, the Jetson included. Every 20 s it asks every member for its status; if the leader isn't a Spark, it
+  moves leadership to dgx-2, else dgx-1 (the first one that is up and within 1000 raft entries of the leader). It
+  logs only when it acts: `journalctl -u etcd-leader-pin | grep moved`. It installs `etcdctl` 3.7.1 (checksum-verified)
+  as `/usr/local/bin/etcdctl`. Tested: leadership moved to the Jetson by hand came back to dgx-2 after 16 s.
+
+Which member leads: `sudo etcdctl ... endpoint status -w table` (above, `IS LEADER`). Move it by hand:
+`sudo etcdctl --endpoints <leader's client URL> ... move-leader <member id in hex>`.
+
+## Dead-node detection
+
+`kube-controller-manager` on the Sparks runs with `node-monitor-grace-period=20s` (`group_vars/sparks.yml`,
+`k3s_kube_controller_manager_args`; Kubernetes' default is 50 s). That is how long a dead node's pods stay in the
+Services: the front door's surviving Spark keeps sending part of its connections to them until then (the drill
+measured ~72 s with the default). Eviction is unchanged (pods move 5 min after NotReady). A Wi-Fi node (Jetson,
+Dell) that loses its link for more than 20 s now shows NotReady sooner; that only takes its own pods out of Services.
+
 ## Docker on the Sparks
 
 k3s runs its own containerd; Docker and its iptables chains are untouched (kube-proxy and flannel add their own chains
