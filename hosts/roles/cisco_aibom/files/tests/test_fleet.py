@@ -248,3 +248,110 @@ def test_llm_args_on_with_key_never_put_the_key_on_the_command_line():
     args = fleet.llm_args(env)
     assert "sk-secret" not in args and "--llm-api-key" not in args
     assert args[args.index("--agentic-timeout") + 1] == "600"
+
+
+EXCLUDES = [".env", ".env.*", "*.key", "node_modules/", "venv/"]
+
+
+def remote_dir_run(run, tmp_path, monkeypatch, files=(), **extra):
+    """dgx-2-style config: the Jetson's Hermes checkout, copied here and scanned as the Jetson's."""
+    go, state = run
+    set_cfg(tmp_path, remote_dirs=[{"host": "jetson", "name": "hermes-agent", "excludes": EXCLUDES,
+                                    "source": "aibom-mirror@192.0.2.1::hermes-agent"}],
+            mirror={"ssh_key": "/k", "known_hosts": "/kh"}, **extra)
+    copy = state / "mirror" / "jetson" / "hermes-agent"
+    REPORTS[str(copy)] = report(str(copy), {"agent": [{"name": "hermes", "file_path": f"{copy}/run_agent.py"}]})
+    calls = []
+
+    def refresh(source, dest, excludes, mirror):
+        calls.append((source, str(dest), list(excludes), mirror))
+        (dest / ".git" / "refs" / "heads").mkdir(parents=True, exist_ok=True)
+        (dest / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        (dest / ".git" / "refs" / "heads" / "main").write_text("97a9ae8\n")
+        for f in files:
+            (dest / f).parent.mkdir(parents=True, exist_ok=True)
+            (dest / f).write_text("x")
+    monkeypatch.setattr(fleet, "refresh_copy", refresh)
+    return go, state, copy, calls
+
+
+def test_remote_dir_is_copied_then_scanned_as_the_other_host(run, tmp_path, monkeypatch):
+    go, state, copy, calls = remote_dir_run(run, tmp_path, monkeypatch)
+    rc, lines = go()
+    assert rc == 0
+    own, remote = lines
+    assert "hermes-agent" not in own["targets"]
+    assert remote["host"] == "jetson" and remote["scanned_on"] == "h" and remote["targets"] == {"hermes-agent": 1}
+    assert calls == [("aibom-mirror@192.0.2.1::hermes-agent", str(copy), EXCLUDES, {"ssh_key": "/k", "known_hosts": "/kh"})]
+    entry = json.loads(next(state.glob("jetson-*.json")).read_text())["targets"]["hermes-agent"]
+    assert entry["method"] == "remote-copy" and entry["commit"] == "97a9ae8" and entry["kind"] == "dir"
+    assert entry["source"] == "aibom-mirror@192.0.2.1::hermes-agent" and entry["copy"] == str(copy)
+
+
+def test_remote_dir_with_a_secret_like_file_fails_and_the_copy_is_deleted(run, tmp_path, monkeypatch):
+    go, state, copy, _ = remote_dir_run(run, tmp_path, monkeypatch, files=["sub/.env.local"])
+    monkeypatch.setattr(fleet, "scan", lambda *a: pytest.fail("a copy with secrets must not be scanned"))
+    monkeypatch.setattr(fleet, "image_of", lambda c: pytest.fail("not reached"))
+    set_cfg(tmp_path, containers=[], dirs=[])
+    rc, lines = go()
+    assert rc == 1 and "sub/.env.local" in lines[-1]["errors"][0] and not copy.exists()
+
+
+def test_remote_dir_respects_the_memory_guard(run, tmp_path, monkeypatch):
+    go, state, copy, calls = remote_dir_run(run, tmp_path, monkeypatch, image_min_mem_gib=20,
+                                            image_min_mem_gib_by_container={"hermes-agent": 30})
+    monkeypatch.setattr(fleet, "mem_available_gib", lambda: 25.0)
+    rc, lines = go()
+    skipped = [x for x in lines if x["event"] == "aibom.skipped"]
+    assert [(x["host"], x["target"], x["need_gib"]) for x in skipped] == [("jetson", "hermes-agent", 30.0)]
+    assert calls == []  # not even copied
+
+
+def test_copies_no_longer_configured_are_deleted(run, tmp_path, monkeypatch):
+    go, state, copy, _ = remote_dir_run(run, tmp_path, monkeypatch)
+    stale = state / "mirror" / "jetson" / "old-checkout"
+    stale.mkdir(parents=True)
+    (stale / "f.py").write_text("x")
+    go()
+    assert copy.exists() and not stale.exists()
+
+
+def test_head_commit_detached_and_packed(tmp_path):
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "HEAD").write_text("abc123\n")
+    assert fleet.head_commit(tmp_path) == "abc123"
+    (tmp_path / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+    (tmp_path / ".git" / "packed-refs").write_text("# pack-refs\ndef456 refs/heads/main\n")
+    assert fleet.head_commit(tmp_path) == "def456"
+    assert fleet.head_commit(tmp_path / "nope") is None
+
+
+def test_refresh_copy_never_copies_git_internals_or_links(tmp_path, monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"] = cmd
+        return fleet.subprocess.CompletedProcess(cmd, 0, "", "")
+    monkeypatch.setattr(fleet.subprocess, "run", fake_run)
+    fleet.refresh_copy("u@h::m", tmp_path / "c", [".env"], {"ssh_key": "/k", "known_hosts": "/kh"})
+    cmd = seen["cmd"]
+    assert cmd[:2] == ["rsync", "-rt"] and not any(a in cmd for a in ("-a", "-l", "--links"))
+    assert "--filter=- /.git/**" in cmd and "--exclude=.env" in cmd and "--delete-excluded" in cmd
+    assert cmd[-2:] == ["u@h::m/", f"{tmp_path / 'c'}/"]
+    assert "StrictHostKeyChecking=yes" in cmd[cmd.index("-e") + 1]
+
+
+def test_cache_persists_in_state_and_old_entries_go(run, tmp_path):
+    go, state = run
+    old = state / "cache" / "scan" / "old.json"
+    old.parent.mkdir(parents=True)
+    old.write_text("{}")
+    fresh = state / "cache" / "agentic" / "fresh.json"
+    fresh.parent.mkdir(parents=True)
+    fresh.write_text("{}")
+    past = datetime.datetime.now().timestamp() - 40 * 86400
+    import os
+    os.utime(old, (past, past))
+    go()
+    assert fleet.CACHE_DIR == state / "cache"
+    assert fresh.exists() and not old.exists()

@@ -1,3 +1,10 @@
+{% set remote_dirs = [] %}
+{% for r in cisco_aibom_remote_dirs %}
+{%   set m = hostvars[r.host].cisco_aibom_mirror_modules | default([]) | selectattr('name', 'equalto', r.name) | first %}
+{%   set _ = remote_dirs.append({"host": r.host, "name": r.name,
+       "source": cisco_aibom_mirror_user ~ "@" ~ hostvars[r.host].ansible_host ~ "::" ~ r.name,
+       "excludes": cisco_aibom_mirror_excludes + (m.excludes | default([]))}) %}
+{% endfor %}
 {{ {"host": inventory_hostname,
     "exe": cisco_aibom_prefix + "/venv/bin/cisco-aibom",
     "state": cisco_aibom_state,
@@ -7,4 +14,7 @@
     "image_min_mem_gib_by_container": cisco_aibom_image_min_mem_gib_by_container,
     "dirs": cisco_aibom_dirs,
     "containers": cisco_aibom_containers,
-    "remote_images": cisco_aibom_remote_images} | to_nice_json }}
+    "remote_images": cisco_aibom_remote_images,
+    "remote_dirs": remote_dirs,
+    "mirror": {"ssh_key": cisco_aibom_mirror_key, "known_hosts": "/etc/cisco-aibom/mirror_known_hosts",
+               "timeout_s": cisco_aibom_mirror_timeout_s | int}} | to_nice_json }}

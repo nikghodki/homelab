@@ -1,0 +1,64 @@
+# This host's code dirs, served read-only to the hosts that copy them (cisco_aibom_mirror_modules)
+- name: Hosts that copy from here
+  ansible.builtin.set_fact:
+    cisco_aibom_mirror_clients: >-
+      {% set clients = [] %}{% for h in groups['all'] %}{% if hostvars[h].cisco_aibom_remote_dirs | default([])
+      | selectattr('host', 'equalto', inventory_hostname) | list %}{% set _ = clients.append(h) %}{% endif %}{% endfor %}{{ clients }}
+
+- name: Copy user (SSH key with a forced command only; no password)
+  ansible.builtin.user:
+    name: "{{ cisco_aibom_mirror_user }}"
+    system: true
+    shell: /bin/sh
+    home: /var/lib/{{ cisco_aibom_mirror_user }}
+    create_home: true
+    password: "!"
+
+- name: Read-only rsync daemon config
+  ansible.builtin.template:
+    src: mirror-rsyncd.conf.j2
+    dest: /etc/cisco-aibom/mirror-rsyncd.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Forced command
+  ansible.builtin.template:
+    src: cisco-aibom-mirror-rsyncd.j2
+    dest: /usr/local/sbin/cisco-aibom-mirror-rsyncd
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Sudo for the forced command only, without arguments
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/cisco-aibom-mirror
+    content: |
+      # Managed by homelab Ansible (roles/cisco_aibom)
+      {{ cisco_aibom_mirror_user }} ALL=(root) NOPASSWD: /usr/local/sbin/cisco-aibom-mirror-rsyncd ""
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+
+- name: Public keys of the hosts that copy from here
+  ansible.builtin.slurp:
+    src: "{{ hostvars[item].cisco_aibom_mirror_key | default(cisco_aibom_mirror_key) }}.pub"
+  delegate_to: "{{ item }}"
+  loop: "{{ cisco_aibom_mirror_clients }}"
+  register: cisco_aibom_mirror_pubkeys
+  failed_when: false
+
+- name: Their keys may only start the daemon, only from their address
+  ansible.posix.authorized_key:
+    user: "{{ cisco_aibom_mirror_user }}"
+    exclusive: true
+    key: |
+      {% for r in cisco_aibom_mirror_pubkeys.results if r.content is defined %}
+      {{ (r.content | b64decode).split()[:2] | join(' ') }} cisco-aibom-mirror@{{ r.item }}
+      {% endfor %}
+    key_options: "{{ ['restrict', 'from=\"' ~ cisco_aibom_mirror_from ~ '\"', 'command=\"' ~ cisco_aibom_mirror_command ~ '\"'] | join(',') }}"
+  vars:
+    cisco_aibom_mirror_from: "{{ cisco_aibom_mirror_clients | map('extract', hostvars, 'ansible_host') | join(',') }}"
+    cisco_aibom_mirror_command: sudo -n /usr/local/sbin/cisco-aibom-mirror-rsyncd
+  when: cisco_aibom_mirror_pubkeys.results | selectattr('content', 'defined') | list | length > 0

@@ -50,7 +50,7 @@ when one Spark is down. Its memory is tight; treat every new process here as a b
 | `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `docker` | standard | 9109 |
 | `nvidia-cdi-refresh` drop-in | CSV mode and retry (role `jetson_cdi`) | — |
 
-Timers: `cisco-aibom.timer` at 01:30 (code dirs only, 3 h per target, each Hermes checkout is about 8,000 Python files; this host's images are scanned on dgx-2 by digest), `lynis-audit`,
+Timers: `cisco-aibom.timer` at 01:30 (`roboclaw` only; the Hermes checkouts are copied to dgx-2 and scanned there, its images too, by digest), `lynis-audit`,
 `homelab-backup`.
 
 ## Memory

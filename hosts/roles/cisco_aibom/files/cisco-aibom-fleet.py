@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Nightly Cisco AIBOM of one host: scan its agent code dirs and AI container images, keep the JSON, log the diff.
-Optionally it also scans other hosts' images by digest (`remote_images`), so a small host needn't run image scans:
-those results are written and logged as the other host's (`host`), with `scanned_on` set to this host.
+Optionally it also scans other hosts' images by digest (`remote_images`) and copies of other hosts' code dirs
+(`remote_dirs`, refreshed with rsync from a read-only rsync daemon on that host before each scan), so a small host
+needn't run heavy scans: those results are written and logged as the other host's (`host`), with `scanned_on` set to
+this host.
 
 Reads a targets file (roles/cisco_aibom/templates/targets.json.j2), runs `cisco-aibom analyze` once per target,
 writes <state>/<host>-<date>.json (kept `keep_days` days) and prints journal lines (SyslogIdentifier cisco-aibom)
@@ -11,12 +13,13 @@ that the host collector ships to Loki:
   {"event": "aibom.removed", ...}  one per component that is gone (capped)
   {"event": "aibom.skipped", "reason": "skipped: low memory", ...}  an image target not scanned because MemAvailable
                                    was below its threshold (image_min_mem_gib / image_min_mem_gib_by_container, keyed by container
-                                   or remote image name)
+                                   or remote image name; remote code dirs use the same guard, keyed by name)
 Secret findings are counted, never named. The agentic stage uses LiteLLM when /etc/cisco-aibom/llm.env exists
 (runbooks/aibom.md), else the BOM is deterministic-only.
 Managed by homelab Ansible (roles/cisco_aibom). Usage: cisco-aibom-fleet <targets.json>
 """
 import datetime
+import fnmatch
 import json
 import os
 import pathlib
@@ -27,6 +30,10 @@ import tempfile
 
 MAX_LINES = 50          # per-component journal lines per run and direction
 HIDDEN_TYPES = {"secret"}
+# cisco-aibom's own cache (<state>/cache: scan/ and agentic/), kept between runs so an unchanged target is not scanned
+# or sent to the LLM again (its key: the git commit, else the files' mtimes, which the remote copies keep); entries
+# older than keep_days are deleted. None (tests): a cache in the run's work dir.
+CACHE_DIR: pathlib.Path | None = None
 # `analyze` insists on an LLM. None is reachable on purpose: a closed port makes it fall back to its deterministic
 # scanners at once (agentic_status "degraded").
 NO_LLM = ["--llm-model", "none", "--llm-provider", "openai", "--llm-api-base", "http://127.0.0.1:9",
@@ -97,7 +104,7 @@ def scan(exe: str, source: str, is_image: bool, timeout: int, workdir: pathlib.P
     out = workdir / "report.json"
     out.unlink(missing_ok=True)
     cmd = [exe, "analyze", source, "-o", "json", "-O", str(out), "--no-progress", "--no-show-summary",
-           "--cache-dir", str(workdir / "cache"), *llm_args()]
+           "--cache-dir", str(CACHE_DIR or workdir / "cache"), *llm_args()]
     if is_image:
         cmd += ["--container-extraction-tier", "docker"]
     run = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, cwd=workdir)
@@ -182,17 +189,107 @@ def prune_remote_images(state: pathlib.Path, wanted: set, pulled: set) -> None:
     book.write_text(json.dumps(sorted(ours & wanted)))
 
 
+def ssh_command(mirror: dict) -> str:
+    """The remote shell rsync uses to reach another host's read-only rsync daemon (its forced command)."""
+    return " ".join(["ssh", "-i", mirror["ssh_key"], "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
+                     "-o", "StrictHostKeyChecking=yes", "-o", f"UserKnownHostsFile={mirror['known_hosts']}",
+                     "-o", "GlobalKnownHostsFile=/dev/null", "-o", "ConnectTimeout=20"])
+
+
+def refresh_copy(source: str, dest: pathlib.Path, excludes: list, mirror: dict) -> None:
+    """Bring the local copy of another host's code dir up to date: regular files only (no symlinks, devices,
+    owners), deletions mirrored, excluded names never copied (the serving daemon hides the same list)."""
+    dest.mkdir(parents=True, exist_ok=True)
+    cmd = ["rsync", "-rt", "--delete", "--delete-excluded", "--timeout=600", "-e", ssh_command(mirror)]
+    cmd += [f"--filter={rule}" for rule in git_ref_rules()]
+    cmd += [f"--exclude={pattern}" for pattern in excludes]
+    cmd += [source.rstrip("/") + "/", str(dest) + "/"]
+    run = subprocess.run(cmd, capture_output=True, text=True, timeout=int(mirror.get("timeout_s", 1800)),
+                         check=False)
+    if run.returncode != 0:
+        raise RuntimeError(f"rsync of {source} exit {run.returncode}: {run.stderr.strip()[-300:]}")
+
+
+def git_ref_rules() -> list[str]:
+    """Of .git only HEAD and the branch refs are copied, so the scanned commit is known; never config or objects."""
+    return ["+ /.git/", "+ /.git/HEAD", "+ /.git/packed-refs", "+ /.git/refs/", "+ /.git/refs/heads/",
+            "+ /.git/refs/heads/**", "- /.git/**"]
+
+
+def head_commit(copy: pathlib.Path) -> str | None:
+    """The commit the copied checkout is at, from its .git/HEAD (detached, or a branch in refs/ or packed-refs)."""
+    git = copy / ".git"
+    try:
+        head = (git / "HEAD").read_text().strip()
+    except OSError:
+        return None
+    if not head.startswith("ref: "):
+        return head or None
+    ref = head[5:].strip()
+    try:
+        return (git / ref).read_text().strip()
+    except OSError:
+        pass
+    try:
+        for line in (git / "packed-refs").read_text().splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[1] == ref:
+                return parts[0]
+    except OSError:
+        pass
+    return None
+
+
+def secret_like(copy: pathlib.Path, excludes: list) -> list[str]:
+    """Files in the copy whose name matches an excluded file pattern (a pattern without "/"). There should be
+    none, since both ends exclude them; any hit means the copy is deleted and the target fails."""
+    names = [p for p in excludes if "/" not in p]
+    hits = []
+    for root, _, files in os.walk(copy):
+        for f in files:
+            if any(fnmatch.fnmatchcase(f, p) for p in names):
+                hits.append(os.path.relpath(os.path.join(root, f), copy))
+    return sorted(hits)
+
+
+def prune_cache(cache: pathlib.Path, keep_days: int) -> None:
+    """Delete cache files not written for keep_days (a reused entry keeps its old mtime: it is rebuilt once)."""
+    if not cache.is_dir():
+        return
+    cutoff = datetime.datetime.now().timestamp() - keep_days * 86400
+    for f in cache.rglob("*"):
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink()
+        except OSError:
+            pass
+
+
+def prune_copies(state: pathlib.Path, wanted: set) -> None:
+    """Delete copies of remote code dirs that are no longer configured (<state>/mirror/<host>/<name>)."""
+    base = state / "mirror"
+    if not base.is_dir():
+        return
+    for host_dir in base.iterdir():
+        for copy in host_dir.iterdir() if host_dir.is_dir() else []:
+            if (host_dir.name, copy.name) not in wanted:
+                shutil.rmtree(copy, ignore_errors=True)
+        if host_dir.is_dir() and not any(host_dir.iterdir()):
+            host_dir.rmdir()
+
+
 def scan_target(cfg: dict, host: str, name: str, source: str, kind: str, opts: dict, work: pathlib.Path,
                 pulled: set) -> dict:
-    """Scan one target into an entry ({"status": ok | skipped, ...}; errors raise). kind: dir | container | image."""
-    entry = {"kind": "dir" if kind == "dir" else "image"}
-    is_image = kind != "dir"
-    if is_image:
+    """Scan one target into an entry ({"status": ok | skipped, ...}; errors raise).
+    kind: dir | container | image | remote-dir (another host's code dir, scanned from a local copy)."""
+    entry = {"kind": "dir" if kind in ("dir", "remote-dir") else "image"}
+    is_image = kind in ("container", "image")
+    if kind != "dir":
         min_gib_by = cfg.get("image_min_mem_gib_by_container") or {}
         need = float(min_gib_by.get(opts.get("key", source), cfg.get("image_min_mem_gib", 0)))
         avail = mem_available_gib() if need > 0 else None
         if avail is not None and avail < need:
-            entry["container" if kind == "container" else "image"] = source
+            entry[{"container": "container", "image": "image"}.get(kind, "source")] = source
             entry.update(status="skipped", reason="low memory", mem_available_gib=round(avail, 1), need_gib=need)
             log("aibom.skipped", host=host, target=name, reason="skipped: low memory",
                 mem_available_gib=round(avail, 1), need_gib=need, **opts.get("log", {}))
@@ -206,13 +303,26 @@ def scan_target(cfg: dict, host: str, name: str, source: str, kind: str, opts: d
         entry["image"] = source
         if ensure_image(source):
             pulled.add(source)
+    elif kind == "remote-dir":
+        # another host's code dir, copied here first (runbooks/aibom.md); the copy is what gets scanned
+        copy = pathlib.Path(opts["copy"])
+        excludes = opts.get("excludes") or []
+        refresh_copy(source, copy, excludes, cfg.get("mirror") or {})
+        hits = secret_like(copy, excludes)
+        if hits:
+            shutil.rmtree(copy, ignore_errors=True)
+            raise RuntimeError(f"copy has {len(hits)} excluded file(s), deleted: {', '.join(hits[:5])}")
+        entry.update(copy=str(copy), commit=head_commit(copy))
+        entry["source"] = source
+        source = str(copy)
     elif not os.path.isdir(source):
         raise RuntimeError(f"{source} does not exist")
-    entry["source"] = source
+    entry.setdefault("source", source)
     timeout = int(cfg.get("timeout_s", 3600))
     try:
         entry["report"] = scan(cfg["exe"], source, is_image, timeout, work)
-        entry["method"] = "aibom-container" if is_image else "dir"
+        entry["method"] = {"container": "aibom-container", "image": "aibom-container",
+                           "remote-dir": "remote-copy"}.get(kind, "dir")
     except RuntimeError as e:
         if not (is_image and "discovery failed" in str(e)):
             raise
@@ -240,7 +350,8 @@ def run_host(cfg: dict, host: str, targets: list, state: pathlib.Path, work: pat
             if entry["status"] == "skipped":
                 skipped.append(name)
         except (RuntimeError, subprocess.TimeoutExpired, ValueError, OSError) as e:
-            entry = {"kind": "dir" if kind == "dir" else "image", "status": "error", "error": str(e)[-300:]}
+            entry = {"kind": "dir" if kind in ("dir", "remote-dir") else "image", "status": "error",
+                     "error": str(e)[-300:]}
             errors.append(f"{name}: {entry['error']}")
         doc["targets"][name] = entry
     doc["finished"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
@@ -277,12 +388,24 @@ def run_host(cfg: dict, host: str, targets: list, state: pathlib.Path, work: pat
 
 def main() -> int:
     cfg = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    global CACHE_DIR
     host, state = cfg["host"], pathlib.Path(cfg["state"])
     state.mkdir(parents=True, exist_ok=True)
+    if cfg.get("persistent_cache", True):
+        CACHE_DIR = state / "cache"
+        CACHE_DIR.mkdir(mode=0o700, exist_ok=True)
     targets = [(d["name"], d["path"], "dir", {}) for d in cfg.get("dirs", [])]
     targets += [(f"container:{c}", c, "container", {"key": c}) for c in cfg.get("containers", [])]
-    # other hosts' images by digest ({host, name, image, paths}); logged as that host's, scanned_on = this host
+    # other hosts' code dirs ({host, name, source, excludes}), copied to <state>/mirror/<host>/<name> and scanned
+    # there, and their images by digest ({host, name, image, paths}); logged as that host's, scanned_on = this host
     remote = {}
+    for r in cfg.get("remote_dirs", []):
+        if r["host"] == host:
+            raise SystemExit(f"remote_dirs entry {r['name']} is for {host} itself: use dirs")
+        remote.setdefault(r["host"], []).append(
+            (r["name"], r["source"], "remote-dir",
+             {"key": r["name"], "excludes": r.get("excludes") or [],
+              "copy": str(state / "mirror" / r["host"] / r["name"])}))
     for r in cfg.get("remote_images", []):
         if r["host"] == host:
             raise SystemExit(f"remote_images entry {r['name']} is for {host} itself: use containers")
@@ -295,6 +418,9 @@ def main() -> int:
         for rhost, rtargets in sorted(remote.items()):
             errors += run_host(cfg, rhost, rtargets, state, work, pulled, scanned_on=host)
     prune_remote_images(state, {r["image"] for r in cfg.get("remote_images", [])}, pulled)
+    prune_copies(state, {(r["host"], r["name"]) for r in cfg.get("remote_dirs", [])})
+    if CACHE_DIR:
+        prune_cache(CACHE_DIR, int(cfg.get("keep_days", 30)))
     return 1 if errors else 0
 
 

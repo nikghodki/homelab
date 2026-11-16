@@ -1,0 +1,4 @@
+#!/bin/sh
+# Managed by homelab Ansible (roles/cisco_aibom). The only command {{ cisco_aibom_mirror_user }}'s key may run (via
+# sudo, so each module can read as its owner): a read-only rsync daemon on stdin/stdout, at the lowest priority.
+exec /usr/bin/nice -n 19 /usr/bin/ionice -c 3 /usr/bin/rsync --server --daemon --config=/etc/cisco-aibom/mirror-rsyncd.conf .

@@ -1,0 +1,19 @@
+# Managed by homelab Ansible (roles/cisco_aibom). runbooks/aibom.md
+# Read-only rsync daemon for other hosts' AIBOM copies of this host's code dirs. It never listens on a port: the
+# forced command of {{ cisco_aibom_mirror_user }}'s SSH key starts it per connection. Each module reads as its owner;
+# the filter hides excluded files from the client whatever it asks for. Of .git only HEAD and the branch refs.
+use chroot = yes
+read only = yes
+list = no
+munge symlinks = yes
+transfer logging = no
+reverse lookup = no
+{% set git_rules = ['+ /.git/', '+ /.git/HEAD', '+ /.git/packed-refs', '+ /.git/refs/', '+ /.git/refs/heads/', '+ /.git/refs/heads/**', '- /.git/**'] %}
+{% for m in cisco_aibom_mirror_modules %}
+
+[{{ m.name }}]
+    path = {{ m.path }}
+    uid = {{ m.owner }}
+    gid = {{ m.owner }}
+    filter = {{ (git_rules + ((cisco_aibom_mirror_excludes + (m.excludes | default([]))) | map('regex_replace', '^', '- ') | list)) | join(' ') }}
+{% endfor %}

@@ -37,7 +37,9 @@ cisco_aibom_enabled: true
 cisco_aibom_dirs:
   - {name: dgx-model-manager, path: /home/nikghodki-dgx/workspace/dgx-model-manager}
   - {name: litellm, path: /opt/homelab/litellm}
-cisco_aibom_containers: [litellm-proxy, open-webui]
+# No containers: LiteLLM and Open WebUI run in k3s since 2026-11-16 (the stopped litellm-proxy/open-webui
+# containers would only rescan their old images). Their k3s images are not scanned yet (follow-up).
+cisco_aibom_containers: []
 # The agentic stage's model API: the role's default, http://model.nghodki.ai/v1 (the front door), as on every host;
 # LiteLLM is in k3s since 2026-11-16 and no longer on dgx-1's loopback.
 # The host collector pushes to dgx-2 over the direct QSFP cable (10.100.136.2, 0.3 ms) instead of Wi-Fi (22 ms avg,
