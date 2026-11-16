@@ -13,7 +13,7 @@ description: Names, abbreviations and plan IDs used across the fleet docs.
 | Argo CD | GitOps controller in k3s. Pulls `cluster/` and `policies/kyverno` from `main`. |
 | CNPG | CloudNativePG, the Postgres operator. Installed, no clusters yet. |
 | compose_stack | The Ansible role that deploys every Docker Compose stack in `hosts/stacks/` to `/opt/homelab/<name>`. |
-| D1–D26 | Design decisions in `docs/design.md` §6. |
+| D1–D27 | Design decisions in `docs/design.md` §6. |
 | Dead man | An alert that fires when a heartbeat stops (Watchdog → Gatus; Gatus scrape → `AlertingHostDown`). |
 | decision 00NN | A decision record in `decisions/`. |
 | DefenseClaw | Cisco AI Defense's open-source agent security product (1.0.9). Hooks, guardrails, scanners, Fleet, Edge Connector. |

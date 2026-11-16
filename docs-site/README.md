@@ -26,7 +26,7 @@ docs-site/
     ├── robotics/                ROS 2 and Zenoh, safety governor, simulation
     ├── operations/              day one, deploying, how to add things, rotation, upgrades, backups, incidents, FAQ
     ├── development/             repo layout, CI, PR and identity rules
-    ├── decisions/               D1–D26 and 0001–0009, status, known limits, docs vs live state
+    ├── decisions/               D1–D27 and 0001–0010, status, known limits, docs vs live state
     └── history/                 changelog from the PR list
 ```
 
@@ -176,7 +176,7 @@ their service pages.
 
 | Decision | Page |
 |---|---|
-| D1–D26 (`docs/design.md` §6) | [decisions/index](content/docs/decisions/index.md) |
+| D1–D27 (`docs/design.md` §6) | [decisions/index](content/docs/decisions/index.md) |
 | `0001-github-free-plan.md` | [development/rules](content/docs/development/rules.md), [decisions/index](content/docs/decisions/index.md) |
 | `0002-backups-off-for-now.md` | [operations/backups](content/docs/operations/backups.md) |
 | `0003-cisco-ai-defense-tools.md` | [security/scanning](content/docs/security/scanning.md), [decisions/index](content/docs/decisions/index.md) |
@@ -186,6 +186,7 @@ their service pages.
 | `0007-edge-in-cluster.md` | [decisions/index](content/docs/decisions/index.md), [network/front-door](content/docs/network/front-door.md) |
 | `0008-image-signing.md` | [platform/image-signing](content/docs/platform/image-signing.md) |
 | `0009-no-services-box.md` | [operations/incident-gpu-oom](content/docs/operations/incident-gpu-oom.md), [decisions/index](content/docs/decisions/index.md) |
+| `0010-retire-coolify.md` | [decisions/index](content/docs/decisions/index.md) |
 | `0000-template.md` | [decisions/index](content/docs/decisions/index.md) |
 
 ### Other repo areas

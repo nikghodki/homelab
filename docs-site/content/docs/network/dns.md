@@ -23,7 +23,7 @@ k3s**. edge-dnsmasq on dgx-1 still runs, for the rollback.
 
 | Target | Names | LAN answer | Tailnet answer |
 |---|---|---|---|
-| `edge` (the front door, Caddy) | `model`, `litellm-admin`, `controlcenter`, `dgxmanager`, `webui`, `coolify`, `ha`, `grafana`, `status`, `ntfy`, `ca`, `id`, `ops`, `phoenix`, `temporal`, `mlflow`, `argocd`; `docs` (added by the docs-site PR) | 192.168.86.11 | the answering Spark's Tailscale IP |
+| `edge` (the front door, Caddy) | `model`, `litellm-admin`, `controlcenter`, `dgxmanager`, `webui`, `ha`, `grafana`, `status`, `ntfy`, `ca`, `id`, `ops`, `phoenix`, `temporal`, `mlflow`, `argocd`; `docs` (added by the docs-site PR) | 192.168.86.11 | the answering Spark's Tailscale IP |
 | `dgx-1` | `nats`, `fleet` (NATS 4222/8883, Fleet 8884/8971, TLS with the homelab CA) | 192.168.86.44 | 100.65.137.82 + LAN IP |
 | `dgx-2` | `backup` (restic rest-server, TLS on 8000) | 192.168.86.36 | 100.124.175.23 + LAN IP |
 | `api` | `k8s` | the API VIP 192.168.86.10 | the answering Spark's Tailscale IP |

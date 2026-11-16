@@ -85,7 +85,7 @@ Two oauth2-proxy instances don't share sessions: each app is its own sign-in (on
 |---|---|
 | Home Assistant | Its phone app can't sign in through a forward-auth proxy. HA keeps its own login (trusted proxies set, P0.16) |
 | LiteLLM UI, DGXMM UI, Open WebUI | Wait for the DGXMM session. Open WebUI has family accounts to migrate |
-| ntfy, Coolify | Own logins or phone apps; a proxy would break the phone apps and API clients. (The voice agent, also listed here before, was retired in D26) |
+| ntfy | Own logins or phone apps; a proxy would break the phone apps and API clients. (The voice agent, also listed here before, was retired in D26) |
 | Fleet API | Machine token auth, not people |
 
 ## Break-glass (Pocket ID down)

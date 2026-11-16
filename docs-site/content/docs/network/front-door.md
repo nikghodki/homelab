@@ -50,7 +50,6 @@ edge-caddy on `192.168.86.44:80`.
 | `litellm-admin.nghodki.ai` | 100.65.137.82:4000 (LiteLLM on dgx-1, by its Tailscale IP) | LiteLLM UI login | no | Host header rewritten to the upstream |
 | `controlcenter.nghodki.ai` | 192.168.86.211:8200 (Jetson, RoboClaw control center) | none in Caddy (unverified in the app) | no | old :9119 route was dead |
 | `dgxmanager.nghodki.ai` | `/` → 302 `/dgxmm/`, then (via edge-caddy) `nginx-gateway:80` → `dgxmm:8090` | none in Caddy (DGXMM UI; Pocket ID after the DGXMM session) | no | |
-| `coolify.nghodki.ai` | `/app/*` → 100.65.137.82:6001 (soketi), `/terminal/ws` → :6002, rest → :8000 | Coolify login | no | |
 | `webui.nghodki.ai` | 100.65.137.82:3100 (Open WebUI) | Open WebUI accounts | no | 30 min timeouts for streaming |
 | `ha.nghodki.ai` | no Caddy route: falls through (via edge-caddy) to `nginx-gateway`, whose `ha.nghodki.ai` server proxies to 192.168.86.211:8123 | Home Assistant login | no | HA trusts proxies 192.168.86.44 and 100.65.137.82 (P0.16) |
 | anything else, or the IP | `nginx-gateway:80` (default; from k3s via edge-caddy) | — | — | e.g. `http://192.168.86.44/v1` reaches LiteLLM |

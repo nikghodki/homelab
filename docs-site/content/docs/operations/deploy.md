@@ -64,7 +64,7 @@ Collections: community.general, ansible.posix, community.docker, community.sops 
 
 ## Hand-run pieces (outside the repo)
 
-The front door (`~/edge-gateway`), nginx-gateway, LiteLLM, Open WebUI, Coolify, Home Assistant, Hermes, LiveKit and the
+The front door (`~/edge-gateway`), nginx-gateway, LiteLLM, Open WebUI, Home Assistant, Hermes, LiveKit and the
 control center are changed by hand. Back up the file first (`cp x x.bak-<what>-<date>`), change it, restart the
 container or unit, check, and describe the change in a PR (or a runbook) so the next person knows.
 

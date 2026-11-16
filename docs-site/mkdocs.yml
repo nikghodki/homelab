@@ -177,7 +177,6 @@ nav:
           - services/mlflow.md
           - services/home-assistant.md
           - services/voice.md
-          - services/coolify.md
           - services/backup-server.md
       - Agents and AI:
           - agents/index.md

@@ -82,7 +82,6 @@ Some pieces are hand-run and not managed by Ansible or Argo CD yet. Know them be
 | LiteLLM proxy + Postgres + Redis | dgx-1 | `~/litellm-setup` (owned by the DGXMM/LiteLLM session) | P3.7 |
 | Open WebUI | dgx-1 | container `open-webui` | P3.7 |
 | DGXMM and its engines | dgx-1, dgx-2 | `~/workspace/dgx-model-manager` (separate project) | stays outside k3s (D3) |
-| Coolify | dgx-1 | container `coolify` | stays a host app |
 | Hermes, Home Assistant, LiveKit, control center (voice retired, D26; these two stay for now) | Jetson | user units of `nikjetson` / `hermes-nikhil`, container `homeassistant` | Hermes moves into k3s in P4.5 |
 | picoclaw's own config and binaries | Pi | `/var/lib/picoclaw` (user and unit managed by role `picoclaw` since #73; the agent config itself isn't in Git) | — |
 | DefenseClaw installs | dgx-1, Jetson ×2, Pi | per-user release installers; Ansible manages policy, PATH, Fleet settings | — |

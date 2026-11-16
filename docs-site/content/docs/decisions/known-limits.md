@@ -20,7 +20,7 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 | Security | SSH password authentication still enabled | after every admin path has a key |
 | Recovery | Backups conflict with decision 0002; no off-site copy; no restore test | user decision |
 | Recovery | Pocket ID, Temporal, MLflow, Grafana data live in Docker volumes that the backups don't cover | add dumps |
-| Ops | edge-caddy/nginx-gateway (the relay), LiteLLM, Open WebUI, Coolify, HA, Hermes are hand-run: not in Ansible or Argo CD; Renovate can't see them | P3.7, P4.5 |
+| Ops | edge-caddy/nginx-gateway (the relay), LiteLLM, Open WebUI, HA, Hermes are hand-run: not in Ansible or Argo CD; Renovate can't see them | P3.7, P4.5 |
 | Ops | No incident runbooks yet (P3.9) | [Incident playbooks](../operations/incidents.md) |
 | Ops | The Dell is weak (2 cores, 8 GB, HDD) | decision 0009 |
 | Robot | Not driving autonomously: mock sink; on-blocks test pending | P5.2 final test |

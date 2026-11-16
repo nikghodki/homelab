@@ -20,7 +20,6 @@ description: "Every service in the fleet in one table: URL, host, port, how it i
 | MLflow | `mlflow.nghodki.ai` | dgx-2 | 4181, 5000 | `ml.yml` | Gatus `mlflow.nghodki.ai`, `MLflow job API` | [MLflow](mlflow.md) |
 | Home Assistant | `ha.nghodki.ai` | Jetson | 8123 | hand (container) | Gatus `Home Assistant (direct)`, `ha.nghodki.ai` | [Home Assistant](home-assistant.md) |
 | LiveKit, control center (voice retired, D26) | `controlcenter.nghodki.ai` | Jetson | 127.0.0.1:7880, 8200 | hand | none | [Voice](voice.md) |
-| Coolify | `coolify.nghodki.ai` | dgx-1 | 8000, 6001, 6002 | Coolify | none | [Coolify](coolify.md) |
 | restic rest-server | `backup.nghodki.ai:8000` | dgx-2 | 8000 | `backups.yml` | none | [Backup server](backup-server.md) |
 | Zenoh router | — | Jetson | 7447 | `robot.yml` | Gatus `Zenoh router` | [ROS 2 and Zenoh](../robotics/ros-zenoh.md) |
 | Safety governor | — | Pi | 127.0.0.1:9113 | `robot.yml` | `SafetyGovernorStatusStale` | [Safety governor](../robotics/safety-governor.md) |

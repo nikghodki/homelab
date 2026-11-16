@@ -1,11 +1,11 @@
 ---
 title: Decisions
-description: One line for every design decision (D1–D26) and every decision record (0001–0009), with its status.
+description: One line for every design decision (D1–D27) and every decision record (0001–0010), with its status.
 ---
 
 Design decisions are in `docs/design.md` §6; later decisions are files in `decisions/` (template `0000-template.md`).
 
-## Design decisions D1–D26
+## Design decisions D1–D27
 
 | # | Topic | Choice | Status |
 |---|---|---|---|
@@ -35,8 +35,9 @@ Design decisions are in `docs/design.md` §6; later decisions are files in `deci
 | D24 | DefenseClaw Fleet transport | dedicated Mosquitto broker on 8884, Caddy API proxy on 8971 | built |
 | D25 | HTTPS for `*.nghodki.ai` | name-constrained homelab web CA + wildcard; install from `ca.nghodki.ai` | built |
 | D26 | Voice and vision | retired for now: `voice-agent.nghodki.ai` off the front door and DNS (both doors), `vision-service` disabled; LiveKit and the control center stay on the Jetson; bring back only with a new decision | done (#75, #76) |
+| D27 | PaaS | Coolify retired (decision 0010): it hosted no apps; containers, data, SSH key, route and DNS name removed | done |
 
-The design doc's table header says "D1–D23" in places (README, `decisions/README.md`); D24–D26 were added later.
+The design doc's table header says "D1–D23" in places (README, `decisions/README.md`); D24–D27 were added later.
 
 ## Decision records
 
@@ -51,6 +52,7 @@ The design doc's table header says "D1–D23" in places (README, `decisions/READ
 | 0007 | The front door in k3s | 2026-11-15 | decided; built (#72), cut over (#78, #79) | kube-vip ARP on the Sparks' Wi-Fi (VIPs 192.168.86.10 API, .11 edge); CoreDNS + Caddy in `edge`, 2 replicas each, routes and names in Git; the tailnet via the Sparks' Tailscale IPs (each CoreDNS replica answers with its own Spark), not a subnet route; kube-state-metrics; `edge` stays out of Kyverno's webhooks; edge-caddy stays as the nginx-gateway relay and rollback; CrowdSec waits |
 | 0008 | Image signing and Enforce | 2026-11-15 | decided | cosign keyless from `build-sign.yml` on `main`; mlflow and ros-zenoh for amd64+arm64, packages public; MuJoCo stays local; Kyverno Enforce everything with failurePolicy Fail except kube-system, kyverno, argocd (and `edge`, kept out by 0007); `verify-images` with `mutateDigest`; new `require-image-digest`; 2 admission replicas |
 | 0009 | No services box | 2026-11-15 | decided | Services stay on the Sparks (alerting on the Dell); hard reserves and job caps instead; revisit after another crash |
+| 0010 | Retire Coolify | 2026-11-15 | decided; done | Coolify (0 apps) removed from dgx-1 with its data, SSH key, route and DNS name; nothing kept |
 
 ## Open questions (design §11)
 

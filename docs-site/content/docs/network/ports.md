@@ -23,7 +23,6 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | 18970 | 127.0.0.1 | DefenseClaw gateway API (incl. Fleet) | |
 | 5432, 6379 | 127.0.0.1 | LiteLLM Postgres, Redis | fixed in P0.6 |
 | 8090 | 127.0.0.1 | DGXMM | via `dgxmanager.nghodki.ai` |
-| 8000, 6001, 6002 | all | Coolify (web, soketi, terminal) | |
 | 9109 | all | fleet-metrics | |
 | 9400 | 127.0.0.1 | dcgm-exporter | |
 | 6443, 10250 | all | k3s API, kubelet | |

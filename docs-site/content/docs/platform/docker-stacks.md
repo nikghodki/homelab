@@ -24,7 +24,7 @@ SOPS). All images are pinned by digest; Renovate keeps them current.
 | `sim` | dgx-2 | none (run by hand) | isaaclab (local image on NVIDIA's + MLflow client), mujoco (local image) (profile `jobs`) | — | `sim` |
 
 Outside the repo (hand-run): edge-gateway (`edge-caddy`, `edge-dnsmasq`; replaced for clients by `edge` in k3s at the P3.3 cutover, kept as the nginx-gateway relay and rollback), LiteLLM + Postgres + Redis →
-`models` and `data`, Open WebUI → `agents` or `models`, nginx-gateway, DGXMM and engines (stay outside), Coolify (stays).
+`models` and `data`, Open WebUI → `agents` or `models`, nginx-gateway, DGXMM and engines (stay outside).
 
 ## The `compose_stack` role
 

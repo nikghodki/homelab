@@ -15,7 +15,6 @@ deleting the Application never deletes the CRDs and with them every Postgres clu
 | LiteLLM | `litellm-postgres` on dgx-1 (hand-run, 127.0.0.1:5432) | CNPG in `data`, primary dgx-2, standby dgx-1 |
 | Temporal | `jobs-postgresql-1` on dgx-2 (databases `temporal`, `temporal_visibility`) | CNPG |
 | MLflow | `ml-postgresql-1` on dgx-2 (database `mlflow`) | CNPG, artifacts on SeaweedFS |
-| Coolify | `coolify-db` on dgx-1 | stays with Coolify |
 
 The plan (architecture §11) is continuous WAL archiving to SeaweedFS (30 days) once SeaweedFS exists (P3.8).
 
