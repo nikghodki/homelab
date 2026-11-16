@@ -68,8 +68,9 @@ endpoints:
   - {name: edge DNS tailnet view (dgx-1), group: edge, url: "tcp://100.65.137.82:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: edge DNS tailnet view (dgx-2), group: edge, url: "tcp://100.124.175.23:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: edge Caddy (VIP), group: edge, url: "https://192.168.86.11/", headers: {Host: ca.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
-  # edge-caddy on dgx-1 stays as the relay to nginx-gateway (model, dgxmanager, ha) until those move into the cluster.
-  - {name: edge-caddy relay (dgx-1), group: edge, url: "http://192.168.86.44/health/liveliness", headers: {Host: model.nghodki.ai}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
+  # The model plane without a relay (since 2026-11-15): Caddy -> DGXMM on dgx-1's direct-cable address (the UI page, not
+  # the / -> /dgxmm/ redirect the web group follows).
+  - {name: DGXMM UI (direct), group: edge, url: "http://192.168.86.11/dgxmm/", headers: {Host: dgxmanager.nghodki.ai}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
   - {name: API (VIP), group: edge, url: "https://192.168.86.10:6443/readyz", client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401"], alerts: [{type: ntfy}]}
 external-endpoints:
   # Key observe_alert-pipeline-heartbeat (Alertmanager posts to /api/v1/endpoints/<key>/external?success=true).

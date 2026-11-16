@@ -17,7 +17,7 @@ cluster/
 │   ├── argocd/            Argo CD 3.6 + KSOPS in the repo-server
 │   ├── kyverno/           Kyverno 1.20, admission (2 replicas) + reports controllers
 │   ├── cnpg-operator/     CloudNativePG 1.30 operator, no clusters yet
-│   ├── cluster-dns/       CoreDNS zone for *.nghodki.ai (forwards to edge-dnsmasq on dgx-1)
+│   ├── cluster-dns/       CoreDNS zone for *.nghodki.ai (forwards to edge-dns, the in-cluster door)
 │   ├── kube-vip/          kube-vip DaemonSet (kube-system, hostNetwork): API VIP .10, edge VIP .11
 │   ├── edge/              namespace edge: CoreDNS (names.txt → zones) and Caddy (the *.nghodki.ai front door)
 │   └── kube-state-metrics/  readiness metrics for vmalert (kube-system)

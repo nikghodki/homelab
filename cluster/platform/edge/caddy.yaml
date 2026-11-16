@@ -109,8 +109,8 @@ spec:
     - {name: http, port: 80, targetPort: http, protocol: TCP}
     - {name: https, port: 443, targetPort: https, protocol: TCP}
 ---
-# Tailnet: both Sparks' Tailscale IPs (dgx-1's since the P3.3 cutover, taking it over from edge-caddy, which keeps
-# serving dgx-1's LAN IP as the nginx-gateway relay and for the rollback).
+# Tailnet: both Sparks' Tailscale IPs (dgx-1's since the P3.3 cutover, taking it over from edge-caddy on dgx-1, which
+# was stopped with nginx-gateway on 2026-11-15: decision 0007, "Relay retired").
 apiVersion: v1
 kind: Service
 metadata:

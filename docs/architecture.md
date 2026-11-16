@@ -137,7 +137,7 @@ unless noted. P3.7 moves each into its k3s namespace and removes the Docker copy
 | `fleet` | dgx-1 | Mosquitto 2.1.2 (8884 TLS), Caddy Fleet API proxy (host network, `:8971`) | `security` |
 | `gpu` | dgx-1, dgx-2 | dcgm-exporter (loopback 9400) | `observe` (DaemonSet) |
 | `backup` | dgx-2 | restic rest-server (8000) | Stays on the host (restores must not need the cluster) |
-| edge-gateway | dgx-1 | `edge-caddy` + `edge-dnsmasq` in `~/edge-gateway`, **not in the repo yet** | `edge` (CoreDNS + Caddy, 2 replicas, behind kube-vip) |
+| edge-gateway | dgx-1 | `edge-caddy` + `edge-dnsmasq` in `~/edge-gateway`, and `nginx-gateway`: **stopped 2026-11-15** (moved; kept a week for rollback) | `edge` (CoreDNS + Caddy, 2 replicas, behind kube-vip): done |
 | LiteLLM | dgx-1 | `litellm-proxy` v1.109.1 + Postgres + Redis (hand-run, not in the repo) | `models` (2 replicas); Postgres → `data` (CNPG); Redis → `models` |
 | Open WebUI | dgx-1 | `open-webui` v0.13.3 (hand-run, not in the repo) | `agents` or `models` (decide in P3.7) |
 
@@ -150,8 +150,8 @@ Not moved: DGXMM and its engines (§3.2). Coolify was retired on 2026-11-15 (dec
 - Every device is reached by **Tailscale MagicDNS** name.
 - `*.nghodki.ai` resolves, on the LAN, to the **kube-vip floating IP** `192.168.86.11`, which lives on whichever
   Spark is up; on the tailnet, to the Tailscale IP of a Spark that is up (Tailscale split DNS lists both Sparks;
-  each CoreDNS replica answers with its own Spark). Decision 0007, runbooks/edge.md. edge-caddy on dgx-1
-  remains only as the relay to nginx-gateway (and the rollback).
+  each CoreDNS replica answers with its own Spark). Decision 0007, runbooks/edge.md. Caddy reaches every
+  backend directly (LiteLLM and DGXMM over dgx-1's direct-cable address); the old door on dgx-1 is stopped.
 
 | Name | Service |
 |---|---|
