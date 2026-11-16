@@ -1,0 +1,40 @@
+# The chart's NetworkPolicies let only pods reach the controller's and repo-server's metrics ports. VictoriaMetrics runs in Docker on
+# dgx-2, so its scrapes arrive from a Docker bridge (172.16.0.0/12) or, from another node, masqueraded to that
+# node's flannel address (10.42.x.0). Allow those sources on the metrics port only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-application-controller-host-scrape
+  namespace: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: argocd
+      app.kubernetes.io/name: argocd-application-controller
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock: {cidr: 10.42.0.0/16}
+        - ipBlock: {cidr: 172.16.0.0/12}
+        - ipBlock: {cidr: 10.100.136.0/24}
+      ports:
+        - {port: 8082, protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-repo-server-host-scrape
+  namespace: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: argocd
+      app.kubernetes.io/name: argocd-repo-server
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock: {cidr: 10.42.0.0/16}
+        - ipBlock: {cidr: 172.16.0.0/12}
+        - ipBlock: {cidr: 10.100.136.0/24}
+      ports:
+        - {port: 8084, protocol: TCP}

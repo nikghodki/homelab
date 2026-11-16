@@ -1,0 +1,29 @@
+# Kyverno admission + reports controllers (cluster/platform/kyverno). Policies are a separate app (kyverno-policies).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+spec:
+  project: platform
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno
+      chart: kyverno
+      targetRevision: 3.10.0
+      helm:
+        releaseName: kyverno
+        skipTests: true
+        valueFiles: [$values/cluster/platform/kyverno/values.yaml]
+    - repoURL: git@github.com:nikghodki/homelab.git
+      targetRevision: main
+      ref: values
+      path: cluster/platform/kyverno/extras
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}

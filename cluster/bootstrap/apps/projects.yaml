@@ -1,0 +1,43 @@
+# Projects. `root` and `argocd` stay in `default` (they must work before these exist).
+# platform: cluster-wide tooling (Kyverno, CNPG, DNS, policies). apps: workloads under cluster/apps, namespaced only.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Cluster platform components (cluster/bootstrap, cluster/platform, policies/kyverno)
+  sourceRepos:
+    - git@github.com:nikghodki/homelab.git
+    - https://argoproj.github.io/argo-helm
+    - https://kyverno.github.io/kyverno
+    - https://cloudnative-pg.github.io/charts
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: "*"}
+  clusterResourceWhitelist:
+    - {group: "*", kind: "*"}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Workloads under cluster/apps; namespaced resources only (plus their Namespace)
+  sourceRepos:
+    - git@github.com:nikghodki/homelab.git
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: "*"}
+    - {server: https://kubernetes.default.svc, namespace: "!argocd"}
+    - {server: https://kubernetes.default.svc, namespace: "!kube-system"}
+    - {server: https://kubernetes.default.svc, namespace: "!kyverno"}
+    - {server: https://kubernetes.default.svc, namespace: "!cnpg-system"}
+  clusterResourceWhitelist:
+    - {group: "", kind: Namespace}
+  namespaceResourceBlacklist:
+    - {group: "", kind: ResourceQuota}
+    - {group: "", kind: LimitRange}

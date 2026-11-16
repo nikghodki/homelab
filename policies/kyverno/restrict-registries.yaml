@@ -1,0 +1,53 @@
+# Images come only from the registries and repositories the fleet uses. Audit (runbooks/kyverno.md).
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: restrict-registries
+  annotations:
+    policies.kyverno.io/title: Allowed registries
+    policies.kyverno.io/description: >-
+      Images must start with an allowed prefix. Names without a registry are docker.io (and docker.io/library/
+      without a namespace). Add a prefix here when a new upstream is reviewed.
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background: {enabled: true}
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: allowed
+      expression: >-
+        [
+          'ghcr.io/nikghodki/',
+          'docker.io/rancher/',
+          'quay.io/argoproj/',
+          'ecr-public.aws.com/docker/library/redis:',
+          'public.ecr.aws/docker/library/redis:',
+          'quay.io/viaductoss/ksops:',
+          'reg.kyverno.io/kyverno/',
+          'ghcr.io/kyverno/',
+          'ghcr.io/cloudnative-pg/'
+        ]
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image)
+        + (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+        + (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers.map(c, c.image) : [])
+    - name: normalized
+      expression: >-
+        variables.images.map(i,
+          (i.split('/').size() > 1 && (i.split('/')[0].contains('.') || i.split('/')[0].contains(':')
+            || i.split('/')[0] == 'localhost'))
+          ? i
+          : (i.split('/').size() > 1 ? 'docker.io/' + i : 'docker.io/library/' + i))
+    - name: bad
+      expression: >-
+        variables.normalized.filter(i, !variables.allowed.exists(p, i.startsWith(p)))
+  validations:
+    - expression: size(variables.bad) == 0
+      messageExpression: >-
+        'images from registries that are not allowed: ' + variables.bad.join(', ')

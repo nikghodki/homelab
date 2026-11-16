@@ -1,0 +1,33 @@
+# Images carry an explicit tag other than `latest`, or a digest. Audit (runbooks/kyverno.md).
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow latest and untagged images
+    policies.kyverno.io/description: Every image needs a tag that isn't latest, or a digest (design, "no latest").
+spec:
+  validationActions: [Audit]
+  evaluation:
+    background: {enabled: true}
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image)
+        + (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : [])
+        + (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers.map(c, c.image) : [])
+    - name: bad
+      # A tag is a ':' after the last '/' (a registry port comes before it).
+      expression: >-
+        variables.images.filter(i, !i.contains('@')
+          && (i.lastIndexOf(':') < i.lastIndexOf('/') || i.lastIndexOf(':') == -1 || i.endsWith(':latest')))
+  validations:
+    - expression: size(variables.bad) == 0
+      messageExpression: >-
+        'images without a tag, or tagged latest: ' + variables.bad.join(', ')

@@ -136,13 +136,24 @@ See decision 0005. The Spark-to-Spark settings don't change. Update the Sparks' 
 checks; then roll one node at a time (agents, Jetson, dgx-1, dgx-2), checking nodes and the etcd member list between
 each. A changed node IP on the Jetson means remove-and-rejoin (above).
 
+## Installed on top (from Git, by Argo CD)
+
+| What | Since | Runbook |
+|---|---|---|
+| Argo CD 3.6.1 (namespace `argocd`) with KSOPS: syncs `cluster/` from `main` | P3.4 | [argocd.md](argocd.md) |
+| Kyverno 1.20.0 (namespace `kyverno`), policies in Audit mode | P3.5 | [kyverno.md](kyverno.md) |
+| CloudNativePG operator 1.30.1 (namespace `cnpg-system`), no Postgres clusters yet | P3.4 | [cluster/README.md](../cluster/README.md) |
+| CoreDNS zone `nghodki.ai` → edge-dnsmasq on dgx-1 (`kube-system/coredns-custom`) | P3.4 | [argocd.md](argocd.md) |
+
+All on the Sparks, one replica each, about 0.95 GiB in total (620 MiB without page cache; limits add up to 2.47 GiB) (decision 0006). The age key is in the cluster as
+`argocd/sops-age` ([argocd.md](argocd.md#the-age-key-in-the-cluster)).
+
 ## Not installed yet (on purpose)
 
 | What | Plan |
 |---|---|
 | kube-vip floating IP; DNS + HTTPS proxy in the cluster | P3.3 |
-| Argo CD (and SOPS in the cluster) | P3.4 |
-| Kyverno | P3.5 |
+| Kyverno **Enforce** and signed-image verification (Kyverno itself runs in Audit mode, [kyverno.md](kyverno.md)) | P3.5 |
 | Tetragon | P3.6 |
 | NVIDIA device plugin / GPU operator: **the cluster doesn't touch the GPUs** (k3s registers an `nvidia` containerd runtime, but nothing requests GPUs) | after the DGXMM work |
 | Workloads (LiteLLM, NATS, Postgres, observability, ...) | P3.7 |

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smoke
+  labels:
+    nghodki.ai/purpose: canary
+    nghodki.ai/sync-test: "1"

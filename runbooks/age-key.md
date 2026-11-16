@@ -6,6 +6,7 @@ Everything under `secrets/` is encrypted with SOPS for one age key.
 |---|---|
 | Public key (recipient) | in `.sops.yaml` |
 | Private key | dgx-1 `~/.config/sops/age/keys.txt` (mode 0600), plus the two offline copies below |
+| In the cluster | Kubernetes Secret `argocd/sops-age` (since P3.4), read only by Argo CD's repo-server (KSOPS). k3s encrypts Secrets at rest. See [argocd.md](argocd.md#the-age-key-in-the-cluster) |
 | Never | in GitHub, in CI, in chat, on the work laptop |
 
 ## Offline copies (do once, and after every rotation)
@@ -22,8 +23,9 @@ sops secrets/<name>.enc.yaml           # create or edit (opens $EDITOR, saves en
 sops -d secrets/<name>.enc.yaml        # print decrypted (only on dgx-1)
 ```
 
-Inside the cluster, decryption happens in Argo CD (plan P3.4); the key is loaded as a Kubernetes secret by hand,
-once, from dgx-1.
+Inside the cluster, decryption happens in Argo CD (KSOPS, plan P3.4); the key was loaded as the Secret
+`argocd/sops-age` by hand, from the file on dgx-1 (`kubectl create secret generic --from-file`, never echoed).
+Files under `cluster/` named `*.enc.yaml` are Kubernetes Secrets with only `data`/`stringData` encrypted.
 
 ## Restore (dgx-1 lost)
 
@@ -35,4 +37,5 @@ once, from dgx-1.
 1. `age-keygen -o new-keys.txt`, then put the new public key in `.sops.yaml`.
 2. `sops updatekeys secrets/*` with both keys present, so every file is re-encrypted for the new key.
 3. Rotate every secret the old key could decrypt.
-4. Replace the offline copies; delete the old key.
+4. Replace the offline copies and the cluster's copy (`argocd/sops-age`, [argocd.md](argocd.md#the-age-key-in-the-cluster));
+   delete the old key.

@@ -1,0 +1,18 @@
+# k3s imports *.server keys of this ConfigMap into CoreDNS (https://docs.k3s.io/advanced#coredns-custom-configuration-imports).
+# Pods resolve *.nghodki.ai through edge-dnsmasq on dgx-1 (P3.3 moves that DNS into the cluster). edge-dnsmasq answers
+# AAAA with NXDOMAIN, which Go programs (Argo CD) treat as "no such host", so AAAA gets an empty NOERROR here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  nghodki.server: |
+    nghodki.ai:53 {
+        errors
+        cache 30
+        template IN AAAA nghodki.ai {
+            rcode NOERROR
+        }
+        forward . 192.168.86.44
+    }

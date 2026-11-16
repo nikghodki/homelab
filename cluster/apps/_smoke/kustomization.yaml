@@ -1,0 +1,8 @@
+# SOPS canary: Argo CD decrypts sops-canary.enc.yaml with KSOPS and applies it. Kept as a permanent check that
+# in-cluster decryption works (runbooks/argocd.md). No pods.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+generators:
+  - secret-generator.yaml

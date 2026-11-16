@@ -1,0 +1,29 @@
+# Argo CD manages itself: chart + values (cluster/platform/argocd/values.yaml) + extras (KSOPS secret, host Services).
+# No resources finalizer: deleting this Application must never delete Argo CD.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 10.18.0
+      helm:
+        releaseName: argocd
+        valueFiles: [$values/cluster/platform/argocd/values.yaml]
+    - repoURL: git@github.com:nikghodki/homelab.git
+      targetRevision: main
+      ref: values
+      path: cluster/platform/argocd/extras
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [ServerSideApply=true]
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}

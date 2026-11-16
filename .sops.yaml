@@ -1,6 +1,12 @@
 # SOPS rules: anything under secrets/ is encrypted for the fleet age key.
-# The private key lives only on dgx-1 (~/.config/sops/age/keys.txt) and in the offline backups; never in GitHub.
+# The private key lives on dgx-1 (~/.config/sops/age/keys.txt), in the offline backups and, since P3.4, as the
+# Kubernetes Secret argocd/sops-age (Argo CD's repo-server decrypts cluster/ with KSOPS). Never in GitHub.
 creation_rules:
   - path_regex: ^secrets/.*\.(ya?ml|json|env|ini)$
     encrypted_regex: ^(data|stringData|.*[Kk]ey.*|.*[Tt]oken.*|.*[Pp]ass.*|.*[Ss]ecret.*|canary)$
+    age: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+  # Kubernetes Secret manifests that Argo CD applies (KSOPS generators in cluster/). Only data/stringData is
+  # encrypted, so kind, name and labels stay readable for Argo CD and kustomize.
+  - path_regex: ^cluster/.*\.enc\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
     age: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
