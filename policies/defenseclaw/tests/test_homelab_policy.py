@@ -38,3 +38,22 @@ def test_guardrail_and_audit():
     assert POLICY["guardrail"]["hilt"]["enabled"] is True
     assert POLICY["audit"]["log_all_actions"] is True
     assert POLICY["audit"]["retention_days"] >= 90
+
+
+MCP = yaml.safe_load((Path(__file__).parents[1] / "mcp-servers.yaml").read_text())
+
+
+def test_mcp_admission_blocks_unregistered_servers():
+    ap = MCP["asset_policy"]
+    assert ap["enabled"] is True
+    assert ap["mode"] == "action"
+    assert ap["mcp"]["registry_required"] is True
+    assert ap["mcp"]["registry_empty_action"] == "deny"
+
+
+def test_mcp_registry_pins_each_launch():
+    names = [r["name"] for r in MCP["asset_policy"]["mcp"]["registry"]]
+    assert len(names) == len(set(names))
+    for rule in MCP["asset_policy"]["mcp"]["registry"]:
+        # A rule with only a name would admit any launch under that name.
+        assert rule.get("url") or (rule.get("command", "").startswith("/") and rule.get("args_prefix")), rule

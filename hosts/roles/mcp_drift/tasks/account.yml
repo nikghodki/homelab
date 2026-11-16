@@ -1,0 +1,61 @@
+---
+- name: "Drift job files and timer for {{ mcp_drift_account }}"
+  become: "{{ mcp_drift_account != ansible_facts['user_id'] }}"
+  become_user: "{{ mcp_drift_account }}"
+  vars:
+    mcp_drift_home: "{{ ansible_facts.getent_passwd[mcp_drift_account][4] }}"
+    mcp_drift_uid: "{{ ansible_facts.getent_passwd[mcp_drift_account][1] }}"
+    mcp_drift_lib: "{{ mcp_drift_home }}/.local/share/homelab-mcp"
+  block:
+    - name: Folders
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ mcp_drift_home }}/.local/bin"
+        - "{{ mcp_drift_lib }}"
+        - "{{ mcp_drift_home }}/.config/systemd/user"
+
+    # The approved tool hashes and server list from the repo, and the same export and hash code CI uses.
+    # Only servers listed in mcp-servers.yaml are checked, so a folder left over from a removed server is unused.
+    - name: Approved tools (tools/ from the repo)
+      ansible.builtin.copy:
+        src: "{{ mcp_drift_repo }}/tools/"
+        dest: "{{ mcp_drift_lib }}/tools/"
+        mode: "0644"
+        directory_mode: "0755"
+
+    - name: Server list and helpers
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ mcp_drift_lib }}/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - {src: "{{ mcp_drift_repo }}/policies/defenseclaw/mcp-servers.yaml", dest: mcp-servers.yaml}
+        - {src: "{{ mcp_drift_repo }}/.github/scripts/export-mcp-tools.py", dest: export-mcp-tools.py}
+        - {src: "{{ mcp_drift_repo }}/.github/scripts/mcp-tool-hashes.py", dest: mcp-tool-hashes.py}
+
+    - name: Script
+      ansible.builtin.copy:
+        src: mcp-drift.py
+        dest: "{{ mcp_drift_home }}/.local/bin/mcp-drift"
+        mode: "0755"
+
+    - name: Service and timer
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "{{ mcp_drift_home }}/.config/systemd/user/{{ item }}"
+        mode: "0644"
+      loop: [mcp-drift.service, mcp-drift.timer]
+
+    - name: Timer is enabled
+      ansible.builtin.systemd_service:
+        name: mcp-drift.timer
+        scope: user
+        enabled: true
+        state: started
+        daemon_reload: true
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ mcp_drift_uid }}"
+      when: not ansible_check_mode

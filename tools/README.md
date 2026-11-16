@@ -35,5 +35,14 @@ HA_TOKEN=... python3 export-mcp-tools.py --url <url> --token-env HA_TOKEN > tool
 The exact command for each server is in its `server.yaml`. Copy the file into `tools/<server>/`, read the diff,
 then run `.github/scripts/mcp-tool-hashes.py update` and commit both files together.
 
-Not exported yet: the `wedding`, `vision-ai` and `home-board` servers in Hermes' config (the Home Board is
-decommissioned), and a live nightly comparison against the running servers (needs a job on the Jetson).
+## Admission and the nightly drift check
+
+Only servers listed in `policies/defenseclaw/mcp-servers.yaml` (same launch as their `server.yaml`) are admitted by
+DefenseClaw on the Jetson (`asset_policy.mcp.registry`, `registry_required`, mode `action`). Every night the
+`mcp-drift` user timer (role `mcp_drift`) runs `tools/list` against each live approved server with the export and
+hash code above, compares it with the `tools.sha256` copied from this folder, and logs a line per changed, added or
+removed tool, and per unapproved server, to Loki (`logger -t mcp-drift`, Grafana "AI inventory"). A new server
+needs a folder here **and** an entry in `mcp-servers.yaml`. Details: runbooks/mcp-admission.md.
+
+The `wedding`, `vision-ai` and `home-board` servers were removed from both Hermes profiles on 2026-11-15 (folder
+gone, vision skipped, Home Board decommissioned), so they are not exported.

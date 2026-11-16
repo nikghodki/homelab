@@ -1,0 +1,41 @@
+# Approved MCP servers for the Jetson's Hermes profiles (plan P4.3, runbooks/mcp-admission.md).
+#
+# `asset_policy` is merged into each account's ~/.defenseclaw/config.yaml by role defenseclaw_policy
+# (defenseclaw_policy_mcp_admission in host_vars/jetson.yml), through `defenseclaw config set`. With
+# registry_required on and mode action, `defenseclaw mcp set` refuses a server that is not listed here with the
+# same launch (URL, or full command path plus exact argv). The runtime registry check is off
+# (runtime_detection.enabled false) so a server already in Hermes is never cut off mid-session; the nightly
+# mcp-drift job (role mcp_drift) flags an unlisted or relaunched server instead, and compares the live
+# tools/list with tools/<name>/tools.sha256.
+#
+# Adding a server: export its tools into tools/<name>/ (tools/README.md), add it here with the launch from its
+# server.yaml, merge, run playbooks/defenseclaw.yml, then add it with `defenseclaw mcp set` or in Hermes' config.
+asset_policy:
+  enabled: true
+  mode: action
+  mcp:
+    registry_required: true
+    registry_empty_action: deny
+    runtime_detection:
+      enabled: false
+      terminal_commands: true
+      unknown_terminal_mcp: observe
+    registry:
+      - name: homeassistant
+        transport: http
+        url: http://localhost:8123/api/mcp/assist
+        reason: Home Assistant Assist MCP (tools/homeassistant)
+      - name: picoclaw_only
+        transport: stdio
+        command: /home/hermes-nikhil/.hermes/tools/node-26.7.0-linux-arm64/bin/node
+        args_prefix:
+          - /home/nikjetson/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js
+        reason: PicoClaw hardware MCP (tools/picoclaw_only)
+
+# Not DefenseClaw settings: how mcp-drift starts each server for its nightly tools/list. A stdio server gets
+# only these variables plus PATH and HOME, so it starts without its credentials (as in tools/<name>/server.yaml).
+drift_check:
+  picoclaw_only:
+    env:
+      MQTT_CREDS_FILE: /nonexistent
+      MQTT_BROKER: mqtt://127.0.0.1:1

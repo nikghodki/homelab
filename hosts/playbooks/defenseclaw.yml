@@ -18,3 +18,8 @@
   hosts: all
   roles:
     - role: defenseclaw_aibom
+
+- name: Nightly MCP drift check (plan P4.3)
+  hosts: all
+  roles:
+    - role: mcp_drift

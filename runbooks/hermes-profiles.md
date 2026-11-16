@@ -20,10 +20,31 @@ redaction.
   parent folders, rX on `mcp-server`); nothing else in nikjetson's home is readable. It uses Hermes' bundled Node
   (`/usr/bin/node` is gone since the JP7 reflash) and NATS as user `hermes` (`~/.picoclaw-nats-credentials`, 0600,
   from `secrets/bus.enc.yaml`).
-- MCP servers that still fail, as before the move: `wedding` (folder no longer exists), `home-board` (decommissioned),
-  `vision-ai` (vision is skipped). WhatsApp was never paired for this profile.
-- DefenseClaw can't scan these MCP servers (local/private by design; a path launcher isn't allowlisted). They're kept
-  with a warning, the same as on the main gateway.
+- WhatsApp was never paired for this profile.
+- DefenseClaw can't scan its MCP servers (local/private by design; a path launcher isn't allowlisted). They're kept
+  with a warning, the same as on the main gateway; admission and the nightly drift check are in
+  [mcp-admission.md](mcp-admission.md).
+
+## MCP servers
+
+| Profile | MCP servers |
+|---|---|
+| main (`nikjetson`) | `homeassistant` |
+| nikhil-ghodki (`hermes-nikhil`) | `homeassistant`, `picoclaw_only` (tools include-list: `send_to_picoclaw_agent`, `check_picoclaw_agent_connection`) |
+
+Only servers in `policies/defenseclaw/mcp-servers.yaml` are approved (runbooks/mcp-admission.md).
+
+Removed 2026-11-15 (they failed at every start): `wedding` (both profiles; `~/workspace/nandita-wedding` no longer
+exists and `/usr/bin/node` is gone since the JP7 reflash), `home-board` (hermes-nikhil; the Home Board is
+decommissioned, 100.65.137.82:8400 does not answer) and `vision-ai` (hermes-nikhil; vision is skipped by decision).
+Removed by deleting only their blocks under `mcp_servers:` (line-based, every other line of `config.yaml` kept, checked
+by parsing before and after); backups in `~/.hermes/backups/config/config.yaml.pre-mcp-cleanup.20261115-172246` of each
+account. After restarting both `hermes-gateway` units the logs show `homeassistant` (28 tools: 24 from the server plus
+Hermes' own resource/prompt helpers) on both and `picoclaw_only` (2 tools) on hermes-nikhil, with no MCP errors.
+
+Left as they were, for the profile owner to clean up: hermes-nikhil's `skills/smart-home/home-board` skill and the
+first line of its `memories/MEMORY.md` (groceries on the Home Board) still describe the decommissioned board, and old
+`config.yaml.bak*` copies still list the removed servers.
 
 ## Skill scanner (temporary: LLM judge off)
 

@@ -1,0 +1,15 @@
+# Managed by homelab Ansible (roles/mcp_drift)
+[Unit]
+Description=Nightly MCP drift check: live tools/list against the approved hashes in tools/
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.local/bin/mcp-drift
+# Findings go to the journal through `logger -t mcp-drift`; stdout would only duplicate them.
+StandardOutput=null
+SyslogIdentifier=mcp-drift-job
+# Exit 1 is drift or an unapproved server: logged, not a unit failure
+SuccessExitStatus=1
+TimeoutStartSec=10min
+Nice=10

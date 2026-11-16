@@ -1,0 +1,7 @@
+---
+# Nightly comparison of live MCP tool definitions with the approved hashes in tools/ (plan P4.3).
+mcp_drift_enabled: false
+# Accounts whose Hermes config is checked. Empty means the Ansible login user only.
+mcp_drift_users: "{{ defenseclaw_policy_users | default([]) }}"
+mcp_drift_time: "*-*-* 03:40:00"
+mcp_drift_repo: "{{ playbook_dir }}/../.."

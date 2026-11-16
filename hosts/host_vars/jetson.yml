@@ -1,5 +1,8 @@
 # Two per-user DefenseClaw installs: the main Hermes profile and nikhil-ghodki's own user (P0.15).
 defenseclaw_policy_users: [nikjetson, hermes-nikhil]
+# MCP admission and nightly drift check (plan P4.3, runbooks/mcp-admission.md); servers in policies/defenseclaw/mcp-servers.yaml
+defenseclaw_policy_mcp_admission: true
+mcp_drift_enabled: true
 # Hermes is connected to DefenseClaw here, so the AIBOM has content
 defenseclaw_aibom_enabled: true
 restic_backup_paths:

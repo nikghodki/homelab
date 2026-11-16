@@ -20,8 +20,9 @@ INITIALIZED = {"jsonrpc": "2.0", "method": "notifications/initialized"}
 LIST = {"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
 
 
-def via_stdio(cmd: list[str]) -> tuple[dict, list]:
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+def via_stdio(cmd: list[str], env: dict | None = None) -> tuple[dict, list]:
+    """`env` replaces the environment (None: inherit), so a server can be started without its credentials."""
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=env)
     replies = {}
     try:
         for msg in (INIT, INITIALIZED, LIST):
