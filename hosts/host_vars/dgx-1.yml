@@ -15,16 +15,17 @@ restic_backup_paths:
   - /home/nikghodki-dgx/workspace/dgx-model-manager/data
   - /home/nikghodki-dgx/workspace/dgx-model-manager/config.yaml
   - /home/nikghodki-dgx/workspace/dgx-model-manager/secrets
-  - /var/lib/docker/volumes/open-webui_open-webui-data/_data
+  # Open WebUI's volume in k3s (local-path PV on dgx-1, runbooks/open-webui.md); the PVC's UID is in the name
+  - /var/lib/rancher/k3s/storage/pvc-c23bf76c-16ed-4d59-9ce8-4188cc12cceb_open-webui_open-webui-data
 restic_backup_excludes:
   - /home/nikghodki-dgx/workspace/dgx-model-manager/data/dgxmm.sqlite3
   - /home/nikghodki-dgx/workspace/dgx-model-manager/data/gguf
   - /home/nikghodki-dgx/workspace/dgx-model-manager/data/hf
-  - /var/lib/docker/volumes/open-webui_open-webui-data/_data/webui.db
-  - /var/lib/docker/volumes/open-webui_open-webui-data/_data/cache
+  - /var/lib/rancher/k3s/storage/pvc-c23bf76c-16ed-4d59-9ce8-4188cc12cceb_open-webui_open-webui-data/webui.db
+  - /var/lib/rancher/k3s/storage/pvc-c23bf76c-16ed-4d59-9ce8-4188cc12cceb_open-webui_open-webui-data/cache
 restic_backup_sqlite:
   - {name: dgxmm, path: /home/nikghodki-dgx/workspace/dgx-model-manager/data/dgxmm.sqlite3}
-  - {name: open-webui, path: /var/lib/docker/volumes/open-webui_open-webui-data/_data/webui.db}
+  - {name: open-webui, path: /var/lib/rancher/k3s/storage/pvc-c23bf76c-16ed-4d59-9ce8-4188cc12cceb_open-webui_open-webui-data/webui.db}
 restic_backup_pre_commands:
   - docker exec litellm-postgres pg_dump -U litellm -d litellm --no-owner | gzip > /var/backups/homelab/litellm-db.sql.gz
 # Cisco AIBOM (runbooks/aibom.md). DGXMM and LiteLLM are only read. Memory cap and guard: group_vars/sparks.yml.

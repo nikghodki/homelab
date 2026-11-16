@@ -37,7 +37,7 @@ dgxmanager), NATS and Fleet still go down with dgx-1 (see
 | `litellm-postgres` | `postgres:16-alpine` (by digest) | 127.0.0.1:5432 | Ansible |
 | `litellm-redis` | `redis:7-alpine` (by digest) | 127.0.0.1:6379 | Ansible |
 | `litellm-defenseclaw-bridge` | `alpine/socat:1.8.0.3` (by digest) | 172.17.0.1:18970 (host network) | Ansible |
-| `open-webui` | `ghcr.io/open-webui/open-webui:v0.13.3` | 0.0.0.0:3100 | hand |
+| `open-webui` | `ghcr.io/open-webui/open-webui:v0.13.3` | 0.0.0.0:3100 | hand; **stopped 2026-11-16** (moved into k3s, kept until 2026-11-23) |
 | `dgxmm` | `dgxmm:latest` | 127.0.0.1:8090 | DGXMM project |
 | `bus-nats-1` | `nats:2.15.3-alpine` | 0.0.0.0:4222, :8883; 127.0.0.1:8222 | `playbooks/bus.yml` |
 | `fleet-mosquitto-1` | `eclipse-mosquitto:2.1.2-alpine` | 0.0.0.0:8884 | `playbooks/fleet.yml` |
@@ -94,5 +94,5 @@ scheduler put them; any Spark is fine); one replica each of `edge/edge-caddy` an
 - dgx-1's umask is 002. uv's Python tree inherits it, and the DefenseClaw policy compiler refuses a group-writable
   interpreter (see [Troubleshooting](../operations/troubleshooting.md)).
 - Its LAN link is Wi-Fi. After a reboot, containers that publish on a LAN IP can fail if Wi-Fi comes up late.
-- LiteLLM (:4000) and Open WebUI (:3100) listen on all interfaces, so they are reachable on the LAN
-  directly, not only through the front door.
+- LiteLLM (:4000) listens on all interfaces, so it is reachable on the LAN directly, not only through the front door.
+  Open WebUI (:3100) did too until it moved into k3s (2026-11-16); its pod is only reachable through the door.

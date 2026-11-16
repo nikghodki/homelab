@@ -37,7 +37,7 @@ All in `cluster/platform/edge/caddy/Caddyfile`, on :80 and :443 (wildcard from t
 | `litellm-admin.nghodki.ai` | 100.65.137.82:4000 (LiteLLM on dgx-1, by its Tailscale IP) | `session_check` (edge-auth, admins), then the LiteLLM UI login | yes | Host header rewritten to the upstream |
 | `controlcenter.nghodki.ai` | 192.168.86.211:8200 (Jetson, RoboClaw control center) | none in Caddy (unverified in the app) | no | old :9119 route was dead |
 | `dgxmanager.nghodki.ai` | the `(dgxmm_ui)` snippet: `/dgxmm/*` → DGXMM 10.100.136.1:8090, `/dgxmm/ondemand/*` 404; `/` → 302 `/dgxmm/`; else a JSON 404 pointing at model.nghodki.ai | `session_check` (edge-auth, admins); DGXMM has no login of its own | yes | `/dgxmm/healthz` (the SPA shell) is open for Gatus and Homepage. SSE unbuffered, 1 h reads, 1 MB request limit |
-| `webui.nghodki.ai` | 100.65.137.82:3100 (Open WebUI) | Open WebUI accounts | no | 30 min timeouts for streaming |
+| `webui.nghodki.ai` | `open-webui/open-webui`, fixed ClusterIP 10.43.0.130:8080; fallback the stopped Docker copy 100.65.137.82:3100 (`lb_policy first`, until 2026-11-23) | Open WebUI accounts | no | 30 min timeouts for streaming |
 | `ha.nghodki.ai` | 192.168.86.211:8123 (Home Assistant on the Jetson), websockets, unbuffered | Home Assistant login | no | HA trusts proxies 192.168.86.44 and 192.168.86.36 (the Caddy pods leave from their Spark's LAN IP) and, until the user removes it, 100.65.137.82 |
 | anything else, or the IP | `(model_plane)` (as nginx's default server did) | — | — | e.g. `http://192.168.86.11/v1/models` reaches LiteLLM |
 

@@ -17,7 +17,7 @@ and #26 (the 2026-11-16 status PR).
 | 6 | (not in the repo) | `earlyoom` and `gpu-oom-guard.service` run on both Sparks; the unit file says "Managed by homelab Ansible (roles/memory_guard)", but no `memory_guard` role exists on `main` or any remote branch | [GPU OOM incident](../operations/incident-gpu-oom.md) |
 | 7 | Architecture §3.1: Fleet broker, NATS, LiteLLM "in k3s" | They run in Docker; only Argo CD, Kyverno, CNPG, CoreDNS zone and P3.3's kube-vip, `edge` front door and kube-state-metrics are in k3s | [Platform](../platform/index.md) |
 | 8 | Decision 0008: GHCR packages `mlflow` and `ros-zenoh` public | Still private: Kyverno refuses both with `UNAUTHORIZED` (P3.5 acceptance case b pending) | [Kyverno](../platform/kyverno.md) |
-| 10 | Design §4.2 / architecture §4.3: no service open to the LAN unless needed | LiteLLM :4000, Open WebUI :3100, Grafana :3000, Phoenix :6006, OTLP 4317–4320, Hermes :8642, control center :8200, fleet-metrics :9109 listen on all interfaces; Temporal and Zenoh have no auth | [Ports](../network/ports.md) |
+| 10 | Design §4.2 / architecture §4.3: no service open to the LAN unless needed | LiteLLM :4000, Grafana :3000, Phoenix :6006, OTLP 4317–4320, Hermes :8642, control center :8200, fleet-metrics :9109 listen on all interfaces; Temporal and Zenoh have no auth | [Ports](../network/ports.md) |
 | 11 | "Pin everything" (cluster/README, CI rules) | Home Assistant is pinned by digest in `hosts/stacks/home-assistant` (#85); the edge-gateway containers (`caddy:2.11`, `nginx:alpine`, dnsmasq) are stopped since #92 (kept as the rollback, platform session); `dgxmm:latest` is the DGXMM session's | [Upgrades](../operations/upgrades.md) |
 
 ## Documents that are behind or inconsistent

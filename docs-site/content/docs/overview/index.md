@@ -80,7 +80,7 @@ Some pieces are hand-run and not managed by Ansible or Argo CD yet. Know them be
 | Old front door: `edge-caddy` + `edge-dnsmasq` | dgx-1 | `~/edge-gateway` | Replaced for clients by the in-cluster door at the P3.3 cutover ([Front door](../network/front-door.md#in-cluster-front-door-p33)); **stopped 2026-11-15** (relay retired, PR #88), kept until 2026-11-22 for a rollback |
 | `nginx-gateway` (routed model, DGXMM, TTS, HA) | dgx-1 | `~/voice-assistant/nginx/nginx.conf` | **stopped 2026-11-15**: its routes are in the k3s Caddyfile |
 | LiteLLM proxy + Postgres + Redis | dgx-1 | `~/litellm-setup` (owned by the DGXMM/LiteLLM session) | P3.7 |
-| Open WebUI | dgx-1 | container `open-webui` | P3.7 |
+| Open WebUI | dgx-1 | in k3s since 2026-11-16 (`open-webui` namespace); the stopped container is the rollback until 2026-11-23 | P3.7 (done) |
 | DGXMM and its engines | dgx-1, dgx-2 | `~/workspace/dgx-model-manager` (separate project) | stays outside k3s (D3) |
 | Hermes, Home Assistant, LiveKit, control center (voice retired, D26; these two stay for now) | Jetson | user units of `nikjetson` / `hermes-nikhil`, container `homeassistant` | Hermes moves into k3s in P4.5 |
 | picoclaw's own config and binaries | Pi | `/var/lib/picoclaw` (user and unit managed by role `picoclaw` since #73; the agent config itself isn't in Git) | — |

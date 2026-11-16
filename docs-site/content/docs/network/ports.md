@@ -13,7 +13,7 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | 22 | all | sshd | |
 | 53 | 100.65.137.82 | edge-dns (k3s, kube-proxy DNAT) | edge-dnsmasq on 192.168.86.44 stopped 2026-11-15 |
 | 80, 443 | 100.65.137.82 | edge-caddy (k3s, kube-proxy DNAT) | the old edge-caddy on 0.0.0.0 stopped 2026-11-15 |
-| 3100 | all | Open WebUI | also via `webui.nghodki.ai` |
+| 3100 | all | Open WebUI (Docker): **stopped** since the move into k3s (2026-11-16); only `webui.nghodki.ai` now | |
 | 4000 | all | LiteLLM | also via `model.nghodki.ai` |
 | 4222 | all | NATS (TLS, homelab CA) | |
 | 8883 | all | NATS MQTT (TLS) | picoclaw |

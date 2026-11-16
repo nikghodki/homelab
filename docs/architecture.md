@@ -87,6 +87,7 @@ Numbers marked "est." are estimates, not measurements.
 | `edge` | DNS (CoreDNS for `*.nghodki.ai`), HTTPS proxy (Caddy, wildcard cert from a Secret, §4.5), `ca.nghodki.ai` install page, CrowdSec | Sparks (2 replicas) |
 | `bus` | NATS JetStream (3 replicas: dgx-1, dgx-2 and, as a small replica, the Jetson) | Sparks + Jetson (tolerates the taint) |
 | `models` | LiteLLM (model, MCP and A2A gateway), DGXMM (one per Spark), DefenseClaw guardrail plugin | Sparks |
+| `open-webui` | Open WebUI (moved 2026-11-16; one namespace per app, `cluster/apps/README.md`) | dgx-1 (its volume) |
 | `data` | CloudNativePG Postgres, SeaweedFS | Sparks |
 | `agents` | Hermes (after P4.5), OpenBot, workers; MCP servers that run in the cluster | Omarchy, Sparks; Hermes on the Jetson |
 | `home` | Home Assistant, LiveKit | Jetson (tolerates the taint) |
@@ -139,7 +140,7 @@ unless noted. P3.7 moves each into its k3s namespace and removes the Docker copy
 | `backup` | dgx-2 | restic rest-server (8000) | Stays on the host (restores must not need the cluster) |
 | edge-gateway | dgx-1 | `edge-caddy` + `edge-dnsmasq` in `~/edge-gateway`, and `nginx-gateway`: **stopped 2026-11-15** (moved; kept a week for rollback) | `edge` (CoreDNS + Caddy, 2 replicas, behind kube-vip): done |
 | LiteLLM | dgx-1 | `litellm-proxy` v1.109.1 + Postgres + Redis (hand-run, not in the repo) | `models` (2 replicas); Postgres → `data` (CNPG); Redis → `models` |
-| Open WebUI | dgx-1 | `open-webui` v0.13.3 (hand-run, not in the repo) | `agents` or `models` (decide in P3.7) |
+| Open WebUI | dgx-1 | moved 2026-11-16; the stopped container is the rollback until 2026-11-23 | its own namespace `open-webui` (cluster/apps convention, not `agents`/`models`), pinned to dgx-1: done |
 
 Not moved: DGXMM and its engines (§3.2). Coolify was retired on 2026-11-15 (decision 0010), not moved.
 
