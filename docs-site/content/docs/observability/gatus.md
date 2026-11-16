@@ -23,6 +23,7 @@ the k3s alerts and the dead man).
 | web | ops.nghodki.ai (Homepage) | `https://192.168.86.11/`, Host `ops...`, no redirect follow | 302 (to Pocket ID) |
 | web | ntfy.nghodki.ai | `https://192.168.86.11/v1/health` | 200 and `healthy == true` |
 | web | status.nghodki.ai | `https://192.168.86.11/health` | below 400 |
+| web | id.nghodki.ai (Pocket ID) | `https://192.168.86.11/.well-known/openid-configuration`, Host `id...` | 200 and `issuer == https://id.nghodki.ai` |
 | web | `*.nghodki.ai certificate` | `https://192.168.86.11/`, Host `webui...`, hourly | below 400 and cert valid > 720 h (30 days) |
 | home | Home Assistant (direct) | `http://192.168.86.211:8123/` | below 400 |
 | observe | Phoenix | `http://192.168.86.36:6006/healthz` | below 400 |
@@ -41,6 +42,7 @@ the k3s alerts and the dead man).
 | robot | Zenoh router (ROS 2) | `tcp://192.168.86.211:7447` | connected (port only, not that `/scan` flows) |
 | k3s | API dgx-1, API dgx-2 | `https://192.168.86.44:6443/readyz`, `.36` | 401 (anonymous off = answering) and cert > 720 h |
 | k3s | etcd dgx-1, dgx-2, jetson | `tcp://10.100.136.1:2379`, `10.100.136.2:2379`, `192.168.86.211:2379` | connected |
+| k3s | argocd.nghodki.ai | `https://192.168.86.11/healthz`, Host `argocd...` | 200 |
 | edge | edge DNS (VIP), edge DNS tailnet view (dgx-1), (dgx-2) | `tcp://192.168.86.11:53`, `tcp://100.65.137.82:53`, `tcp://100.124.175.23:53` | connected (TCP: the Dell's containers can't send UDP to k3s Services) |
 | edge | edge Caddy (VIP) | `https://192.168.86.11/`, Host `ca...` | 200 and cert > 720 h |
 | edge | DGXMM UI (direct) | `https://192.168.86.11/dgxmm/healthz`, Host `dgxmanager...` | 200 (Caddy → DGXMM on dgx-1's direct-cable address; the one path open without sign-in) |
