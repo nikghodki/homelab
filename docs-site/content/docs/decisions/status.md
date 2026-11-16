@@ -4,7 +4,7 @@ description: Where each plan phase stands on 2026-11-15 (end of day), what is wa
 ---
 
 Source: `docs/project-plan.md` §2a ("Status on 2026-11-15 (evening)"), corrected with what merged after it was written
-(PRs #52–#73) and the live state. Where this page and §2a differ, this page is newer; the differences are listed at the
+(PRs #52–#79) and the live state. Where this page and §2a differ, this page is newer; the differences are listed at the
 bottom.
 
 Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started · 🔄 in progress (another session)
@@ -13,10 +13,10 @@ Legend: ✅ done · 🟡 partly · ⏸️ prepared, waiting · ⬜ not started �
 
 | Milestone | Meaning | State |
 |---|---|---|
-| M0 | No known critical/high finding open; every agent behind DefenseClaw 1.0.9 | mostly: F1–F5, F8, F10 closed; F6 (dgx-1 single point of failure) open until P3.3; F7 half (dead routes) |
+| M0 | No known critical/high finding open; every agent behind DefenseClaw 1.0.9 | mostly: F1–F5, F8, F10 closed; F6 (dgx-1 single point of failure) narrowed by the P3.3 cutover (web and DNS on both Sparks; nginx-gateway routes, NATS, Fleet, LiteLLM still on dgx-1, P3.7); F7 half (dead routes; the voice route is gone, D26) |
 | M1 | Repo, CI, Ansible, bus and observability live | ✅ |
 | M2 | Aliases, always-on robot and guard models, guardrail, Phoenix | blocked on P2.0 and the DGXMM session |
-| M3 | k3s with quorum, Argo CD deploys from Git, dgx-1 no longer a SPOF | k3s, Argo CD, Kyverno Enforce ✅; SPOF removal = P3.3 🔄 |
+| M3 | k3s with quorum, Argo CD deploys from Git, dgx-1 no longer a SPOF | k3s, Argo CD, Kyverno Enforce ✅; SPOF removal: P3.3 ✅ for web and DNS; the rest is P3.7 |
 | M4–M6 | agents/tools/OpenBot; robot end to end; first trained policy on the robot | not started beyond the pieces below |
 
 ## Phase 0 (urgent fixes)
@@ -72,7 +72,7 @@ senders) · P2.1–P2.3, P2.5, P2.7, P2.8 ⬜ (DGXMM work).
 |---|---|---|
 | P3.1 | ✅ | D2 confirmed and refined |
 | P3.2 | ✅ | k3s over Wi-Fi (#54, decision 0005) — §2a still says "waits on Ethernet" |
-| P3.3 | 🔄 | kube-vip and DNS + Caddy in the cluster: branch `p3.3-edge-in-cluster`, apps live from the branch at check time |
+| P3.3 | ✅ (two follow-ups) | kube-vip (VIPs 192.168.86.10 API, .11 edge), CoreDNS + Caddy in `edge`, kube-state-metrics; Gatus group `edge`; vmalert `front-door` rules (#72, decision 0007; voice route dropped in #76). **Cut over 2026-11-15**: Tailscale policy for both Sparks (#78), dgx-2 as a second split-DNS nameserver (console; live), #79 (dgx-1's Tailscale IP on the tailnet Services, k3s DNS → edge-dns, Gatus via the VIP, front-door alerts critical). edge-caddy on dgx-1 stays as the nginx-gateway relay and rollback. Left: the check from a family device (**you**) and a tailnet failover drill a day later (`runbooks/edge.md`, "Cutover" steps 5–6) |
 | P3.4 | ✅ | Argo CD + KSOPS (#57, #58, #59) |
 | P3.5 | ✅ (one user step) | Kyverno Enforce with 6 policies incl. `verify-images`, 2 admission replicas (#65, #68); `build-sign.yml` with cosign keyless (#62–#64). Acceptance done except the signed-image case: the GHCR packages must be made **public** (you) |
 | P3.6 | ⬜ | Tetragon |
@@ -101,7 +101,8 @@ P6.1, P6.6–P6.12 ⬜.
 ## Waiting on the user
 
 1. Make the GHCR packages `mlflow` and `ros-zenoh` public (GitHub UI): until then Kyverno refuses every
-   `ghcr.io/nikghodki` image (P3.5, decision 0008).
+   `ghcr.io/nikghodki` image (P3.5, decision 0008). Still private at check time (anonymous pull: 403).
+1. P3.3 cutover step 5: from a family device, check that Home Assistant and Open WebUI open and ntfy alerts arrive.
 1. P0.11: cable the Sparks' 10 GbE ports (then redo reservations and the k3s LAN settings).
 2. P2.0: choose models and alias names.
 3. Decision 0004: OpenBot path (recommended: cua + OpenShell).
@@ -126,6 +127,7 @@ P6.1, P6.6–P6.12 ⬜.
 ## Where §2a of the plan is behind
 
 - P3.2 is done (k3s, #54), P3.4 done (#57–#59), P3.5 done (#57, #62–#65, #68): §2a says "P3.2–P3.9 wait on Ethernet".
+- P3.3 is done (#72, #78, #79; cut over 2026-11-15): not in §2a.
 - P4.3 is done (#67): not in §2a.
 - P5.2 is built (#53, #60): §2a says ⬜.
 - P6.5 is done (#52): not in §2a.

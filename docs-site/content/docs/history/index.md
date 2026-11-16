@@ -110,5 +110,19 @@ Both Sparks went down from GPU memory exhaustion around 14:46–15:00 ([incident
 | #70 | Hardening: Lynis remediation role, documented Lynis exceptions, Dell UFW allow for dgx-1 |
 | #73 | Robot: picoclaw as its own unprivileged user; its motion tools go through the safety governor (motion bridge) |
 
-PR numbers skipped above (#1) were not merged to `main` (unverified). Open work at the time of writing: P3.3
-(edge in the cluster), on its own branch.
+## Evening: docs, the front door in k3s, code review, voice retired (18:17–18:39)
+
+| PR | What |
+|---|---|
+| #71 | docs-site: operator docs for the whole fleet (these pages; MDX then) |
+| #72 | P3.3, build and parallel test, no cutover: kube-vip (VIPs 192.168.86.10 API, .11 edge), CoreDNS + Caddy in `edge`, kube-state-metrics; Gatus group `edge`, vmalert `front-door` rules, `compare-front-doors.sh`; decision 0007, `runbooks/edge.md` |
+| #74 | Code review 2026-11-15 (`docs/reviews/code-review-2026-11-15.md`) and low-risk fixes: Jetson GPU per-mille, `pocketid_sync` logout URLs and secrets on stdin, `FleetHostSilent` with `lag()`, Tempo remote write to VictoriaMetrics, nightly scan also covers `hosts/`, MCP hash check fails on a missing `tools.json`, and more |
+| #75 | D26: retire the voice route and the vision service (front door, DNS, Jetson) |
+| #76 | edge: drop the retired `voice-agent` route and DNS name from the in-cluster config too |
+| #77 | docs: tool review 2026-11 (`docs/reviews/tool-review-2026-11.md`: inventory, overlaps, best-in-class, free-ness, recommendations) |
+| #78 | Tailscale policy: front door and DNS on both Sparks (P3.3 cutover step 1) |
+| #79 | P3.3 cutover: dgx-1's Tailscale IP on the tailnet Services, k3s DNS → edge-dns, Gatus via the VIP, front-door alerts critical; `verify-cutover.sh` |
+
+PR numbers skipped above (#1) were not merged to `main` (unverified). Open work at the time of writing: the P3.3
+follow-ups (a check from a family device, a tailnet failover drill; `runbooks/edge.md`, "Cutover" steps 5–6) and the
+docs site on the Dell (`runbooks/docs-site.md`).

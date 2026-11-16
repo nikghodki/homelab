@@ -49,20 +49,15 @@ Each recipe ends with a PR. Things outside the repo (DNS, Caddy) are changed by 
 
 ## A DNS name
 
-On dgx-1 in `~/edge-gateway/dnsmasq/dnsmasq.conf` (back up first):
-
-```
-address=/myapp.nghodki.ai/192.168.86.44
-address=/myapp.nghodki.ai/100.65.137.82
-```
-
-`docker restart edge-dnsmasq`; `dig +short @192.168.86.44 myapp.nghodki.ai` and `@100.65.137.82`. Only A records: AAAA
-answers NXDOMAIN ([DNS](../network/dns.md)).
+`myapp  edge` in `cluster/platform/edge/names.txt`, then `.github/scripts/edge-zone.py generate`; PR. Argo CD rolls
+edge-dns. Check `dig +short @100.65.137.82 myapp.nghodki.ai` ([DNS](../network/dns.md#change-a-record)). To keep the
+rollback complete, also add the `edge-zone.py dnsmasq` lines to edge-dnsmasq on dgx-1.
 
 ## A Caddy route
 
-In `(nghodki_routes)` of `~/edge-gateway/conf/Caddyfile` (back up first), `caddy validate`, `docker restart edge-caddy`
-([Front door](../network/front-door.md)). Add the http → https redirect if the app uses Secure cookies or passkeys.
+A block in `(nghodki_routes)` of `cluster/platform/edge/caddy/Caddyfile`; PR ([Front door](../network/front-door.md#add-a-route)).
+Add the http → https redirect if the app uses Secure cookies or passkeys. Routes behind nginx-gateway (and the
+rollback) also need the block in `~/edge-gateway/conf/Caddyfile` on dgx-1 (`runbooks/edge.md`).
 
 ## A Gatus check
 

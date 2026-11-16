@@ -1,6 +1,6 @@
 ---
 title: "Cluster networking"
-description: "How k3s traffic flows: node IPs on the Spark cable, flannel VXLAN, /32 routes for the Wi-Fi nodes, service CIDR and fixed ClusterIPs."
+description: "How k3s traffic flows: node IPs on the Spark cable, flannel VXLAN, /32 routes for the Wi-Fi nodes, service CIDR, fixed ClusterIPs and the kube-vip addresses."
 ---
 
 k3s was built over Wi-Fi before Ethernet (decision 0005). The Spark-to-Spark path is the target layout already; only
@@ -40,7 +40,7 @@ use 2 (loose); the role checks this and fails if it is strict. Check:
 | Service CIDR | 10.43.0.0/16 |
 | CNI | flannel VXLAN (UDP 8472), MTU 1450 (every path is MTU 1500) |
 | DNS | CoreDNS at 10.43.0.10, plus the `nghodki.ai` zone ([DNS](dns.md)) |
-| Disabled | traefik, servicelb, metrics-server (80/443 belong to edge-caddy on dgx-1) |
+| Disabled | traefik, servicelb, metrics-server (80/443 on dgx-1 belong to edge-caddy; LoadBalancer IPs come from kube-vip) |
 | Measured | 0.4 ms Spark to Spark, 4–15 ms pod to pod over Wi-Fi (2026-11-15) |
 
 Raising the cable to jumbo frames would need the flannel MTU set by hand.
@@ -54,18 +54,38 @@ the static band 10.43.0.0–10.43.0.255, which the API server doesn't hand out d
 | IP:port | Service | Used by |
 |---|---|---|
 | 10.43.0.10:53 | kube-dns | pods |
+| 10.43.0.53:53 | `edge/edge-dns-lan` (also on the VIP 192.168.86.11) | kube-system's CoreDNS for `nghodki.ai` (since the P3.3 cutover) |
 | 10.43.0.100:80, :8083 | `argocd/argocd-server-host` | edge-caddy (`argocd.nghodki.ai`), VictoriaMetrics |
 | 10.43.0.101:8082 | `argocd/argocd-controller-host` | VictoriaMetrics |
 | 10.43.0.102:8084 | `argocd/argocd-repo-server-host` | VictoriaMetrics |
 | 10.43.0.110:8000 | `kyverno/kyverno-admission-host` | VictoriaMetrics |
 | 10.43.0.111:8000 | `kyverno/kyverno-reports-host` | VictoriaMetrics |
+| 10.43.0.120:8080 | `kube-system/kube-state-metrics-host` | VictoriaMetrics (front-door and Kyverno replica alerts) |
 
 Scrapes from Docker arrive from a Docker bridge (172.16.0.0/12) or, from another node, as that node's flannel address
 (10.42.x.0). The NetworkPolicies in `cluster/platform/argocd/extras/host-scrape-netpol.yaml` allow those sources on
 the metrics ports only. To add one: pick the next free address, add a row to `cluster/README.md`, and allow the hosts in
 a NetworkPolicy if the pods have one.
 
-P3.3 (in progress) adds kube-vip and LoadBalancer Services; at check time `edge-dns-lan` had ClusterIP 10.43.0.53.
+## Addresses outside the cluster (P3.3)
+
+kube-vip v1.3.1 (DaemonSet on the two Sparks, `kube-system`, hostNetwork with `NET_ADMIN`/`NET_RAW`, ARP mode on
+`wlP9s9`) holds two VIPs, each on the leader of its own lease (decision 0007, `runbooks/edge.md`):
+
+| Address | What | Lease |
+|---|---|---|
+| 192.168.86.10 | k3s API VIP (`k8s.nghodki.ai` on the LAN). Not in the API cert's SANs: use the name, not the IP | `kube-system/plndr-cp-lock` |
+| 192.168.86.11 | edge VIP: `edge-dns-lan` :53, `edge-caddy-lan` :80/:443 | `kube-system/plndr-svcs-lock` |
+| 100.65.137.82, 100.124.175.23 | the Sparks' Tailscale IPs (since the cutover, dgx-1's too): `edge-dns-tailnet`, `edge-caddy-tailnet` (`externalIPs`, kube-proxy DNAT) | — |
+
+Both VIPs sit below the Nest's DHCP pool (`.20`–`.250`). LoadBalancer Services set `allocateLoadBalancerNodePorts:
+false`. At check time both VIPs were on dgx-1's `wlP9s9` (`ip -br addr show wlP9s9`). Clients use these Services since the
+P3.3 cutover (2026-11-15). On dgx-1, `nat PREROUTING` jumps to `KUBE-SERVICES` before `DOCKER`, so kube-proxy's DNAT
+for 100.65.137.82 takes that address from edge-caddy and edge-dnsmasq, whose sockets stay open for the rollback.
+
+Known issue: UDP from Docker containers on the Dell to any k3s Service is dropped (bad outer VXLAN checksum on the
+Dell's `flannel.1`); TCP and host-originated UDP work, so Gatus checks the edge DNS over TCP. Fix candidate (not
+applied): `ethtool -K flannel.1 tx-checksum-ip-generic off` on the Dell.
 
 ## Docker and k3s side by side
 

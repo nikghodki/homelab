@@ -4,14 +4,15 @@ description: "For each host and key service: what keeps working, what breaks, wh
 ---
 
 This is the as-built behaviour on 2026-11-15, not the target in architecture §16 (which assumes services already in
-k3s behind kube-vip).
+k3s behind kube-vip). Web and DNS are in k3s on both Sparks since the P3.3 cutover (2026-11-15); a Spark failover
+on the tailnet path hasn't been drilled yet (`runbooks/edge.md`, cutover step 6).
 
 ## Hosts
 
 | Down | Keeps working | Breaks | You hear about it from |
 |---|---|---|---|
-| **dgx-1** | Alerts to the phone (Dell ntfy over Tailscale); Gatus checks; observe stack on dgx-2; Temporal, MLflow (job API on the LAN); Hermes on the Jetson (but no model); the robot's safety governor; k3s API on dgx-2 (dgx-2 + Jetson keep quorum) | Every `*.nghodki.ai` web route and `nghodki.ai` DNS (front door and dnsmasq); LiteLLM, Open WebUI, DGXMM, Coolify; NATS (picoclaw MQTT, governor NATS e-stop and reset, Hermes's picoclaw MCP); Fleet broker and API (the Edge Connector keeps deciding locally); Pocket ID sign-in (reached through dgx-1); Ansible, the age key, kubectl (all on dgx-1) | Gatus: web group, NATS, Fleet, dgx-1 ssh, API dgx-1, etcd dgx-1; then `K3sEtcdMemberDown` |
-| **dgx-2** | Front door and DNS; models on dgx-1; NATS; Gatus and ntfy (Dell); k3s API on dgx-1 (dgx-1 + Jetson) | Metrics, logs, traces, dashboards, vmalert alerts; Pocket ID (so no sign-in anywhere); Temporal; MLflow; Phoenix; backups | Gatus: Grafana, Phoenix, Temporal, MLflow, dgx-2 ssh, API dgx-2, etcd dgx-2; after 15 min the missing Watchdog heartbeat |
+| **dgx-1** | Alerts to the phone (Dell ntfy over Tailscale); Gatus checks; observe stack on dgx-2; Temporal, MLflow (job API on the LAN); Hermes on the Jetson (but no model); the robot's safety governor; k3s API on dgx-2 (dgx-2 + Jetson keep quorum) | model, dgxmanager and ha (the nginx-gateway relay); tailnet clients that resolved to dgx-1 until the 30 s TTL runs out (the other web routes and DNS stay up on dgx-2, unverified by a drill); LiteLLM, Open WebUI, DGXMM, Coolify; NATS (picoclaw MQTT, governor NATS e-stop and reset, Hermes's picoclaw MCP); Fleet broker and API (the Edge Connector keeps deciding locally); Ansible, the age key, kubectl (all on dgx-1) | Gatus: web group, NATS, Fleet, dgx-1 ssh, API dgx-1, etcd dgx-1; then `K3sEtcdMemberDown` |
+| **dgx-2** | Front door and DNS (dgx-1's replicas); models on dgx-1; NATS; Gatus and ntfy (Dell); k3s API on dgx-1 (dgx-1 + Jetson) | Metrics, logs, traces, dashboards, vmalert alerts; Pocket ID (so no sign-in anywhere); Temporal; MLflow; Phoenix; backups | Gatus: Grafana, Phoenix, Temporal, MLflow, dgx-2 ssh, API dgx-2, etcd dgx-2; after 15 min the missing Watchdog heartbeat |
 | **Both Sparks** (the 2026-11-15 case) | Gatus and ntfy on the Dell; the phone gets every Spark check failing; the robot keeps its local safety loop (the LiDAR is on the Pi and the Zenoh router on the Jetson); the governor loses NATS, so only the ROS e-stop works | Everything web, models, observability, k3s API (only the Jetson's etcd vote is left: no quorum) | Gatus, many checks at once |
 | **Jetson** | Cluster (the two Sparks keep quorum over the cable); models; web | Hermes (both profiles), Home Assistant, the Zenoh router (so the Pi's `/scan` stops reaching anything and the governor holds the robot stopped: `scan_stale`), LiveKit and the control center | Gatus: Home Assistant, ha.nghodki.ai, jetson ssh, Zenoh router, etcd jetson; `K3sEtcdMemberDown`; `SafetyGovernorLidarStale` |
 | **Jetson and a Spark** | Running containers and pods | The k3s API (no quorum): nothing new is scheduled until one is back | `K3sEtcdQuorumLost` (if vmalert's Spark is alive) |
@@ -26,9 +27,10 @@ k3s behind kube-vip).
 | Wi-Fi / router reboot | Every host's LAN link drops. The Sparks keep quorum over the cable; the Jetson leaves quorum until it reconnects; the Pi's `/scan` and heartbeats stop, so the governor stops the robot within 1–2 s; collectors buffer and retry for 30 min | Gatus floods when it comes back; `FleetHostSilent` if longer than 5 min |
 | Internet | Everything local keeps working. No downloads, no Renovate, no GitHub (no deploys), no ntfy.sh (no iOS instant push, no backup route) | — |
 | Tailscale control plane | Existing connections keep working; new ones may fail | — |
-| A Tailscale-only path (phone away from home) | The phone still reaches the Dell's ntfy and dgx-1's front door over Tailscale | — |
-| edge-caddy | All web routes | Gatus web group |
-| edge-dnsmasq | `nghodki.ai` names stop resolving on the tailnet and LAN; in k3s, Argo CD can't resolve `id.nghodki.ai` (login fails); containers with `extra_hosts` keep working | Gatus checks by IP keep passing (they don't use DNS), so this one is quiet (known gap) |
+| A Tailscale-only path (phone away from home) | The phone still reaches the Dell's ntfy and the front door on both Sparks over Tailscale | — |
+| edge-caddy (dgx-1) | model, dgxmanager, ha (the nginx-gateway relay) | Gatus `edge-caddy relay (dgx-1)`, web group |
+| Front door in k3s (`edge` pods, kube-vip) | Every `*.nghodki.ai` route and `nghodki.ai` DNS (both replicas down); one replica down: the other Spark serves | Gatus `web` and `edge` groups; `EdgeFrontDoorDown`, `KubeVipDown` (critical), `EdgeReplicasDown` |
+| edge-dnsmasq (dgx-1) | Nothing since the P3.3 cutover (it is only the rollback); edge-dns in k3s answers clients and pods | — |
 | Pocket ID | No new sign-ins. Gatus keeps checking. Temporal UI restarts in a loop until it's back. Use [break-glass](../security/identity.md) | Homepage monitor (no Gatus check for `id.nghodki.ai`) |
 | LiteLLM / the model engine | Hermes can't answer; Open WebUI has no models; the skill scanner's LLM judge (off anyway) | Gatus `model.nghodki.ai (LiteLLM)` |
 | NATS | picoclaw loses its MQTT input; the governor's NATS e-stop and reset can't arrive (the ROS e-stop still works); Hermes's picoclaw MCP fails | Gatus NATS (TLS), NATS MQTT |

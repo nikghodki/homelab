@@ -7,7 +7,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/libexec/docs-build
+ExecStart=/usr/local/sbin/docs-build
 # Results go to the journal through `logger -t docs-build`; the job's own output (git, pip, mkdocs) is tagged apart.
 SyslogIdentifier=docs-build-job
 TimeoutStartSec=20min

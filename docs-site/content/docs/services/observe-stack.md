@@ -11,11 +11,11 @@ description: "The observability services on dgx-2 as a deployable unit: containe
 
 | Container | Version | Published | Config in the repo |
 |---|---|---|---|
-| victoriametrics | v1.156.0 | — (8428 on the stack network) | `victoriametrics/scrape.yml` (stack self-scrapes, Gatus, Temporal, Argo CD, Kyverno) |
+| victoriametrics | v1.156.0 | — (8428 on the stack network) | `victoriametrics/scrape.yml` (stack self-scrapes, Gatus, Temporal, Argo CD, Kyverno, kube-state-metrics); also takes Tempo's remote write |
 | vmalert | v1.156.0 | — | `vmalert/rules/*.yml`, 30 s evaluation |
 | alertmanager | v0.35.0 | — | `alertmanager/alertmanager.yml.j2` |
 | loki | 3.7.10 | — | `loki/loki.yaml` (adapted from DefenseClaw 1.0.9; 30 days) |
-| tempo | 2.10.10 | — | `tempo/tempo.yaml` (adapted; 30 days) |
+| tempo | 2.10.10 | — | `tempo/tempo.yaml` (adapted; 30 days); the metrics generator remote-writes to `victoriametrics:8428` (#74; there is no Prometheus in the stack) |
 | otel-defenseclaw | collector-contrib 0.165.0 | 4317, 4318 | `otel-defenseclaw/config.yaml` (adapted) |
 | otel-fleet | collector-contrib 0.165.0 | 4319, 4320 | `otel-fleet/config.yaml` |
 | grafana | 13.3.1 | 3000 | `grafana/provisioning/`, `grafana/dashboards/`; home dashboard Fleet Home |

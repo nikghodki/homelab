@@ -1,11 +1,14 @@
 ---
 title: "dgx-1"
-description: "The first DGX Spark: interactive models, the web front door and DNS, NATS, DefenseClaw Fleet, Ansible control node, k3s server."
+description: "The first DGX Spark: interactive models, a front-door replica and the nginx-gateway relay, NATS, DefenseClaw Fleet, Ansible control node, k3s server."
 ---
 
-dgx-1 is the busiest host. It serves the interactive models and almost every web route. It is also where people and
-agents work: the repo clone, the age key, Ansible and kubectl all live here. If dgx-1 is down, most web UIs and
-`*.nghodki.ai` DNS go with it (see [Failure scenarios](../observability/failure-scenarios.md)).
+dgx-1 is the busiest host. It serves the interactive models and runs one of the two front-door replicas. It is also
+where people and agents work: the repo clone, the age key, Ansible and kubectl all live here. Since the P3.3 cutover
+(2026-11-15) the web front door and DNS run in k3s on both Sparks
+([Front door](../network/front-door.md#in-cluster-front-door-p33)), but the routes behind nginx-gateway (model,
+dgxmanager, ha), LiteLLM, NATS and Fleet still go down with dgx-1 (see
+[Failure scenarios](../observability/failure-scenarios.md)).
 
 ## Hardware and OS
 
@@ -15,7 +18,7 @@ agents work: the repo clone, the age key, Ansible and kubectl all live here. If 
 | Hardware | NVIDIA DGX Spark, GB10 (Grace Blackwell), 20 cores, 121 GiB unified memory, 3.7 TB NVMe (32% used) |
 | OS | Ubuntu 24.04.5 LTS (DGX OS), kernel 7.0.0-1025-nvidia, NVIDIA driver 580.178 (architecture §10.1) |
 | User | `nikghodki-dgx` |
-| LAN | `wlP9s9` 192.168.86.44 (Wi-Fi). Also carried two extra /32s, 192.168.86.10 and .11, at check time: kube-vip addresses from the P3.3 test (unverified, P3.3 is in progress) |
+| LAN | `wlP9s9` 192.168.86.44 (Wi-Fi). Also carries the kube-vip VIPs 192.168.86.10 (k3s API) and .11 (edge) as /32s while dgx-1 holds their leases (both at check time; they move to dgx-2 on failover; [Cluster networking](../network/cluster-network.md#addresses-outside-the-cluster-p33)) |
 | Tailscale | 100.65.137.82, `spark-83dc.tail1cb707.ts.net`, `tag:gpu`, `tag:control` |
 | Spark cable 1 | `enp1s0f0np0` 10.100.136.1/24 (k3s, etcd, flannel) |
 | Spark cable 2 | `enP2p1s0f0np0` 10.100.137.1/24 (RDMA/NCCL for pooled models) |
@@ -27,8 +30,8 @@ agents work: the repo clone, the age key, Ansible and kubectl all live here. If 
 
 | Container | Image | Published | Managed by |
 |---|---|---|---|
-| `edge-caddy` | `caddy:2.11` (tag, not a digest) | 0.0.0.0:80, :443 | hand, `~/edge-gateway` |
-| `edge-dnsmasq` | `edge-dnsmasq:local` (Alpine 3.20 + dnsmasq) | host network, :53 on 192.168.86.44 and 100.65.137.82 | hand, `~/edge-gateway` |
+| `edge-caddy` | `caddy:2.11` (tag, not a digest) | 0.0.0.0:80, :443 (reached on 192.168.86.44: the nginx-gateway relay and the rollback since the P3.3 cutover) | hand, `~/edge-gateway` |
+| `edge-dnsmasq` | `edge-dnsmasq:local` (Alpine 3.20 + dnsmasq) | host network, :53 on 192.168.86.44 and 100.65.137.82 (the latter is DNATed to the cluster since the cutover; kept for the rollback) | hand, `~/edge-gateway` |
 | `nginx-gateway` | `nginx:alpine` | none (Docker network `gateway`) | hand, `~/voice-assistant/nginx` |
 | `litellm-proxy` | `ghcr.io/berriai/litellm:v1.109.1` (digest-pinned, P0.13) | 0.0.0.0:4000 | hand, `~/litellm-setup` |
 | `litellm-postgres` | `postgres:16-alpine` | 127.0.0.1:5432 | hand |
@@ -61,8 +64,9 @@ Timers: `cisco-aibom.timer` (~04:20), `lynis-audit.timer` (Sunday ~03:30), `home
 
 ### k3s pods
 
-Argo CD controller and redis, CNPG operator, Kyverno admission and reports controllers (where the scheduler put
-them; any Spark is fine). See [k3s](../platform/k3s.md).
+Argo CD controller and redis, CNPG operator, Kyverno admission and reports controllers, kube-state-metrics (where the
+scheduler put them; any Spark is fine); one replica each of `edge/edge-caddy` and `edge/edge-dns` and a kube-vip pod
+(one per Spark). See [k3s](../platform/k3s.md).
 
 ## Files that matter
 
@@ -73,7 +77,7 @@ them; any Spark is fine). See [k3s](../platform/k3s.md).
 | `~/.venvs/ansible` | Ansible venv. Run playbooks from `~/homelab/hosts`. |
 | `~/.kube/config` | Admin kubeconfig (server `https://192.168.86.44:6443`), not in Git |
 | `~/.local/bin` | `gh` (as nikghodki), `sops`, `helm`, `argocd`, `cosign`, `safety-reset`, `safety-estop` |
-| `~/edge-gateway/conf/Caddyfile`, `~/edge-gateway/dnsmasq/dnsmasq.conf` | Front door and DNS (outside the repo) |
+| `~/edge-gateway/conf/Caddyfile`, `~/edge-gateway/dnsmasq/dnsmasq.conf` | The old front door and DNS (outside the repo): nginx-gateway relay and rollback. Routes live in `cluster/platform/edge/` since the P3.3 cutover (`runbooks/edge.md`) |
 | `~/.defenseclaw/` | DefenseClaw config, `.env` (Fleet secrets), audit DB |
 | `/opt/homelab/bus`, `/opt/homelab/fleet`, `/opt/homelab/gpu` | Deployed stacks |
 | `/etc/safety-operator/nats-operator.json` | NATS `operator` credentials for `safety-reset` (root, 0600) |
@@ -82,8 +86,8 @@ them; any Spark is fine). See [k3s](../platform/k3s.md).
 
 - Shell setup: `export PATH=$HOME/.local/bin:$PATH KUBECONFIG=$HOME/.kube/config`.
 - Health: `docker ps`, `curl -s http://127.0.0.1:4000/health/liveliness` (LiteLLM), `kubectl get nodes`.
-- Restart the front door after a config change: `docker restart edge-caddy` (a `caddy reload` hasn't always taken
-  effect).
+- Restart edge-caddy after a config change: `docker restart edge-caddy` (a `caddy reload` hasn't always taken
+  effect). The in-cluster front door: `kubectl -n edge rollout restart deploy/edge-caddy`.
 
 ## Gotchas
 

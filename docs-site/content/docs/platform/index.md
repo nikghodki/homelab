@@ -7,7 +7,7 @@ Two deployment systems run side by side:
 
 | | Docker stacks (interim) | k3s (target) |
 |---|---|---|
-| What | Almost every service today | Argo CD, Kyverno (Enforce), CNPG operator, CoreDNS zone; P3.3 edge (in progress) |
+| What | Almost every service today | Argo CD, Kyverno (Enforce), CNPG operator, CoreDNS zone; kube-vip, the `edge` front door and kube-state-metrics (P3.3, cut over 2026-11-15) |
 | Source | `hosts/stacks/<name>/compose.yaml` + templates | `cluster/` and `policies/kyverno` |
 | Applied by | Ansible (`hosts/playbooks/<name>.yml`), by a person, from dgx-1 | Argo CD, polling `main` every 2 min |
 | Secrets | SOPS → `.env` / private templates at deploy time | SOPS → KSOPS in the repo-server |

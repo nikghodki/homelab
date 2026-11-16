@@ -1,6 +1,6 @@
 ---
 title: "Jetson"
-description: "The Jetson Orin: Hermes (two profiles), Home Assistant, the Zenoh router, LiveKit and the control center; an etcd member and tainted k3s worker."
+description: "The Jetson Orin: Hermes (two profiles), Home Assistant, the Zenoh router, LiveKit and the control center (voice and vision retired, D26); an etcd member and tainted k3s worker."
 ---
 
 The Jetson is the home and robot brain. It also holds the third etcd vote, which is what keeps the k3s API writable
@@ -25,9 +25,9 @@ when one Spark is down. Its memory is tight; treat every new process here as a b
 |---|---|---|
 | `hermes-gateway` | Hermes main profile (`~/.hermes/hermes-agent`), platform `api_server` | 0.0.0.0:8642 |
 | `defenseclaw-gateway` | DefenseClaw 1.0.9 for nikjetson | 127.0.0.1:18970 |
-| `livekit-server` | LiveKit (`--dev --key-file ~/.config/livekit/keys.yaml`) for the voice companion | 127.0.0.1:7880 |
+| `livekit-server` | LiveKit (`--dev --key-file ~/.config/livekit/keys.yaml`), left running after voice was retired (D26) | 127.0.0.1:7880 |
 | `control-center` | RoboClaw Control Center (uvicorn, py310 venv) | 0.0.0.0:8200 |
-| `vision-service` | RoboClaw vision service (face recognition, presence, `:8090`) | running at check time, port not seen listening. Design D19 says vision is not deployed: this is a [discrepancy](../decisions/discrepancies.md) |
+| `vision-service` | RoboClaw vision service (face recognition, presence) | **disabled and inactive** since D26 (2026-11-15) |
 | `homelab-aibom.timer` | DefenseClaw AIBOM, 03:15 | — |
 | `mcp-drift.timer` | MCP drift check, ~03:40 (also for hermes-nikhil) | — |
 

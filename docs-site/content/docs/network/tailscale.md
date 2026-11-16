@@ -37,14 +37,17 @@ The policy names two hosts by IP: `dgx-1` = 100.65.137.82 and `dgx-2` = 100.124.
 | # | From | To | Ports | Why |
 |---|---|---|---|---|
 | 1 | `group:admins` | everything | all | You: SSH, kubectl, every UI |
-| 2 | `group:family`, `group:guests` | dgx-1 | tcp 80, 443, tcp/udp 53 | The web front door (Home Assistant, Open WebUI, …) and DNS for `nghodki.ai` |
+| 2 | `group:family`, `group:guests` | dgx-1, dgx-2 | tcp 80, 443, tcp/udp 53 | The web front door (Home Assistant, Open WebUI, …) and DNS for `nghodki.ai`, on both Sparks for the in-cluster front door (#78) |
 | 3 | `tag:gpu`, `tag:control` | `tag:gpu`, `tag:control` | all | Sparks and the Jetson talk freely (k3s, etcd, NATS, model sync) |
-| 4 | every fleet tag | dgx-1 | tcp/udp 53, tcp 80, 443 | DNS and the front door for fleet devices |
+| 4 | every fleet tag | dgx-1, dgx-2 | tcp/udp 53, tcp 80, 443 | DNS and the front door for fleet devices (dgx-2 added in #78) |
 | 5 | every fleet tag | dgx-2 | tcp 4317–4320, 8000 | OTLP telemetry and backups |
 | 6 | `tag:agent`, `tag:home` | dgx-1 | tcp 4000, 4222, 8883 | LiteLLM, NATS, MQTT |
 | 7 | `tag:robot` | dgx-1 | tcp 8883, 4222, 8884 | MQTT/NATS and the DefenseClaw Fleet broker (D24) |
 | 8 | dgx-1 | every fleet tag | tcp 22 | Ansible and admin automation from dgx-1 |
 | 9 | dgx-1 | `tag:agent` | tcp 443 | dgx-1 checks the Dell's ntfy over Tailscale HTTPS (PR #56) |
+
+Grants 2 and 4 gained dgx-2 in #78, step 1 of the P3.3 cutover (`runbooks/edge.md`): the front door and DNS answer on
+both Sparks' Tailscale IPs. That the console policy matches the file is unverified (the cutover needed it).
 
 SSH rule: `group:admins` may use Tailscale SSH to their own devices (`autogroup:self`) as non-root or root, with
 `check` (re-authentication).
@@ -59,8 +62,8 @@ Tailscale runs these on every save and refuses a policy that breaks one:
 | Source | Must accept | Must deny |
 |---|---|---|
 | the admin | dgx-2:22, dgx-1:4000 | — |
-| the family account | dgx-1:443, dgx-1:80 | dgx-1:22, dgx-2:3000, dgx-1:5432 |
-| the guest account | dgx-1:443 | dgx-1:22, dgx-1:8883, dgx-2:22 |
+| the family account | dgx-1:443, dgx-1:80, dgx-2:443, dgx-2:53 | dgx-1:22, dgx-2:22, dgx-2:3000, dgx-1:5432 |
+| the guest account | dgx-1:443, dgx-2:443 | dgx-1:22, dgx-1:8883, dgx-2:22, dgx-2:6006 |
 | `tag:robot` | dgx-1:8883, dgx-1:8884, dgx-2:4319 | dgx-1:4000, dgx-1:22, dgx-1:8971, dgx-2:3000 |
 | `tag:agent` | dgx-1:4000, dgx-1:8883 | dgx-2:22 |
 | dgx-1 | `tag:agent`:443, `tag:robot`:22 | `tag:robot`:443 |
@@ -69,10 +72,13 @@ Checked live from the Pi (P1.4): bus and Fleet broker open; LiteLLM, SSH and the
 
 ## Split DNS
 
-The tailnet's DNS settings send `nghodki.ai` to dgx-1's Tailscale address, 100.65.137.82, where edge-dnsmasq answers.
-This is set in the Tailscale admin console, not in the repo (unverified beyond the dnsmasq comment
-"Tailscale split DNS → 100.65.137.82"). Every `*.nghodki.ai` record has both a LAN and a Tailscale answer, so tailnet
-clients get 100.65.137.82.
+The tailnet's DNS settings (admin console, not in the repo) send `nghodki.ai`, and a separate `model.nghodki.ai`
+entry, to **both Sparks' Tailscale IPs**, 100.65.137.82 and 100.124.175.23 (`tailscale dns status` on dgx-1, after the
+P3.3 cutover on 2026-11-15). On both, the in-cluster edge-dns answers ([DNS](dns.md)); each replica answers with its
+own Spark's Tailscale IP, so a client never gets a dead Spark's address for longer than the 30 s TTL.
+
+Before the cutover only 100.65.137.82 was listed, where edge-dnsmasq answered with both of dgx-1's addresses.
+Rollback for a broken dgx-2 or cluster: remove 100.124.175.23 from the nameservers (`runbooks/edge.md`).
 
 ## Tailscale HTTPS
 

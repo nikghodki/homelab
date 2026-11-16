@@ -11,7 +11,7 @@ others every 4 h.
 
 | Alert | Group | Means | For | Severity |
 |---|---|---|---|---|
-| `FleetHostSilent` | fleet-hosts | a host's last `system_memory_usage_bytes` sample is over 5 min old (its collector or the host is down) | 2m | critical |
+| `FleetHostSilent` | fleet-hosts | `max by (host_name) (lag(system_memory_usage_bytes{state="used"}[1d])) > 300`: a host's last sample is over 5 min old (its collector or the host is down). `lag()` over a day since #74 (the old instant selector dropped a silent host before 300 s, so it never fired); resolves after a day of silence, when the Gatus ssh checks still cover it | 2m | critical |
 | `FleetDiskWarning` | fleet-hosts | a filesystem is over 80% used | 10m | warning |
 | `FleetDiskCritical` | fleet-hosts | over 90% used | 5m | critical |
 | `FleetMemoryLow` | fleet-hosts | free + cached memory under 2 GB | 10m | warning |
@@ -63,10 +63,23 @@ These depend on Gatus (Dell) **and** VictoriaMetrics/vmalert (dgx-2).
 | `ArgoCDAppNotHealthy` | an app isn't Healthy | 15m | warning |
 | `ArgoCDMetricsDown` | the application controller's metrics don't answer (nothing syncs; app alerts are blind) | 10m | warning |
 | `KyvernoAdmissionDown` | no admission replica answers: new pods in enforced namespaces are **refused** (kube-system, kyverno, argocd keep working) | 5m | critical |
-| `KyvernoAdmissionDegraded` | fewer than 2 admission replicas available (needs kube-state-metrics from P3.3; no series, no alert) | 15m | warning |
+| `KyvernoAdmissionDegraded` | fewer than 2 admission replicas available (from kube-state-metrics, P3.3) | 15m | warning |
 | `KyvernoRejectionsSpike` | more than 5 refusals in 15 min (seen by one replica) | — | warning |
 | `KyvernoWebhookErrors` | the admission webhook answers 5xx (those requests are refused) | 10m | warning |
 | `KyvernoAdmissionSlow` | admission p99 above 8 s (webhook timeouts are 10 s, 20 s for `verify-images`) | 15m | warning |
+
+## Front door (`front-door.yml`)
+
+The front door in k3s (P3.3), from kube-state-metrics at 10.43.0.120. `KubeVipDown` and `EdgeFrontDoorDown` are
+critical since the cutover (#79). Gatus group `edge` checks the VIPs themselves.
+
+| Alert | Means | For | Severity |
+|---|---|---|---|
+| `KubeVipNotReady` | the kube-vip DaemonSet isn't ready on every Spark (the VIPs can't fail over) | 5m | warning |
+| `KubeVipDown` | no kube-vip ready: 192.168.86.10/.11 may be on no node | 1m | critical |
+| `EdgeReplicasDown` | an `edge` Deployment (edge-caddy, edge-dns) has fewer than 2 ready replicas | 10m | warning |
+| `EdgeFrontDoorDown` | an `edge` Deployment has no ready replica: `*.nghodki.ai` DNS or HTTPS is down | 2m | critical |
+| `KubeStateMetricsDown` | kube-state-metrics doesn't answer (the rules above are blind) | 10m | warning |
 
 ## Robot (`robot.yml`)
 

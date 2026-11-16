@@ -13,7 +13,7 @@ description: The passkey OIDC provider on dgx-2 (service view). Clients, the syn
 | Secrets | `secrets/console.enc.yaml` → `pocketid_encryption_key`, `pocketid_static_api_key` (files, 0600, uid 1000), `oidc_<client>_secret` |
 | Data | volume `console_pocket-id-data` |
 | Health | `https://id.nghodki.ai/healthz` (Homepage). No Gatus check (known gap) |
-| Depends on | dgx-1's front door and DNS (clients reach it through 192.168.86.44) |
+| Depends on | the front door and DNS in k3s (clients reach it through a Spark's Tailscale IP or the VIP 192.168.86.11); containers with `extra_hosts` go to edge-caddy on 192.168.86.44 |
 | k3s target | `console` |
 
 Everything else: [Pocket ID and sign-in](../security/identity.md).

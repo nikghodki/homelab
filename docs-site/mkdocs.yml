@@ -169,6 +169,7 @@ nav:
           - services/fleet-broker.md
           - services/pocket-id.md
           - services/homepage.md
+          - services/docs-site.md
           - services/observe-stack.md
           - services/phoenix.md
           - services/gatus-ntfy.md

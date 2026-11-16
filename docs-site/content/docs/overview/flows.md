@@ -10,12 +10,12 @@ These are the paths that matter most when something breaks. Each one names the h
 ```mermaid
 sequenceDiagram
   participant B as Browser (LAN or tailnet)
-  participant DNS as edge-dnsmasq (dgx-1 port 53)
-  participant C as edge-caddy (dgx-1 port 443)
+  participant DNS as edge-dns (k3s, port 53 on a Spark)
+  participant C as edge-caddy (k3s, port 443 on a Spark)
   participant G as Grafana (dgx-2 port 3000)
   participant P as Pocket ID (dgx-2 port 1411)
   B->>DNS: grafana.nghodki.ai A?
-  DNS-->>B: 192.168.86.44 (LAN) or 100.65.137.82 (tailnet)
+  DNS-->>B: the answering Spark's Tailscale IP (tailnet) or 192.168.86.11 (LAN VIP)
   B->>C: TLS, wildcard cert from the homelab web CA
   C->>G: reverse_proxy 192.168.86.36:3000
   G-->>B: redirect to id.nghodki.ai (OIDC, PKCE)
@@ -24,9 +24,11 @@ sequenceDiagram
   P-->>B: passkey prompt, then back to Grafana
 ```
 
-- DNS: tailnet clients use Tailscale split DNS, which points `nghodki.ai` at dgx-1's Tailscale address. LAN clients
-  must use dgx-1 as their resolver for `nghodki.ai` (unverified how each LAN device is configured; the Nest router's
-  DHCP doesn't hand it out by itself).
+- DNS: tailnet clients use Tailscale split DNS, which points `nghodki.ai` at both Sparks' Tailscale addresses; each
+  edge-dns replica answers with its own Spark (P3.3, [DNS](../network/dns.md)). LAN clients would have to use the
+  VIP 192.168.86.11 as their resolver for `nghodki.ai` (unverified how each LAN device is configured; the Nest
+  router's DHCP doesn't hand it out by itself).
+- model, dgxmanager and ha go one hop further: the Caddy pod → edge-caddy on 192.168.86.44:80 → nginx-gateway.
 - TLS: the device must trust the homelab web CA, installed once from `http://ca.nghodki.ai`. See [PKI](../security/pki.md).
 - Every service behind the front door has the same shape. The full table is in [Front door](../network/front-door.md).
 

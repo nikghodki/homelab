@@ -7,7 +7,7 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 
 | Area | Limit | Mitigation / plan |
 |---|---|---|
-| Availability | dgx-1 is a single point of failure for web, DNS, NATS, Fleet, LiteLLM and the operator's tools (F6) | P3.3 (kube-vip, DNS + Caddy in k3s), P3.7 |
+| Availability | dgx-1 is a single point of failure for web, DNS, NATS, Fleet, LiteLLM and the operator's tools (F6) | P3.3 moved web and DNS into k3s (cut over 2026-11-15); the nginx-gateway routes (model, dgxmanager, ha), NATS, Fleet and LiteLLM still need dgx-1 (P3.7) |
 | Availability | A GPU job can take a Spark and all its services down (unified memory) | caps on our jobs, earlyoom/gpu-oom-guard (not in Git), P2.7 reserves |
 | Availability | Alerting needs the Dell or dgx-2; both down = silence | accepted |
 | Network | Everything is on Wi-Fi; a router reboot hits every host | P0.11 for the Sparks |
@@ -20,7 +20,7 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 | Security | SSH password authentication still enabled | after every admin path has a key |
 | Recovery | Backups conflict with decision 0002; no off-site copy; no restore test | user decision |
 | Recovery | Pocket ID, Temporal, MLflow, Grafana data live in Docker volumes that the backups don't cover | add dumps |
-| Ops | The front door, LiteLLM, Open WebUI, Coolify, HA, Hermes are hand-run: not in Ansible or Argo CD; Renovate can't see them | P3.3, P3.7, P4.5 |
+| Ops | edge-caddy/nginx-gateway (the relay), LiteLLM, Open WebUI, Coolify, HA, Hermes are hand-run: not in Ansible or Argo CD; Renovate can't see them | P3.7, P4.5 |
 | Ops | No incident runbooks yet (P3.9) | [Incident playbooks](../operations/incidents.md) |
 | Ops | The Dell is weak (2 cores, 8 GB, HDD) | decision 0009 |
 | Robot | Not driving autonomously: mock sink; on-blocks test pending | P5.2 final test |

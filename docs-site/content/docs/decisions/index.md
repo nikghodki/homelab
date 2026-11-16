@@ -1,11 +1,11 @@
 ---
 title: Decisions
-description: One line for every design decision (D1–D25) and every decision record (0001–0009), with its status.
+description: One line for every design decision (D1–D26) and every decision record (0001–0009), with its status.
 ---
 
 Design decisions are in `docs/design.md` §6; later decisions are files in `decisions/` (template `0000-template.md`).
 
-## Design decisions D1–D25
+## Design decisions D1–D26
 
 | # | Topic | Choice | Status |
 |---|---|---|---|
@@ -27,15 +27,16 @@ Design decisions are in `docs/design.md` §6; later decisions are files in `deci
 | D16 | Secrets | SOPS + age, key offline | built; key also in the cluster since 0006 |
 | D17 | Pi storage | 1 TB card, fresh OS, restored | done (P0.2) |
 | D18 | MacBook Air | left alone | in force |
-| D19 | Vision | not deployed | in force, but `vision-service` runs on the Jetson ([discrepancy](discrepancies.md)) |
+| D19 | Vision | not deployed | in force; `vision-service` on the Jetson disabled under D26 |
 | D20 | Tool and agent gateway | LiteLLM as MCP and A2A gateway, per-key tool permissions, `pre_mcp_call` guardrail | decided; not built (P4.2, P4.10) |
 | D21 | Simulation | Isaac Lab 3.0, Isaac Sim when needed, MuJoCo, MLflow, ONNX → TensorRT/ONNX Runtime | Isaac Lab, MuJoCo, MLflow running |
 | D22 | Sign-in | Pocket ID (passkeys), oauth2-proxy for apps without OIDC | built for 7 apps |
 | D23 | Single pane of glass | standalone Fleet Console at `ops.nghodki.ai`; Homepage until then; one Alertmanager; Fleet Home | Homepage and Fleet Home built; console UI design open |
 | D24 | DefenseClaw Fleet transport | dedicated Mosquitto broker on 8884, Caddy API proxy on 8971 | built |
 | D25 | HTTPS for `*.nghodki.ai` | name-constrained homelab web CA + wildcard; install from `ca.nghodki.ai` | built |
+| D26 | Voice and vision | retired for now: `voice-agent.nghodki.ai` off the front door and DNS (both doors), `vision-service` disabled; LiveKit and the control center stay on the Jetson; bring back only with a new decision | done (#75, #76) |
 
-The design doc's table header says "D1–D23" in places (README, `decisions/README.md`); D24 and D25 were added later.
+The design doc's table header says "D1–D23" in places (README, `decisions/README.md`); D24–D26 were added later.
 
 ## Decision records
 
@@ -47,8 +48,8 @@ The design doc's table header says "D1–D23" in places (README, `decisions/READ
 | 0004 | OpenBot licensing | 2026-11-15 | **proposed, pending (user)** | OpenBot needs closed CopilotKit Intelligence; recommend cua + NVIDIA OpenShell |
 | 0005 | k3s over Wi-Fi | 2026-11-15 | decided | Build now; Spark-to-Spark on the cable, Jetson and Dell over Wi-Fi with /32 routes; risks and wired migration listed |
 | 0006 | GitOps platform | 2026-11-15 | decided; Kyverno parts replaced by 0008 | Argo CD 3.6 (Helm, self-managed, app of apps), KSOPS, the age key in the cluster, Kyverno in Audit in its own namespace, CNPG operator, single replicas, fixed ClusterIPs, ~2.5 GiB budget |
-| 0007 | — | — | — | no such file (numbering skips it) |
-| 0008 | Image signing and Enforce | 2026-11-15 | decided | cosign keyless from `build-sign.yml` on `main`; mlflow and ros-zenoh for amd64+arm64, packages public; MuJoCo stays local; Kyverno Enforce everything with failurePolicy Fail except kube-system, kyverno, argocd (and edge until P3.3); `verify-images` with `mutateDigest`; new `require-image-digest`; 2 admission replicas |
+| 0007 | The front door in k3s | 2026-11-15 | decided; built (#72), cut over (#78, #79) | kube-vip ARP on the Sparks' Wi-Fi (VIPs 192.168.86.10 API, .11 edge); CoreDNS + Caddy in `edge`, 2 replicas each, routes and names in Git; the tailnet via the Sparks' Tailscale IPs (each CoreDNS replica answers with its own Spark), not a subnet route; kube-state-metrics; `edge` stays out of Kyverno's webhooks; edge-caddy stays as the nginx-gateway relay and rollback; CrowdSec waits |
+| 0008 | Image signing and Enforce | 2026-11-15 | decided | cosign keyless from `build-sign.yml` on `main`; mlflow and ros-zenoh for amd64+arm64, packages public; MuJoCo stays local; Kyverno Enforce everything with failurePolicy Fail except kube-system, kyverno, argocd (and `edge`, kept out by 0007); `verify-images` with `mutateDigest`; new `require-image-digest`; 2 admission replicas |
 | 0009 | No services box | 2026-11-15 | decided | Services stay on the Sparks (alerting on the Dell); hard reserves and job caps instead; revisit after another crash |
 
 ## Open questions (design §11)
@@ -57,5 +58,5 @@ The design doc's table header says "D1–D23" in places (README, `decisions/READ
 2. Models and alias names (D4, P2.0).
 3. GitHub Pro (answered: no, decision 0001).
 4. Off-site backup target (on hold).
-5. When to bring vision back, and where.
+5. When to bring vision back, and where (D26: voice too, with a new decision).
 6. CopilotKit Intelligence licensing (decision 0004).

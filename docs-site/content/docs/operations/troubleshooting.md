@@ -6,10 +6,12 @@ description: Real problems hit while building the fleet, with their symptoms, ca
 ## DNS and names
 
 **kubectl or Argo CD says "no such host" for a `*.nghodki.ai` name that `dig` resolves.**
-edge-dnsmasq answers AAAA with NXDOMAIN; Go's resolver treats that as "no such host". Use the IP in kubeconfigs
-(`https://192.168.86.44:6443`); in k3s the `cluster-dns` CoreDNS zone answers AAAA with empty NOERROR. ([DNS](../network/dns.md))
+edge-dnsmasq answers AAAA with NXDOMAIN; Go's resolver treats that as "no such host". Since the P3.3 cutover clients
+and pods get edge-dns in k3s, which answers AAAA with empty NOERROR; only queries that still reach dnsmasq
+(192.168.86.44:53) hit this. ([DNS](../network/dns.md))
 
-**`pi.nghodki.ai` goes nowhere.** It still points at 192.168.86.34; the Pi is .39. Use the IP or fix the dnsmasq line.
+**`pi.nghodki.ai` goes nowhere.** It still points at 192.168.86.34; the Pi is .39. Use the IP or fix the line in
+`cluster/platform/edge/names.txt`.
 
 ## Docker and Ansible
 

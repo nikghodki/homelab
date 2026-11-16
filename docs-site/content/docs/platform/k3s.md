@@ -63,7 +63,9 @@ The join token is in `/etc/rancher/k3s/token` (0600), from `secrets/k3s.enc.yaml
   `export KUBECONFIG=$HOME/.kube/config` yourself: k3s's bundled `kubectl` otherwise defaults to the root-only
   `/etc/rancher/k3s/k3s.yaml` and fails with a permission error.
 - `k8s.nghodki.ai` resolves to both Sparks and is in the cert, but Go clients can't use it (the AAAA NXDOMAIN quirk,
-  [DNS](../network/dns.md)).
+  [DNS](../network/dns.md)). Since the P3.3 cutover edge-dns answers it (LAN: the API VIP 192.168.86.10; tailnet: the
+  answering Spark's Tailscale IP, both in the cert by name) with AAAA NOERROR, so kubeconfigs can move to
+  `https://k8s.nghodki.ai:6443` (not done on dgx-1). The VIP itself isn't in the cert's SANs: use the name, not the IP.
 - Anonymous API access is off: `curl -k https://192.168.86.44:6443/readyz` answers 401 when the API server is up.
 
 ## Health
@@ -119,9 +121,16 @@ off (decision 0002); SeaweedFS is P3.8. Restore: stop k3s on every server; on on
 `sudo k3s server --cluster-reset --cluster-reset-restore-path=<snapshot>`; start it; wipe
 `/var/lib/rancher/k3s/server/db` on the others and start them.
 
+## Front door add-ons (P3.3)
+
+kube-vip v1.3.1 (DaemonSet on the Sparks in `kube-system`: API VIP 192.168.86.10, edge VIP 192.168.86.11), the
+`edge` namespace (CoreDNS + Caddy, 2 replicas each, one per Spark) and kube-state-metrics (`kube-system`, 10.43.0.120).
+Argo CD apps `kube-vip`, `edge`, `kube-state-metrics` (PR #72, decision 0007). Clients use them since the cutover
+(#79, 2026-11-15; [Front door](../network/front-door.md#in-cluster-front-door-p33), `runbooks/edge.md`). Together ~105 MiB working set (requests 240 Mi, limits 960 Mi).
+
 ## Not installed (on purpose)
 
-kube-vip and in-cluster DNS/Caddy (P3.3, in progress); Tetragon (P3.6); the NVIDIA device plugin (the cluster doesn't touch the GPUs; k3s registers an `nvidia`
+Tetragon (P3.6); the NVIDIA device plugin (the cluster doesn't touch the GPUs; k3s registers an `nvidia`
 runtime but nothing requests GPUs); workloads (P3.7); off-host snapshots (P3.8); metrics-server, an Ingress
 controller, ServiceLB.
 

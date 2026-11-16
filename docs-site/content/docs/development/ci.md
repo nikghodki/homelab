@@ -24,8 +24,10 @@ the repo settings (which is why build-sign uses plain buildx/cosign binaries, PR
 
 ## `nightly-scan.yml` (09:17 UTC daily, manual)
 
-gitleaks over full history; OSV-Scanner for new advisories; Trivy (CRITICAL) on every `image:tag@sha256` in `.github/`
-and `cluster/`; a CycloneDX SBOM of the repo. Artifact `nightly-reports` (30 days).
+gitleaks over full history; OSV-Scanner for new advisories; Trivy (CRITICAL) on every `image:tag@sha256` in `.github/`,
+`cluster/` and `hosts/` (compose stacks, role defaults; since #74), with one Trivy DB download for all images; the job
+summary lists scan errors separately from CRITICAL findings (both fail the job); a CycloneDX SBOM of the repo. Not
+`robots/` (the Isaac Lab base is too big for a hosted runner). Artifact `nightly-reports` (30 days).
 
 ## `build-sign.yml` (pushes to `main` touching image files, manual on `main`)
 

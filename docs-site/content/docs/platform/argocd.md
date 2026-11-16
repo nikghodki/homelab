@@ -29,6 +29,7 @@ cluster/
 │   ├── projects.yaml    AppProjects `platform` and `apps`
 │   ├── argocd.yaml      Argo CD manages itself
 │   ├── kyverno.yaml, kyverno-policies.yaml, cnpg-operator.yaml, cluster-dns.yaml
+│   ├── kube-vip.yaml, edge.yaml, kube-state-metrics.yaml   the front door (P3.3)
 │   └── smoke.yaml       SOPS canary
 ├── platform/<component>/  Helm values + extras/ (kustomize: Services, NetworkPolicies, SOPS secrets)
 └── apps/<name>/         workloads (empty until P3.7); _smoke is the canary
@@ -44,6 +45,9 @@ cluster/
 | `kyverno-policies` | platform | `policies/kyverno` | kyverno | sync-wave 1; retries until the CRDs exist; Enforce |
 | `cnpg-operator` | platform | chart cloudnative-pg 0.29.1 | cnpg-system | |
 | `cluster-dns` | platform | `cluster/platform/cluster-dns` | kube-system | CoreDNS zone for `nghodki.ai` |
+| `kube-vip` | platform | `cluster/platform/kube-vip` | kube-system | API VIP 192.168.86.10, edge VIP 192.168.86.11 (P3.3) |
+| `edge` | platform | `cluster/platform/edge` | edge | the `*.nghodki.ai` front door: CoreDNS + Caddy, KSOPS Secret `web-tls` (P3.3) |
+| `kube-state-metrics` | platform | `cluster/platform/kube-state-metrics` | kube-system | readiness metrics for vmalert |
 | `smoke` | apps | `cluster/apps/_smoke` | smoke | SOPS canary; the only app with the resources finalizer |
 
 All have automated sync with prune and selfHeal, and retries (5×, 30 s backoff, up to 5 min). Deleting the `argocd`,
@@ -54,8 +58,7 @@ Projects: `platform` (cluster-wide, repos: this repo, argo-helm, kyverno, cloudn
 cluster resources); `apps` (this repo only; namespaced resources plus Namespace; not `argocd`, `kube-system`, `kyverno`,
 `cnpg-system`; no ResourceQuota or LimitRange).
 
-At check time three more apps were live, `edge`, `kube-vip` and `kube-state-metrics`, tracking branch
-`p3.3-edge-in-cluster` (P3.3 testing, not on `main`).
+All ten apps were Synced and Healthy at check time, the P3.3 ones from `main` (PR #72).
 
 ## Add an app
 

@@ -20,7 +20,7 @@ site. The internal CA has no constraint, so it stays on fleet hosts.
 
 | Cert | Served by | Where it lives on the host |
 |---|---|---|
-| `web.crt` / key | edge-caddy on dgx-1 (`:443`, `voice-agent.nghodki.ai`) | `~/edge-gateway/conf/certs/` |
+| `web.crt` / key | edge-caddy on dgx-1 (`:443`); the in-cluster Caddy (P3.3) | `~/edge-gateway/conf/certs/`; KSOPS Secret `edge/web-tls` (`cluster/platform/edge/web-tls.enc.yaml`) |
 | `nats.crt` | NATS on dgx-1 (4222, 8883) | `/opt/homelab/bus/nats/certs/` |
 | `fleet.crt` | Mosquitto 8884 and fleet-caddy 8971 on dgx-1 | `/opt/homelab/fleet/{mosquitto,caddy}/certs/` |
 | `backup.crt` | restic rest-server on dgx-2 | `/opt/homelab/backup/rest-server/` |
@@ -60,7 +60,10 @@ Renew the web wildcard:
    digitalSignature; AKI/SKI.
 2. Commit `hosts/files/pki/web.crt` (and `pki_web_key` in SOPS if the key changed).
 3. Copy cert and key to `~/edge-gateway/conf/certs/` (key 0600) and `docker restart edge-caddy`.
-4. Devices need nothing: they trust the CA, not the certificate.
+4. Refresh `cluster/platform/edge/web-tls.enc.yaml` from SOPS (`runbooks/edge.md`, "Renew the wildcard cert"), merge,
+   then `kubectl -n edge rollout restart deploy/edge-caddy` (the Secret's name doesn't change, so the pods don't roll
+   on their own).
+5. Devices need nothing: they trust the CA, not the certificate.
 
 The exact `openssl` commands aren't in the repo (runbooks/web-https.md describes the extensions only).
 
@@ -68,4 +71,3 @@ The exact `openssl` commands aren't in the repo (runbooks/web-https.md describes
 
 - HTTP → HTTPS redirect and HSTS once devices trust the CA.
 - If `nghodki.ai` is ever registered: Let's Encrypt via DNS-01, retire the web CA.
-- In k3s (P3.3), the wildcard comes from a SOPS Secret in `edge`, mounted by the Caddy pods. Renewal stays manual.

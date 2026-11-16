@@ -23,16 +23,20 @@ has `NVRM: ... Out of memory [NV_ERR_NO_MEMORY]` and then system OOM-killer line
 6. Prevention: memory caps on our jobs (AIBOM 6 GiB, sims 16 GiB, JAX 15%), DGXMM reserves (P2.7, pending), `earlyoom`
    and `gpu-oom-guard` (live but not in the repo).
 
-## The front door is down (dgx-1's edge-caddy or edge-dnsmasq)
+## The front door is down (`edge` in k3s)
 
-Symptoms: every `*.nghodki.ai` page fails; Gatus web group red; the phone still gets ntfy over Tailscale.
+Symptoms: every `*.nghodki.ai` page fails; Gatus web and edge groups red; `EdgeFrontDoorDown` or `KubeVipDown`; the
+phone still gets ntfy over Tailscale.
 
-1. `docker ps -a --filter name=edge-` on dgx-1. `docker logs --tail 50 edge-caddy`.
-2. A bad Caddyfile: `docker exec edge-caddy caddy validate --config /etc/caddy/Caddyfile`; restore the last
-   `Caddyfile.bak-*`; `docker restart edge-caddy`.
-3. DNS: `dig @192.168.86.44 grafana.nghodki.ai` and `@100.65.137.82`. dnsmasq uses `bind-dynamic`; if Tailscale came up
-   late it should still bind, otherwise `docker restart edge-dnsmasq`.
-4. Meanwhile, reach services directly by LAN IP and port ([Ports](../network/ports.md)), e.g. Grafana at
+1. `kubectl -n edge get pods -o wide`, `kubectl -n edge logs deploy/edge-caddy --tail 50` (and `edge-dns`);
+   `kubectl -n kube-system get pods -l app.kubernetes.io/name=kube-vip -o wide`.
+2. A bad change: revert the PR; Argo CD rolls back within ~3 minutes.
+3. DNS: `dig @100.65.137.82 grafana.nghodki.ai`, `@100.124.175.23` and `@192.168.86.11`.
+4. Cluster or Argo CD broken: the rollback in `runbooks/edge.md` ("Cutover" → "Rollback") hands dgx-1's Tailscale IP
+   back to edge-caddy and edge-dnsmasq, which still listen.
+5. Only model, dgxmanager or ha fail: edge-caddy on dgx-1 (the relay): `docker ps -a --filter name=edge-`,
+   `docker logs --tail 50 edge-caddy`.
+6. Meanwhile, reach services directly by LAN IP and port ([Ports](../network/ports.md)), e.g. Grafana at
    `http://192.168.86.36:3000`.
 
 ## Pocket ID is down
@@ -40,7 +44,7 @@ Symptoms: every `*.nghodki.ai` page fails; Gatus web group red; the phone still 
 Symptoms: sign-in pages fail; Temporal UI restarts in a loop; Argo CD login loops.
 
 1. `ssh nikghodki-dgx-2@192.168.86.36 'sudo docker ps --filter name=pocket-id; sudo docker logs --tail 50 console-pocket-id-1'`.
-2. Remember it's reached through dgx-1's front door: check `curl -sk https://192.168.86.44/healthz -H 'Host: id.nghodki.ai'`.
+2. Check it through the front door: `curl -sk https://192.168.86.11/healthz -H 'Host: id.nghodki.ai'`.
 3. Use break-glass while it's down ([Pocket ID: break-glass](../security/identity.md)).
 4. `ansible-playbook playbooks/console.yml` redeploys it (data is in the volume; not backed up).
 

@@ -1,4 +1,0 @@
-{
-  "title": "Operations",
-  "pages": ["index", "deploy", "how-to-add", "secrets-rotation", "upgrades", "backups", "incidents", "incident-gpu-oom", "troubleshooting"]
-}

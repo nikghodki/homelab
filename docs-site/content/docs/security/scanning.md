@@ -27,10 +27,12 @@ installed from hash-locked files. Full job list: [CI](../development/ci.md).
 ## Nightly (`nightly-scan.yml`, 09:17 UTC)
 
 gitleaks over full history, OSV-Scanner for new advisories, Trivy (CRITICAL) on **every** `image@sha256` reference in
-`.github/` and `cluster/`, and a CycloneDX SBOM of the repo. Reports are an artifact for 30 days.
+`.github/`, `cluster/` and `hosts/` (the compose stacks and role defaults, added in #74), and a CycloneDX SBOM of the
+repo. A scan error (pull, registry, DB) is reported separately from CRITICAL findings; both fail the run. Reports are
+an artifact for 30 days.
 
-Not scanned nightly: images referenced only in `hosts/stacks/*/compose.yaml` (the grep covers `.github` and `cluster`
-only), and the hand-run containers on dgx-1.
+Not scanned nightly: images under `robots/` (the Isaac Lab base is too big for a hosted runner), images pinned by tag
+only, and the hand-run containers on dgx-1.
 
 ## MCP tool pinning
 

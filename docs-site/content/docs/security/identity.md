@@ -36,8 +36,9 @@ Client secrets are `oidc_<client>_secret` in `secrets/console.enc.yaml`. The Arg
 
 ## The sync script
 
-`pocketid_sync.py` makes Pocket ID match the YAML (groups, users, clients). It is idempotent, writes new client secrets
-straight into SOPS (never printed), and uses the static API key from SOPS. Tests in
+`pocketid_sync.py` makes Pocket ID match the YAML (groups, users, clients, including callback and logout callback
+URLs). It is idempotent, writes new client secrets straight into SOPS (on `sops set --value-stdin`, so they never show
+in `ps` or a log), and uses the static API key from SOPS. Tests in
 `hosts/files/pocket-id/tests/` run in CI.
 
 ```bash
@@ -84,7 +85,7 @@ Two oauth2-proxy instances don't share sessions: each app is its own sign-in (on
 |---|---|
 | Home Assistant | Its phone app can't sign in through a forward-auth proxy. HA keeps its own login (trusted proxies set, P0.16) |
 | LiteLLM UI, DGXMM UI, Open WebUI | Wait for the DGXMM session. Open WebUI has family accounts to migrate |
-| ntfy, Coolify, voice agent | Own logins or phone apps; a proxy would break the phone apps and API clients |
+| ntfy, Coolify | Own logins or phone apps; a proxy would break the phone apps and API clients. (The voice agent, also listed here before, was retired in D26) |
 | Fleet API | Machine token auth, not people |
 
 ## Break-glass (Pocket ID down)

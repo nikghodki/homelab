@@ -7,12 +7,12 @@ description: What lives where in nikghodki/homelab and who applies each folder.
 
 | Folder | Holds | Applied by |
 |---|---|---|
-| `docs/` | `design.md` (D1–D25), `architecture.md`, `project-plan.md` (status in §2a), `model-supply-chain.md`, `upstream-issues/` (8 drafts, not posted) | people |
-| `docs-site/` | this documentation (MDX) | people |
-| `decisions/` | decision records 0001–0009 (0007 doesn't exist), `0000-template.md` | people |
-| `runbooks/` | how-tos: age key, AIBOM, alerting, Argo CD, build-sign, Edge Connector, hardening, Hermes profiles, k3s, Kyverno, MCP admission, MLflow, robot ROS, robot safety, sign-in, simulation, Temporal, web HTTPS | people |
+| `docs/` | `design.md` (D1–D26), `architecture.md`, `project-plan.md` (status in §2a), `model-supply-chain.md`, `reviews/` (code review 2026-11-15, tool review 2026-11), `upstream-issues/` (8 drafts, not posted) | people |
+| `docs-site/` | this documentation (MkDocs Material), served privately at https://docs.nghodki.ai (behind Pocket ID, admins) from the Dell, rebuilt by a systemd timer every 15 min; runbook `runbooks/docs-site.md` | people, the Dell's timer |
+| `decisions/` | decision records 0001–0009, `0000-template.md` | people |
+| `runbooks/` | how-tos: age key, AIBOM, alerting, Argo CD, build-sign, docs site, edge (the front door in k3s), Edge Connector, hardening, Hermes profiles, k3s, Kyverno, MCP admission, MLflow, robot ROS, robot safety, sign-in, simulation, Temporal, web HTTPS | people |
 | `hosts/` | Ansible: `inventory.yml`, `group_vars/`, `host_vars/`, `playbooks/` (22), `roles/` (26), `stacks/` (11 Compose stacks), `files/` (fleet-metrics, LiteLLM guardrail, Pocket ID sync, PKI certs, web CA page) | Ansible from dgx-1 |
-| `cluster/` | `bootstrap/apps/` (app of apps), `platform/` (argocd, kyverno, cnpg-operator, cluster-dns), `apps/` (`_smoke`) | Argo CD |
+| `cluster/` | `bootstrap/apps/` (app of apps), `platform/` (argocd, kyverno, cnpg-operator, cluster-dns, kube-vip, edge, kube-state-metrics), `apps/` (`_smoke`) | Argo CD |
 | `policies/` | `defenseclaw/` (fleet policy, MCP server registry `mcp-servers.yaml`, edge policy, tests), `kyverno/` (5 ValidatingPolicies + 1 ImageValidatingPolicy), `tailscale/policy.hujson` | Ansible, Argo CD, the Tailscale console |
 | `identity/` | `pocket-id.yaml` (groups, users, OIDC clients) | `pocketid_sync.py` |
 | `secrets/` | SOPS-encrypted files only (12 + README) | decrypted on dgx-1 / by KSOPS |

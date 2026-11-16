@@ -12,13 +12,14 @@ description: "Every service in the fleet in one table: URL, host, port, how it i
 | Fleet broker and API | `fleet.nghodki.ai` | dgx-1 | 8884, 8971 | `fleet.yml` | Gatus `Fleet MQTT`, `Fleet API` | [Fleet broker](fleet-broker.md) |
 | Pocket ID | `id.nghodki.ai` | dgx-2 | 1411 | `console.yml` | Homepage monitor `/healthz` | [Pocket ID](pocket-id.md) |
 | Homepage | `ops.nghodki.ai` | Dell | 4180 | `ops.yml` | Gatus `ops.nghodki.ai` (302) | [Homepage](homepage.md) |
+| Docs site | `docs.nghodki.ai` | Dell | 4181 | `ops.yml` (role `docs_site` + stack `ops`) | Gatus `docs.nghodki.ai` (302), `docs build` | [Docs site](docs-site.md) |
 | Grafana, VictoriaMetrics, Loki, Tempo, vmalert, Alertmanager | `grafana.nghodki.ai` | dgx-2 | 3000 (+ internal) | `observe.yml` | Gatus `Grafana`, heartbeat | [Observe stack](observe-stack.md) |
 | Phoenix | `phoenix.nghodki.ai` | dgx-2 | 6006 | `observe.yml` | Gatus `Phoenix` | [Phoenix](phoenix.md) |
 | Gatus, ntfy | `status.nghodki.ai`, `ntfy.nghodki.ai` | Dell | 8081, 8085 | `alerting.yml` | dead man `AlertingHostDown` | [Gatus and ntfy](gatus-ntfy.md) |
 | Temporal | `temporal.nghodki.ai` | dgx-2 | 7233, 8233, 9233 | `jobs.yml` | Gatus `Temporal frontend`, `temporal.nghodki.ai` | [Temporal](temporal.md) |
 | MLflow | `mlflow.nghodki.ai` | dgx-2 | 4181, 5000 | `ml.yml` | Gatus `mlflow.nghodki.ai`, `MLflow job API` | [MLflow](mlflow.md) |
 | Home Assistant | `ha.nghodki.ai` | Jetson | 8123 | hand (container) | Gatus `Home Assistant (direct)`, `ha.nghodki.ai` | [Home Assistant](home-assistant.md) |
-| LiveKit, control center, voice page | `voice-agent.nghodki.ai`, `controlcenter.nghodki.ai` | Jetson, dgx-1 | 7880, 8200 | hand | none | [Voice](voice.md) |
+| LiveKit, control center (voice retired, D26) | `controlcenter.nghodki.ai` | Jetson | 127.0.0.1:7880, 8200 | hand | none | [Voice](voice.md) |
 | Coolify | `coolify.nghodki.ai` | dgx-1 | 8000, 6001, 6002 | Coolify | none | [Coolify](coolify.md) |
 | restic rest-server | `backup.nghodki.ai:8000` | dgx-2 | 8000 | `backups.yml` | none | [Backup server](backup-server.md) |
 | Zenoh router | — | Jetson | 7447 | `robot.yml` | Gatus `Zenoh router` | [ROS 2 and Zenoh](../robotics/ros-zenoh.md) |

@@ -36,7 +36,8 @@ tools/<server>/
 CI (`ai-scanners` job):
 
 1. `mcp-tool-hashes.py check tools` fails if a tool was added, removed or changed without `tools.sha256` being updated
-   in the same PR. A changed description or schema (tool poisoning, a "rug pull") must show up in a reviewed diff.
+   in the same PR, and (since #74) if a pinned server's `tools.json` is missing. A changed description or schema (tool
+   poisoning, a "rug pull") must show up in a reviewed diff.
 2. `scan-mcp-tools.py tools` runs mcp-scanner (YARA, offline) on every `tools.json` and fails on HIGH/CRITICAL. A
    reviewed false positive goes under `accepted_findings` in `server.yaml`, pinned to the tool's sha256, so it lapses as
    soon as the tool changes.

@@ -17,7 +17,7 @@ Homepage is the interim "single pane of glass" launcher until the Fleet Console 
 
 Tiles (with a `siteMonitor` each, mostly through the front door): Observe (Grafana, Status, Phoenix, ntfy), Models (Open
 WebUI, LiteLLM, DGXMM), ML (MLflow; its monitor uses the job API's open `/health` on 192.168.86.36:5000 because the
-browser URL answers 302 when signed out), Home (Home Assistant), Security & Identity (Pocket ID, CA install page), Fleet
+browser URL answers 302 when signed out), Home (Home Assistant), Docs (this site; its monitor asks the `docs` container's `/healthz` on the stack network), Security & Identity (Pocket ID, CA install page), Fleet
 (Fleet API health, link only). The container resolves the `*.nghodki.ai` names with `extra_hosts` → 192.168.86.44 and trusts the web CA through
 `NODE_EXTRA_CA_CERTS`.
 

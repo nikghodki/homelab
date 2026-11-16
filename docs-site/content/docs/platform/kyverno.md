@@ -14,7 +14,7 @@ Enforce); runbooks/kyverno.md.
 | Admission controller | **2 replicas, one per Spark** (topology spread `DoNotSchedule` on hostname, PDB `minAvailable: 1`), so one Spark's OOM doesn't stop admission |
 | Reports controller | 1 replica (hourly background scans, 1 worker, PolicyReports) |
 | Off | background (generate/mutate-existing) and cleanup controllers, policy exceptions, the pre-delete webhook cleanup hook, `forceFailurePolicyIgnore` |
-| Webhook scope | the webhooks' `namespaceSelector` leaves out **`kube-system`, `kyverno`, `argocd`** and, until P3.3 merges, **`edge`**. Those are never blocked, even with Kyverno dead; background scans still report on them |
+| Webhook scope | the webhooks' `namespaceSelector` leaves out **`kube-system`, `kyverno`, `argocd`** and **`edge`** (the front door, decision 0007). Those are never blocked, even with Kyverno dead; background scans still report on them |
 | Policies | `policies/kyverno/*.yaml`, app `kyverno-policies`: five `ValidatingPolicy` (CEL) and one `ImageValidatingPolicy` |
 | Metrics | admission 10.43.0.110:8000 (ClientIP affinity: the scrape sees one replica at a time), reports 10.43.0.111:8000 |
 | Alerts | `KyvernoAdmissionDown` (critical), `KyvernoAdmissionDegraded`, `KyvernoRejectionsSpike`, `KyvernoWebhookErrors`, `KyvernoAdmissionSlow` ([Alert rules](../observability/alert-rules.md)) |
@@ -43,6 +43,10 @@ so a bad Deployment is refused before it makes pods.
 `registry.k8s.io/kube-state-metrics/kube-state-metrics`. Names without a registry count as `docker.io/...`.
 
 Everything else (`default`, `smoke`, `cnpg-system`, and every new namespace from `cluster/apps`) is enforced.
+
+**Why `edge` stays out** (decision 0007): enforced, edge-caddy and edge-dns could only be recreated while a Kyverno
+replica is up, and the front door must survive a dead Kyverno, like Argo CD. Its pods pass every policy (`kyverno apply`
+on the live pods, 2026-11-15: 33 pass, 0 fail); check new `edge` manifests with `kyverno apply` before merging.
 
 ## Our own images and GHCR visibility
 

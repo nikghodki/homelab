@@ -42,7 +42,7 @@ from fleet work.
 
 ## Working in parallel (people and agents)
 
-Several sessions work at once (for example P3.3 edge-in-cluster and P3.5 Enforce while these docs were written). Each
+Several sessions work at once (for example P3.3 edge-in-cluster and P3.5 Enforce while these docs were first written). Each
 uses its **own git worktree** and branch:
 
 ```bash
@@ -63,8 +63,8 @@ Rules for parallel work:
 2. Rebase before pushing and before merging; resolve conflicts on your side.
 3. Before deploying a **shared** stack (`observe` above all), rebase and deploy from an up-to-date tree:
    `remove_orphans` would otherwise remove another session's services.
-4. Argo CD apps can be tested from a branch (`targetRevision: <branch>`), as P3.3 does, but `main` must end up as the
-   source.
+4. Argo CD apps can be tested from a branch (`targetRevision: <branch>`), as P3.3 did before #72 merged, but `main`
+   must end up as the source.
 5. Don't leave worktrees behind (`git worktree list`).
 
 ## What a PR should contain
