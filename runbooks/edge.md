@@ -66,7 +66,8 @@ Only the in-cluster door (the old one on dgx-1 is retired):
 1. A new name: add `<name>  edge` (or a host target, see the file's header) to `cluster/platform/edge/names.txt`, then
    `.github/scripts/edge-zone.py generate` (writes the zones; CI runs `check`).
 2. The route: add a `@<name> host <name>.nghodki.ai` / `handle` block to `cluster/platform/edge/caddy/Caddyfile`
-   (inside `(nghodki_routes)`, so it's on :80 and :443). Backends are LAN IPs and ports, a Service name, or, for a
+   (inside `(nghodki_routes)`, so it's on :80 and :443). Every `reverse_proxy` to a backend gets
+   `import strip_session_cookie` (the sign-in cookies are for edge-auth only; `signed_in` does it for you). Backends are LAN IPs and ports, a Service name, or, for a
    service on dgx-1, a port it publishes on the LAN, its Tailscale IP or `10.100.136.1` (the direct cable; there's no
    relay onto dgx-1's Docker networks any more).
 3. PR, gated merge; Argo CD rolls the pods (the ConfigMaps are hashed) within ~3 minutes.

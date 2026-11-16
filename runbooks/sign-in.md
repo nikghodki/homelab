@@ -54,6 +54,10 @@ people in for every app that has no login of its own ([decision 0011](../decisio
 Pocket ID client (`edge-auth`), one callback (`https://auth.nghodki.ai/oauth2/callback`), one cookie (`_edge_auth`,
 `.nghodki.ai`, Secure, 7 days, refreshed hourly): **one sign-in covers every such app**, on the LAN and the tailnet.
 
+No backend receives the sign-in cookies: every `reverse_proxy` in the Caddyfile imports `strip_session_cookie`
+(drops `_edge_auth*` from the `Cookie` header), signed-in route or not; only edge-auth's own routes on `auth.nghodki.ai`
+and the forward-auth calls keep them (2026-11-16, decision 0011).
+
 **Put an app behind Pocket ID:**
 
 1. Make the app reachable from the Sparks **only through a gate that checks the front door's token**, and publish
