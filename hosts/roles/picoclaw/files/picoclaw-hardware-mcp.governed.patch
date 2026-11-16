@@ -1,0 +1,233 @@
+--- a/picoclaw-hardware-mcp.js
++++ b/picoclaw-hardware-mcp.js
+@@ -15,12 +15,21 @@
+  *   ROBOCLAW_API   base URL of the car          (default http://roboclaw.local)
+  *   VISION_PI_API  base URL of this Pi's vision-ai (default http://localhost:8100)
+  *   ROS2_NAV_DIR   path to the ros2-nav workspace (default ~/workspace/roboclaw/ros2-nav)
++ *   PICOCLAW_MOTION_SOCKET  the motion bridge's socket (default /run/robot-motion/motion.sock)
++ *
++ * Motion goes through the robot's safety governor (homelab runbooks/robot-safety.md): drive, turn
++ * and the task tools built on them ask the local motion bridge (governor-motion.js) to publish
++ * /cmd_vel_in + /safety/heartbeat; the governor applies the e-stop, speed caps, LiDAR obstacle stop
++ * and watchdogs. Nothing here calls the car's /drive, /turn or /velocity any more. stop latches the
++ * governor's e-stop and also calls the car's /stop. Tools that would drive the car around the
++ * governor (Nav2 via cmd_vel_bridge, vision-ai follow-me) are disabled.
+  */
+ 
+ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+ import { z } from "zod";
+ import { makeHttpClient, tool } from "./mcp-common.js";
++import { makeMotionClient, hardStop, MOTION_SOCKET } from "./governor-motion.js";
+ import mqtt from "mqtt";
+ import { readFileSync } from "fs";
+ import { homedir } from "os";
+@@ -65,6 +74,11 @@
+ 
+ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+ 
++// Motion: only through the safety governor (motion bridge socket), never the car's HTTP motion API.
++const motion = makeMotionClient();
++const GOVERNOR_ONLY = "disabled: it would drive the car around the robot's safety governor " +
++  "(homelab runbooks/robot-safety.md). It comes back once its motion goes through /cmd_vel_in.";
++
+ // ---------------------------------------------------------------------------
+ // MQTT client for PicoClaw agent messaging
+ // ---------------------------------------------------------------------------
+@@ -236,20 +250,40 @@
+   return best;
+ }
+ 
+-const turnWait = (deg) => deg * MS_PER_DEGREE + 350;
+-const driveWait = (ms) => ms + 350;
++// A refused request or a hard stop (e-stop, governor fault, no governor) ends the whole task.
++// An obstacle doesn't: the caller scans and turns away, as before.
++function governed(r) {
++  if (r.error) throw new Error(`motion bridge refused the move: ${r.error}`);
++  if (hardStop(r)) {
++    throw new Error(`safety governor blocked the move: ${r.blocked_reason} ` +
++      `(${JSON.stringify(r.governor_states || r.governor || {})})`);
++  }
++  return r;
++}
+ 
++// The drive/turn tools report any block (an obstacle too) as a tool error, with the governor's answer.
++function mustMove(r) {
++  governed(r);
++  if (r.blocked) throw new Error(`safety governor blocked the move: ${r.blocked_reason}: ${JSON.stringify(r)}`);
++  return r;
++}
++
++// The bridge answers when the move has ended, so there's no extra wait (the car's API returned at once).
+ async function doTurn(direction, degrees) {
+   if (degrees < 8) return { skipped: true, degrees };
+-  const r = await post("/turn", { direction, degrees });
+-  await sleep(turnWait(degrees));
+-  return r;
++  return governed(await motion.turn({ direction, degrees }));
+ }
+ 
+-async function driveChunk(speed, ms) {
+-  const r = await post("/drive", { direction: "forward", speed, duration_ms: ms, avoid: true });
+-  await sleep(driveWait(ms));
+-  return r;
++async function driveChunk(speed, ms, direction = "forward") {
++  return governed(await motion.drive({ direction, speed, duration_ms: ms }));
++}
++
++// End of a task: zero command through the governor (no e-stop latch), then the car's own /stop too.
++async function endTask() {
++  const out = {};
++  try { out.governor = await motion.halt(); } catch (e) { out.governor = { error: e.message }; }
++  try { out.car = await post("/stop"); } catch (e) { out.car = { error: e.message }; }
++  return out;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -270,9 +304,18 @@
+   tool(async () => get("/sensors")));
+ 
+ server.registerTool("stop",
+-  { title: "Stop", description: "Emergency stop — halt all motion immediately.",
++  { title: "Stop",
++    description: "Emergency stop — halt all motion immediately. Latches the safety governor's e-stop (a person must run safety-reset before the robot can move again) and also sends the car its own stop.",
+     inputSchema: {} },
+-  tool(async () => post("/stop")));
++  tool(async () => {
++    const out = {};
++    try { out.governor = await motion.stop(); } catch (e) { out.governor = { error: e.message }; }
++    try { out.car = await post("/stop"); } catch (e) { out.car = { error: e.message }; }
++    if (out.governor.error && out.car.error) {
++      throw new Error(`stop failed on both paths: governor: ${out.governor.error}; car: ${out.car.error}`);
++    }
++    return out;
++  }));
+ 
+ server.registerTool("horn",
+   { title: "Horn", description: "Sound the buzzer (e.g. when a person is in the way).",
+@@ -281,23 +324,23 @@
+   tool(async ({ duration_ms }) => post("/horn", duration_ms ? { duration_ms } : {})));
+ 
+ server.registerTool("drive",
+-  { title: "Drive", description: "Move in a direction. Forward motion gets firmware obstacle avoidance + edge protection when avoid=true (default).",
++  { title: "Drive", description: "Move in a direction for a while, through the robot's safety governor (speed caps, LiDAR obstacle stop, e-stop). Returns what the governor allowed; a blocked move is an error. Strafing is not supported.",
+     inputSchema: {
+       direction: z.enum(["forward","backward","strafe_left","strafe_right","spin_left","spin_right"]),
+       speed: z.number().int().min(0).max(255).optional().describe("0-255 (default 180)."),
+       duration_ms: z.number().int().min(0).max(10000).optional()
+-        .describe("Move this long then stop; omit for open-ended (deadman stops it)."),
+-      avoid: z.boolean().optional().describe("Obstacle/edge avoidance for forward motion (default true)."),
++        .describe("Move this long then stop (default 1000)."),
++      avoid: z.boolean().optional().describe("Ignored: the safety governor's LiDAR obstacle stop is always on."),
+     } },
+-  tool(async (a) => post("/drive", a)));
++  tool(async ({ direction, speed, duration_ms }) => mustMove(await motion.drive({ direction, speed, duration_ms }))));
+ 
+ server.registerTool("turn",
+-  { title: "Turn", description: "Rotate in place by degrees (open-loop, approximate).",
++  { title: "Turn", description: "Rotate in place by degrees (open-loop, approximate), through the robot's safety governor.",
+     inputSchema: {
+       direction: z.enum(["spin_left","spin_right"]),
+       degrees: z.number().int().min(1).max(360),
+     } },
+-  tool(async (a) => post("/turn", a)));
++  tool(async ({ direction, degrees }) => mustMove(await motion.turn({ direction, degrees }))));
+ 
+ server.registerTool("scan_surroundings",
+   { title: "Scan", description: "Sweep the ultrasonic pan head and return distance at each angle.",
+@@ -378,8 +421,8 @@
+       openStreak = openness(best.distance_cm) >= OPEN_CM ? openStreak + 1 : 0;
+       if (openStreak >= 2) { log.push({ note: "entered an open area" }); break; }
+     }
+-    await post("/stop");
+-    return { done: true, steps: log.length, log };
++    const stopped = await endTask();
++    return { done: true, steps: log.length, log, stopped };
+   }));
+ 
+ server.registerTool("explore",
+@@ -402,8 +445,8 @@
+         if (turn.degrees >= 12) { await doTurn(turn.direction, turn.degrees); log.push({ turn }); }
+       }
+     }
+-    await post("/stop");
+-    return { done: true, log };
++    const stopped = await endTask();
++    return { done: true, log, stopped };
+   }));
+ 
+ server.registerTool("follow_nearest",
+@@ -436,58 +479,38 @@
+       if (turn.degrees >= 12) await doTurn(turn.direction, turn.degrees);
+       let action = "hold";
+       if (target.distance_cm > target_cm + TOL) { await driveChunk(speed, 500); action = "advance"; }
+-      else if (target.distance_cm < target_cm - TOL) { await post("/drive", { direction: "backward", speed, duration_ms: 400 }); await sleep(driveWait(400)); action = "back off"; }
++      else if (target.distance_cm < target_cm - TOL) { await driveChunk(speed, 400, "backward"); action = "back off"; }
+       log.push({ target, turn, action });
+     }
+-    await post("/stop");
+-    return { done: true, target_cm, log };
++    const stopped = await endTask();
++    return { done: true, target_cm, log, stopped };
+   }));
+ 
+ // ---- ROS2 nav: goal dispatch -----------------------------------------------
+ 
+ server.registerTool("navigate_to",
+   { title: "Navigate to a pose",
+-    description: "Drive to a map-frame (x, y, yaw) goal via Nav2's NavigateToPose action. Requires the navigation stack (ros2-nav/launch/navigation.launch.py) already running with a previously-saved map -- this tool does not start it.",
++    description: "DISABLED until Nav2 publishes /cmd_vel_in through the safety governor. Drive to a map-frame (x, y, yaw) goal via Nav2's NavigateToPose action. Requires the navigation stack (ros2-nav/launch/navigation.launch.py) already running with a previously-saved map -- this tool does not start it.",
+     inputSchema: {
+       x: z.number().describe("Target x position, meters, map frame."),
+       y: z.number().describe("Target y position, meters, map frame."),
+       yaw_deg: z.number().min(-180).max(180).optional().describe("Target heading, degrees (default 0)."),
+       timeout_ms: z.number().int().min(5000).max(300000).optional().describe(`Max time to wait for the goal to finish (default ${NAV_GOAL_TIMEOUT_MS}).`),
+     } },
+-  tool(async ({ x, y, yaw_deg = 0, timeout_ms = NAV_GOAL_TIMEOUT_MS }) => {
+-    const yawRad = (yaw_deg * Math.PI) / 180;
+-    const qz = Math.sin(yawRad / 2);
+-    const qw = Math.cos(yawRad / 2);
+-    const goalYaml = `{pose: {header: {frame_id: 'map'}, pose: {position: {x: ${x}, y: ${y}, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: ${qz}, w: ${qw}}}}}`;
+-    const { code, timedOut, stdout, stderr } = await runRos2Shell(
+-      `ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose "${goalYaml}"`,
+-      timeout_ms
+-    );
+-    if (timedOut) {
+-      throw new Error(
+-        `navigate_to timed out after ${timeout_ms}ms without completing -- goal may still be running server-side. ` +
+-        `stdout tail: ${stdout.slice(-500)}`
+-      );
+-    }
+-    if (code !== 0) throw new Error(`ros2 action send_goal exited ${code}: ${(stderr || stdout).slice(-1000)}`);
+-    return { done: true, x, y, yaw_deg, output: stdout.slice(-2000) };
+-  }));
++  tool(async () => { throw new Error(`navigate_to ${GOVERNOR_ONLY}`); }));
+ 
+ server.registerTool("explore_frontier",
+   { title: "Autonomously explore",
+-    description: "Launch explore_lite for a bounded time to autonomously map unexplored space, then stop it. Requires the navigation/mapping stack already running.",
++    description: "DISABLED until Nav2 publishes /cmd_vel_in through the safety governor. Launch explore_lite for a bounded time to autonomously map unexplored space, then stop it. Requires the navigation/mapping stack already running.",
+     inputSchema: { max_seconds: z.number().int().min(10).max(300).optional().describe("How long to explore before stopping (default 60).") } },
+-  tool(async ({ max_seconds = 60 }) => {
+-    const { timedOut, stdout, stderr } = await runRos2Shell(`ros2 launch explore_lite explore.launch.py use_sim_time:=false`, max_seconds * 1000);
+-    return { done: true, max_seconds, stopped_by_timeout: timedOut, output: stdout.slice(-2000), stderr_tail: stderr.slice(-500) };
+-  }));
++  tool(async () => { throw new Error(`explore_frontier ${GOVERNOR_ONLY}`); }));
+ 
+ // ---- Pi's own vision-ai: follow/enroll/battery (same-host now) ------------
+ 
+ server.registerTool("follow_start",
+-  { title: "Start following", description: "Begin following the enrolled person using the Pi's camera. Fails if no face is enrolled yet.",
++  { title: "Start following", description: "DISABLED: vision-ai's follow-me drives the car itself, around the safety governor. Begin following the enrolled person using the Pi's camera.",
+     inputSchema: {} },
+-  tool(async () => piPost("/follow/start")));
++  tool(async () => { throw new Error(`follow_start ${GOVERNOR_ONLY}`); }));
+ 
+ server.registerTool("follow_stop",
+   { title: "Stop following", description: "Stop the active follow-me session and halt the robot.",
+@@ -602,4 +625,4 @@
+ 
+ const transport = new StdioServerTransport();
+ await server.connect(transport);
+-console.error(`picoclaw-hardware MCP server ready (car: ${CAR_API}, vision-ai: ${PI_API})`);
++console.error(`picoclaw-hardware MCP server ready (car: ${CAR_API}, motion via governor: ${MOTION_SOCKET}, vision-ai: ${PI_API})`);

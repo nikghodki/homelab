@@ -6,7 +6,8 @@ robots/
   tasks/      # training tasks: reward, termination, domain randomization
   policies/   # trained policy manifests (MLflow version, checksum, limits)
   maps/       # SLAM maps
-  safety/     # safety governor: limits.yaml (speed caps, watchdogs) and the node (governor/); runbooks/robot-safety.md
+  safety/     # safety governor: limits.yaml (speed caps, watchdogs), the node (governor/) and the motion bridge
+              # for picoclaw's MCP motion tools (motion_bridge/); runbooks/robot-safety.md
   sim/        # simulator images (Isaac Lab, MuJoCo) and measure.sh; run via hosts/stacks/sim
 ```
 

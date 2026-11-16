@@ -1,0 +1,15 @@
+#!/bin/sh
+# Managed by homelab Ansible (role safety_governor). Motion-path integration test, mock sink only, in ROS
+# domain 73 with a throw-away governor and bridge: picoclaw's real MCP server (as {{ safety_governor_mcp_user }})
+# -> test bridge -> test governor -> mock sink; a fake car on 127.0.0.1 records every HTTP request.
+# runbooks/robot-safety.md.
+set -a
+. "{{ safety_governor_zenoh_env }}"
+set +a
+export ROS_DOMAIN_ID=73
+export MOTION_IT_MCP_USER="{{ safety_governor_mcp_user }}"
+export MOTION_IT_MCP_NODE="{{ safety_governor_mcp_node }}"
+export MOTION_IT_MCP_SERVER="{{ safety_governor_mcp_server }}"
+export PYTHONPATH="{{ safety_governor_code_dir }}"
+exec "{{ safety_governor_micromamba }}" run -p "{{ safety_governor_env }}" \
+  python "{{ safety_governor_code_dir }}/integration/motion_integration.py"

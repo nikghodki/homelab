@@ -1,0 +1,44 @@
+# Managed by homelab Ansible (role safety_governor). runbooks/robot-safety.md
+# picoclaw's MCP motion tools -> this socket -> /cmd_vel_in + /safety/heartbeat -> the safety governor.
+# Runs as the governor's user (the RoboStack env lives in its home); primary group robot-motion, so the
+# socket in /run/robot-motion is reachable by that group (picoclaw) and nobody else.
+[Unit]
+Description=Robot motion bridge (MCP motion tools -> /cmd_vel_in + heartbeat -> safety governor)
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ safety_governor_user }}
+Group={{ safety_governor_motion_group }}
+EnvironmentFile={{ safety_governor_zenoh_env }}
+Environment=PYTHONPATH={{ safety_governor_code_dir }}
+Environment=PYTHONUNBUFFERED=1
+Environment=ROS_LOG_DIR=/tmp/ros-log
+ExecStart={{ safety_governor_micromamba }} run -p {{ safety_governor_env }} \
+  python -m motion_bridge.node --config {{ safety_governor_config_dir }}/motion-bridge.json
+RuntimeDirectory={{ safety_governor_motion_socket | dirname | basename }}
+RuntimeDirectoryMode=0750
+UMask=0007
+SyslogIdentifier=robot-motion-bridge
+KillSignal=SIGINT
+TimeoutStopSec=10
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+# micromamba run keeps a lock file here
+ReadWritePaths={{ safety_governor_home }}/.cache/mamba
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

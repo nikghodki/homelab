@@ -8,7 +8,10 @@ without any agent or LLM, an **e-stop** (latched), **speed caps**, an **obstacle
 **As deployed, the governor drives a mock sink: it never sends anything to the motors.** A real sink is
 enabled only for the on-blocks test below.
 
-## How the robot is driven today (2026-11-15)
+picoclaw (the robot's agent) runs as its own unprivileged user `picoclaw`, and its motion tools go through
+the governor (via the motion bridge); see [picoclaw](#picoclaw-own-user-motion-through-the-governor).
+
+## How the robot is driven (updated 2026-11-15, motion path governed)
 
 The car is an ESP32 with its own HTTP API (`firmware/roboclaw_firmware.ino` in the roboclaw project, not on
 these hosts). Endpoints used: `POST /drive {direction, speed 0-255, duration_ms, avoid}`, `POST /turn
@@ -18,7 +21,7 @@ for 500 ms, and does its own ultrasonic and IR-edge avoidance on forward `/drive
 
 | Path | Who | How it reaches the motors | Through the governor? |
 |---|---|---|---|
-| 1 | picoclaw (`picoclaw-gateway`) | MCP server `picoclaw-hardware` (stdio, Pi `~/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js`): tools `drive`, `turn`, `stop`, `explore`, `go_to_room`, `follow_nearest`, `map_room` → HTTP to `ROBOCLAW_API` (`http://roboclaw.local`) `/drive`, `/turn` | **No** |
+| 1 | picoclaw (system unit `picoclaw`, user `picoclaw`) | MCP server `picoclaw-hardware` (stdio, Pi `/var/lib/picoclaw/roboclaw/mcp-server/picoclaw-hardware-mcp.js`): tools `drive`, `turn`, `explore`, `go_to_room`, `follow_nearest`, `map_room` → motion bridge socket `/run/robot-motion/motion.sock` → `/cmd_vel_in` + `/safety/heartbeat`. `stop` latches the governor's e-stop and calls the car's `/stop`. `status`, `get_sensors`, `horn`, `scan_surroundings` still call the car's HTTP API (no motion). `navigate_to`, `explore_frontier` (Nav2) and `follow_start` (vision-ai follow-me) are disabled: they would drive around the governor | **Yes** (since 2026-11-15) |
 | 2 | Nav2 (later, P5.3) | `/cmd_vel` → `cmd_vel_bridge` (Pi `~/workspace/roboclaw/ros2-nav`, Humble env `ros2_nav`, **not running**) → `POST /velocity` | **No** (it listens on `/cmd_vel`) |
 | 3 | Jetson control-center backend | `POST /stop` only | n/a (stop only) |
 | 4 | the governor | sink `http_velocity` (`POST /velocity`) or `ros_cmd_vel` (`/cmd_vel`) | it *is* the governor |
@@ -26,19 +29,23 @@ for 500 ms, and does its own ultrasonic and IR-edge avoidance on forward `/drive
 `roboclaw.local` does not resolve on the LAN (no mDNS alias), so paths 1 and 2 can't reach the car at
 the moment either. Nothing on the Pi drives the motors directly (no serial or GPIO motor driver).
 
-**Gap that must be closed before the robot drives on its own** (not done here; picoclaw and its MCP
-server were left untouched):
-1. Point the MCP server's motion tools at the governor: publish `geometry_msgs/Twist` on `/cmd_vel_in`
-   (plus a heartbeat) instead of calling `/drive` and `/turn`. Keep `stop` calling `/stop` directly, as a
-   second stop path.
+**Gaps that must be closed before the robot drives on its own:**
+1. ~~Point the MCP server's motion tools at the governor~~ Done 2026-11-15 (motion bridge, below).
 2. Give the car's firmware one caller: only the governor's address (or a shared token) may call
-   `/drive`, `/turn` and `/velocity`. Until then anything on the LAN can bypass the governor.
+   `/drive`, `/turn` and `/velocity`. Until then anything on the LAN can bypass the governor, including
+   picoclaw's own `exec`/`web_fetch` tools (e.g. `curl http://<car>/drive`): the MCP server no longer
+   calls them, but the agent's network access isn't filtered.
 3. When Nav2 arrives, it publishes `/cmd_vel_in`, not `/cmd_vel`; don't run `cmd_vel_bridge` next to the
-   governor's `http_velocity` sink.
+   governor's `http_velocity` sink. Then re-enable `navigate_to`/`explore_frontier` in the MCP patch.
+4. The Jetson has its own copy of the same MCP server (`tools/picoclaw_only`, for Hermes), still with the
+   direct `/drive`/`/turn` calls. Hermes' `tools.include` only exposes `send_to_picoclaw_agent` and
+   `check_picoclaw_agent_connection`, but that is a client-side filter.
 
 ## Architecture
 
 ```
+ picoclaw MCP drive/turn/... ─> /run/robot-motion/motion.sock ─> robot-motion-bridge ─> /cmd_vel_in + /safety/heartbeat
+
  /cmd_vel_in (Twist) ─┐                                    ┌─> sink: mock (default) | http_velocity → car /velocity
  /scan (LaserScan) ───┤   safety_governor (rclpy node)     │         | ros_cmd_vel → /cmd_vel
  /safety/estop Bool ──┤   core.Governor (pure Python):     ├─> /safety/status (std_msgs/String, JSON, 2 Hz)
@@ -80,12 +87,12 @@ server were left untouched):
     `safety_governor_ros_reset_enabled`), because any node on the Zenoh network could publish it. The
     governor still listens and logs each attempt (`INTERVENTION kind=reset_refused ... reset from ros refused`).
     The pure core enforces it too: `Governor(config, reset_sources={"nats"})` refuses any other source.
-  - Limit: picoclaw runs as the Pi's login user, which has passwordless sudo, so it could read the root-only
-    operator file or stop the governor. Fully human-only needs picoclaw under its own unprivileged user (follow-up).
+  - picoclaw runs as its own user `picoclaw` (no sudo, login home closed), so it can't read the root-only
+    operator file or the governor's files, or stop the governor (checked by the role on every run; below).
 - **Fail safe:** zero is sent to the sink at 10 Hz in every non-moving state; on exit the node sends zero
   once more. If the node is down, nothing calls the car, and the firmware's 500 ms deadman stops it. The
   watchdogs don't latch: they clear when inputs come back.
-- **Heartbeat:** the commanding side (Nav2 bridge, teleop, the MCP server once it's rewired) must send
+- **Heartbeat:** the commanding side (Nav2 bridge, teleop, the motion bridge while a move runs) must send
   `std_msgs/Empty` on `/safety/heartbeat` or anything on `robot.pi.cmd.heartbeat`, at least every 2 s
   (5 Hz is a good rate). No heartbeat, no motion.
 - **Transport:** ROS goes over Zenoh in client mode through the Jetson's router (runbooks/robot-ros.md),
@@ -105,6 +112,10 @@ server were left untouched):
 | Reset CLI | `~/.local/bin/safety-reset` (as operator; also on dgx-1) |
 | NATS credentials (operator, from SOPS `nats_operator_password`) | `/etc/safety-operator/nats-operator.json` (root, 0600; dir 0700), Pi and dgx-1 |
 | Integration test | `~/.local/lib/safety-governor/run-integration-test` |
+| Motion bridge: unit | `/etc/systemd/system/robot-motion-bridge.service` (system unit, as the login user, group `robot-motion`) |
+| Motion bridge: code, config | `~/.local/lib/safety-governor/motion_bridge/`, `~/.config/safety-governor/motion-bridge.json` (code: `robots/safety/motion_bridge/`) |
+| Motion bridge: socket | `/run/robot-motion/motion.sock` (dir 0750, socket 0660, group `robot-motion` = picoclaw) |
+| Motion integration test | `~/.local/lib/safety-governor/run-motion-integration-test` |
 | nats-py | `nats-py 2.14.0` (conda-forge) in env `ros2_kilted`, pinned by the role |
 
 Role variables (`hosts/roles/safety_governor/defaults/main.yml`): `safety_governor_sink` (`mock`),
@@ -119,6 +130,74 @@ source ~/.venvs/ansible/bin/activate
 ansible-playbook playbooks/robot.yml --limit pi --check --diff
 ansible-playbook playbooks/robot.yml --limit pi
 ```
+
+## picoclaw (own user), motion through the governor
+
+Playbook `hosts/playbooks/robot.yml` (play "PicoClaw (own user)", role `picoclaw`), after the governor play.
+
+**The user.** System user `picoclaw` (uid 995 on the Pi), shell `nologin`, home `/var/lib/picoclaw`, groups
+`picoclaw` and `robot-motion` only: no `sudo`, no `dialout` (picoclaw's serial/i2c/spi tools are off and the
+MCP server uses no serial port), no `dclaw-ipc` (the DefenseClaw Lite hook loads its engine in-process and
+never uses the Edge Connector's socket, runbooks/edge-connector.md). The login home is 0750, so picoclaw
+can't read anything in it. The role checks on every run that `sudo -l -U picoclaw` says "not allowed" and
+that `runuser -u picoclaw -- test -r` fails for `/etc/safety-operator/nats-operator.json` and the governor's
+credentials, config, unit and code. Checked by hand 2026-11-15: `sudo -u picoclaw cat` on each →
+`Permission denied`.
+
+**Unit** `/etc/systemd/system/picoclaw.service` (`systemctl status picoclaw`, `journalctl -u picoclaw`):
+`User=picoclaw`, `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome=yes` (/home invisible), `PrivateTmp`,
+`PrivateDevices`, no capabilities, `MemoryMax=1G`. Writable: `~/.picoclaw` and `~/.defenseclaw/logs` only;
+`config.json` and `.security.yml` are read-only inside the unit, so the agent can't rewrite its own hook,
+MCP server or model settings.
+
+| What | Where (owner) |
+|---|---|
+| Binaries `picoclaw`, `node` | `/var/lib/picoclaw/bin/` (root, 0755) |
+| Config, `.security.yml` (MQTT/NATS password, model keys), workspace, sessions, logs | `/var/lib/picoclaw/.picoclaw/` (picoclaw, 0700) |
+| LiteLLM key (`OPENAI_API_KEY`) | `/etc/picoclaw/picoclaw.env` (root, 0600; read by systemd) |
+| DefenseClaw Lite hook, engine, policy | `/var/lib/picoclaw/.defenseclaw/{bin,lib,policies}` (root:picoclaw, read-only); log `.defenseclaw/logs/dclaw_hook.log` (picoclaw) |
+| MCP server `picoclaw-hardware` | `/var/lib/picoclaw/roboclaw/mcp-server/` (root:picoclaw, read-only); `governor-motion.js` from `hosts/roles/picoclaw/files/`; original `picoclaw-hardware-mcp.js.pre-governor` |
+| Config path rewrite helper | `/usr/local/lib/picoclaw/picoclaw_paths.py` (paths only, never the secrets) |
+
+The first run copied everything once from the login user (`~/.picoclaw`, `~/.defenseclaw`, `~/.local/bin/{picoclaw,node}`,
+`~/.config/picoclaw/env`, `~/workspace/roboclaw/mcp-server`; marker `/var/lib/picoclaw/.migrated-from-nikghodki-raspberry-1`)
+and pointed `config.json`'s workspace, hook and MCP paths at the new home. The NATS/MQTT credentials and the
+LiteLLM key are unchanged. After the move (2026-11-15): NATS `connz?auth=1` on dgx-1 shows `picoclaw`, MQTT client
+`picoclaw-pi`, reconnected at 01:41:30Z; `dclaw_hook.log`: `Loading libdclaw from /var/lib/picoclaw/.defenseclaw/lib/libdclaw_core.so`,
+`DefenseClaw Lite engine initialized`.
+
+**The roboclaw code is not a git repository** (Pi `~/workspace/roboclaw`, dgx-1 `~/workspace/roboclaw/dgx`, Jetson
+copy for Hermes): there was no repo to commit to. The change to the user's `picoclaw-hardware-mcp.js` is the patch
+`hosts/roles/picoclaw/files/picoclaw-hardware-mcp.governed.patch`, applied by the role (`ansible.posix.patch`, idempotent);
+the role fails if any `post("/drive" | "/turn" | "/velocity")` is left. If roboclaw becomes a repo, commit the patched file
+there and drop the patch.
+
+**Motion path.** The MCP server's motion tools send one JSON request per call to the motion bridge's Unix socket
+(`governor-motion.js`); the bridge (`robots/safety/motion_bridge/`, ROS 2 node in `ros2_kilted`, unit
+`robot-motion-bridge`) publishes `geometry_msgs/Twist` on `/cmd_vel_in` at 10 Hz and `std_msgs/Empty` on
+`/safety/heartbeat` at 5 Hz (reliable, depth 10, as the governor subscribes) for the move's duration, then one zero
+Twist, and answers with what the governor did (from `/safety/status`: moved, clamped, blocked and why). Why this and
+not NATS: the governor's command input is ROS; a local socket needs no new subject or permissions and keeps working
+when dgx-1 is down, and the socket's group decides who may command motion.
+- `drive`: speed 0–255 scales to 0–0.4 m/s or 0–2.0 rad/s (above the caps, so the governor clamps; below the
+  ceiling, so it never rejects); `duration_ms` default 1000, max 10000; strafing refused; `avoid` ignored (the
+  governor's LiDAR stop is always on). `turn`: 0.8 rad/s for the angle. A blocked move is a tool error.
+- No request, no heartbeat: between moves the governor sits in `fault/heartbeat_timeout`.
+- A move is refused before anything is published if the governor's e-stop is latched or no status came for 2 s.
+- `stop` (tool) → bridge `stop`: zero Twist and `/safety/estop true` (latched; **clearing needs `safety-reset`, a
+  human**), plus the car's `/stop`. The task tools end with `halt` (zero, no latch) plus the car's `/stop`.
+- Every request is one journal line: `journalctl -t robot-motion-bridge` → `MOTION op=drive uid=995 ... result=...`.
+
+**Rollback** (back to picoclaw as the login user, ungoverned motion):
+```bash
+# on the Pi
+sudo systemctl disable --now picoclaw
+systemctl --user enable --now picoclaw-gateway   # old unit, old ~/.picoclaw and old MCP server (direct HTTP motion)
+chmod 0775 ~                                     # only if something needs the old home mode
+# the bridge can stay; to remove it too: sudo systemctl disable --now robot-motion-bridge
+```
+The role stops and disables the old user unit on every run, so don't run `robot.yml` after a rollback until this
+change is reverted in the repo. Nothing was deleted: the old files and unit are still in the login home.
 
 ## E-stop
 
@@ -189,8 +268,17 @@ ROS reset was refused (22/22 checks).
   throw-away governor in ROS domain 73 (fake `/scan` never reaches domain 0, where the real LiDAR and
   the deployed governor are) on NATS subjects `robot.pi.safety.test.*`, publishes fake `/scan` (obstacle
   at 0.2 m ahead or clear), `/cmd_vel_in` and heartbeats, sends e-stops over NATS as picoclaw and over
-  ROS, stops the heartbeat, the scan and the commands, and checks the mock sink's log. 20 checks, about
+  ROS, stops the heartbeat, the scan and the commands, and checks the mock sink's log. 22 checks, about
   25 s; exit 0 when all pass. It refuses to run without `ROS_DOMAIN_ID=73` (the wrapper sets it).
+- **Motion path on the Pi** (mock sink only): `~/.local/lib/safety-governor/run-motion-integration-test`. Domain 73
+  again: a throw-away governor (mock sink, NATS off), a throw-away bridge on a socket in a temp folder, fake `/scan`,
+  a fake car on 127.0.0.1 that records every request, and picoclaw's real MCP server run as `picoclaw` (`sudo -u`).
+  It calls `drive` forward at speed 255 (mock sink gets vx 0.2 = the cap, from 0.4 commanded), checks the motion ends
+  with the call and the heartbeat stops, `turn`, a refused strafe, `drive` with an obstacle 0.2 m ahead (blocked) and
+  backwards (allowed), `explore`, `stop` (governor e-stop latched + car `/stop`), `drive` during the e-stop (blocked),
+  that the car never got `/drive`, `/turn` or `/velocity`, and that nothing exceeded the caps. 15 checks, about 30 s.
+  2026-11-15: 15/15 (car saw only `/status` and `/stop`); the governor test 22/22. The `zenoh ... Unknown token` errors
+  printed at the end are rmw_zenoh shutdown noise. Bridge unit tests: CI (`robots/safety/motion_bridge/tests`).
 
 ## "Robot on blocks" test (for you)
 
@@ -204,12 +292,14 @@ the ground** for the whole test.
    (the physical kill) for the whole test.
 2. Find the car's IP (router DHCP list or its serial console); `roboclaw.local` doesn't resolve. Check
    it answers: `curl -s http://<car-ip>/status`.
-3. Make sure nothing else drives the car during the test: don't ask picoclaw to move (its MCP tools
-   call the car directly and bypass the governor), and check `cmd_vel_bridge` isn't running
-   (`pgrep -fa cmd_vel_bridge` on the Pi: nothing).
+3. Make sure nothing else drives the car during the test: stop picoclaw (`sudo systemctl stop picoclaw`; its moves
+   go through the governor now, but you don't want an agent commanding during the test), and check
+   `cmd_vel_bridge` isn't running (`pgrep -fa cmd_vel_bridge` on the Pi: nothing).
 4. On the Pi: `systemctl --user is-active ros-lidar safety-governor` → both `active`;
+   `systemctl is-active robot-motion-bridge` → `active`;
    `safety-estop status` → `"sink": {"kind": "mock", "real": false}`.
-5. Run the integration test once: `~/.local/lib/safety-governor/run-integration-test` → `22/22 checks passed`.
+5. Run the integration tests once: `~/.local/lib/safety-governor/run-integration-test` → `22/22 checks passed`;
+   `~/.local/lib/safety-governor/run-motion-integration-test` → `15/15 checks passed`.
 
 ### Enable the real sink, only for this test
 
@@ -277,13 +367,28 @@ Open two terminals on the Pi. In both: `export PATH=$HOME/.local/bin:$PATH`.
    state `fault` until it has a scan, then moving again because A and B are still running.
 5. Stop B and A.
 
+### Check 5: picoclaw's path (motion bridge)
+
+Stop terminals A and B first (the bridge sends its own heartbeat while it moves). With the governor clear
+(`safety-reset` if needed):
+
+1. Send one request to the bridge, as picoclaw would (from the Pi):
+   `sudo -u picoclaw python3 -c 'import socket;s=socket.socket(socket.AF_UNIX);s.connect("/run/robot-motion/motion.sock");s.sendall(b"{\"op\":\"drive\",\"direction\":\"forward\",\"speed\":100,\"duration_ms\":1500}\n");print(s.makefile().readline())'`.
+   **Expect:** the wheels turn forward slowly for 1.5 s, then stop; the answer has `"moved": true`.
+2. The same with `"speed":255`. **Expect:** no faster than the 0.2 m/s cap; `"clamped": true`.
+3. Board in front at 25 cm, the same request. **Expect:** no motion; `"blocked": true, "blocked_reason": "obstacle"`.
+4. `{"op":"stop"}`. **Expect:** status `estop` (`latched by ros`); the step-1 request now answers
+   `"blocked_reason": "estop"` and the wheels stay still. `safety-reset` to clear.
+5. Optional, end to end: `sudo systemctl start picoclaw` and ask it (MQTT) to drive forward for a second: same as 1.
+   Ask it to stop: e-stop latched as in 4.
+
 ### After: back to the mock sink
 
 ```bash
 ansible-playbook playbooks/robot.yml --limit pi --diff     # no -e: sink mock, real_sink_enabled false
 ```
 
-On the Pi: `safety-estop status` → `"real": false`. Write down the results (date, commit, pass/fail per
+On the Pi: `safety-estop status` → `"real": false`; `sudo systemctl start picoclaw` if you stopped it. Write down the results (date, commit, pass/fail per
 check, any limit changed) in the PR or issue for the change you tested. If a check failed, leave the
 real sink off and open an issue.
 

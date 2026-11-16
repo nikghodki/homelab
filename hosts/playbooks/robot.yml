@@ -18,3 +18,11 @@
   become: true
   roles:
     - role: safety_governor
+
+# picoclaw as its own unprivileged user; its motion tools go through the governor's motion bridge
+# (runbooks/robot-safety.md). After the governor play: that creates the robot-motion group and the bridge.
+- name: PicoClaw (own user)
+  hosts: edge
+  become: true
+  roles:
+    - role: picoclaw

@@ -1,0 +1,47 @@
+# Managed by homelab Ansible (role picoclaw). runbooks/robot-safety.md
+# picoclaw as its own unprivileged user: no sudo, nothing writable but its state and hook logs, /home hidden.
+# Motion only through the safety governor: the MCP server talks to the motion bridge's socket (group robot-motion).
+# Rollback: the old user unit ({{ picoclaw_old_unit }}, login user {{ picoclaw_old_user }}) is disabled, not deleted.
+[Unit]
+Description=PicoClaw gateway (user {{ picoclaw_user }}; motion via the safety governor)
+Wants=network-online.target
+After=network-online.target robot-motion-bridge.service
+
+[Service]
+Type=simple
+User={{ picoclaw_user }}
+Group={{ picoclaw_user }}
+SupplementaryGroups={{ picoclaw_groups | join(' ') }}
+Environment=HOME={{ picoclaw_home }}
+EnvironmentFile={{ picoclaw_env_file }}
+WorkingDirectory={{ picoclaw_home }}
+ExecStart={{ picoclaw_home }}/bin/picoclaw gateway
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths={{ picoclaw_home }}/.picoclaw {{ picoclaw_home }}/.defenseclaw/logs
+# Its own config (hook, MCP server, model) is not writable by the agent, even though the folder is.
+ReadOnlyPaths={{ picoclaw_home }}/.picoclaw/config.json {{ picoclaw_home }}/.picoclaw/.security.yml
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+MemoryMax={{ picoclaw_memory_max }}
+
+[Install]
+WantedBy=multi-user.target
