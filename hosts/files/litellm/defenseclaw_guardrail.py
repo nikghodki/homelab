@@ -15,6 +15,11 @@ LiteLLM config:
           default_on: true
           api_base: os.environ/DEFENSECLAW_URL       # e.g. http://host.docker.internal:18970
           api_key: os.environ/DEFENSECLAW_TOKEN      # the gateway token
+          skip_key_aliases: [defenseclaw-dgx1]       # optional, see below
+
+Keys in ``skip_key_aliases`` are not checked: DefenseClaw's own LLM judge and the security scanners call models
+through LiteLLM with prompts that quote the suspicious text they are judging, so checking them would block the
+scanners (and the judge would recurse into itself). Only the LiteLLM admin can name a key's alias.
 """
 from __future__ import annotations
 
@@ -37,8 +42,24 @@ CHAT_CALL_TYPES = {"completion", "acompletion", "text_completion", "atext_comple
 MCP_CALL_TYPES = {"call_mcp_tool", "mcp_call"}
 
 
-class GuardrailBlocked(Exception):
-    """Raised to stop a call. LiteLLM returns it to the caller as an error."""
+try:  # inside LiteLLM: an HTTPException reaches the caller as 400 (any other exception would be a 500)
+    from fastapi import HTTPException as _Refusal
+except ImportError:  # unit tests run without FastAPI
+    _Refusal = None
+
+
+class GuardrailBlocked(_Refusal or Exception):  # type: ignore[misc]
+    """Raised to stop a call. LiteLLM returns it to the caller as HTTP 400 with the reason."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+        if _Refusal is not None:
+            super().__init__(status_code=400, detail={"error": message})
+        else:
+            super().__init__(message)
+
+    def __str__(self) -> str:
+        return self.message
 
 
 def _last_user_text(messages: list[dict] | None) -> str:
@@ -55,11 +76,15 @@ def _last_user_text(messages: list[dict] | None) -> str:
 
 class DefenseClawGuardrail(CustomGuardrail):
     def __init__(self, api_base: str | None = None, api_key: str | None = None, timeout: float = 3.5,
-                 client_name: str = "litellm", **kwargs: Any) -> None:
+                 client_name: str = "litellm", skip_key_aliases: list[str] | str | None = None,
+                 **kwargs: Any) -> None:
         self.api_base = (api_base or "http://127.0.0.1:18970").rstrip("/")
         self.api_key = api_key
-        self.timeout = timeout
+        self.timeout = float(timeout)
         self.client_name = client_name
+        if isinstance(skip_key_aliases, str):
+            skip_key_aliases = [a for a in skip_key_aliases.replace(",", " ").split() if a]
+        self.skip_key_aliases = frozenset(skip_key_aliases or ())
         self._transport: httpx.AsyncBaseTransport | None = None  # tests inject a mock transport
         super().__init__(**kwargs)
 
@@ -85,6 +110,8 @@ class DefenseClawGuardrail(CustomGuardrail):
 
     # ------------------------------------------------------------------ LiteLLM hook
     async def async_pre_call_hook(self, user_api_key_dict: Any, cache: Any, data: dict, call_type: str) -> dict:
+        if getattr(user_api_key_dict, "key_alias", None) in self.skip_key_aliases:
+            return data
         session = self._session(user_api_key_dict, data)
         if call_type in MCP_CALL_TYPES:
             event = {"event": "pre_tool", "session_id": session,

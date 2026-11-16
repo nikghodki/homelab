@@ -106,3 +106,18 @@ def test_other_call_types_are_not_checked():
     g = make(lambda r: pytest.fail("should not be called"))
     data = {"input": ["x"]}
     assert run(g.async_pre_call_hook(Key(), None, data, "aembedding")) is data
+
+
+@pytest.mark.parametrize("skip", [["picoclaw-pi"], "judge-a, picoclaw-pi", "picoclaw-pi judge-b"])
+def test_skipped_key_aliases_are_not_checked(skip):
+    # the scanners' and judges' own keys: their prompts quote what they judge
+    g = make(lambda r: pytest.fail("should not be called"), skip_key_aliases=skip)
+    assert run(g.async_pre_call_hook(Key(), None, {"messages": [{"role": "user", "content": "hi"}]}, "acompletion"))
+    assert run(g.async_pre_call_hook(Key(), None, {"name": "x", "arguments": {}}, "call_mcp_tool"))
+
+
+def test_other_keys_are_still_checked_when_some_are_skipped():
+    seen = []
+    g = make(lambda r: (seen.append(1), httpx.Response(200, json={"action": "allow"}))[1], skip_key_aliases=["judge"])
+    run(g.async_pre_call_hook(Key(), None, {"messages": [{"role": "user", "content": "hi"}]}, "acompletion"))
+    assert seen == [1]
