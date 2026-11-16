@@ -43,4 +43,4 @@ k3s_kubeconfig_user: ""
 k3s_kubeconfig_server: https://k8s.nghodki.ai:6443
 
 k3s_service: "{{ 'k3s' if k3s_role == 'server' else 'k3s-agent' }}"
-k3s_arch_suffix: "{{ {'aarch64': '-arm64', 'x86_64': ''}[ansible_architecture] }}"
+k3s_arch_suffix: "{{ {'aarch64': '-arm64', 'x86_64': ''}[ansible_facts['architecture']] }}"
