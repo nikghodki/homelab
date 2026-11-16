@@ -28,6 +28,9 @@ spec:
             matchLabels: {ops.nghodki.ai/role: agent}
         - ipBlock: {cidr: 10.42.0.0/31}
         - ipBlock: {cidr: 10.42.1.0/31}
+        # Docker containers on the pod's own node (DGXMM's route sync on dgx-1): the policy check runs before
+        # kube-proxy's masquerade, so it sees the container's bridge address
+        - ipBlock: {cidr: 172.16.0.0/12}
       ports:
         - {port: 4000, protocol: TCP}
   egress:
