@@ -10,7 +10,7 @@ the repo settings (which is why build-sign uses plain buildx/cosign binaries, PR
 
 ## `pr-checks.yml` (pull requests, daily on `main`, manual)
 
-Two jobs, so two checks on every PR. GitHub bills each job rounded up to a whole minute, so the steps run in sequence
+Two jobs, so two checks on every PR (measurement test, not for merge). GitHub bills each job rounded up to a whole minute, so the steps run in sequence
 inside a job instead of as 8 parallel jobs (12-14 billable minutes a run before; infra-optimization review 2026-11 §4).
 Each tool is still its own step with its own log. A step after a failed one still runs (`!cancelled()`), so one run
 reports every failure, and any failed step fails the job.
