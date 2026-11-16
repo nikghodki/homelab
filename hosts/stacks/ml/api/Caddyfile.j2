@@ -1,7 +1,9 @@
-# Job API for MLflow (plan P6.5; runbooks/mlflow.md): LAN-only 192.168.86.36:5000 -> mlflow:5000.
-# Jobs can't sign in with a browser, so this endpoint takes HTTP basic auth (user sim, password in
-# secrets/ml.enc.yaml; MLFLOW_TRACKING_USERNAME/PASSWORD in the client). Only /health is open, for Gatus.
-# Rendered 0600 for uid 65532 (the container user).
+# MLflow's ways in (plan P6.5; runbooks/mlflow.md), both LAN only, both -> mlflow:5000. Rendered 0600 for uid 65532
+# (the container user): it holds the API password hash and the edge origin token.
+#   :5000  job API. Jobs can't sign in with a browser, so this takes HTTP basic auth (user sim, password in
+#          secrets/ml.enc.yaml; MLFLOW_TRACKING_USERNAME/PASSWORD in the client). Only /health is open, for Gatus.
+#   :4181  the browser UI via the front door, which signs people in (edge-auth, decision 0011) and adds X-Edge-Origin;
+#          without it 403. No access log here (it would record the token).
 {
 	admin off
 	auto_https off
@@ -25,5 +27,16 @@
 			sim {{ ml_secrets.mlflow_api_password_hash }}
 		}
 		reverse_proxy mlflow:5000
+	}
+}
+
+:4181 {
+	@door header X-Edge-Origin "{{ console_secrets.edge_origin_token }}"
+	handle @door {
+		request_header -X-Edge-Origin
+		reverse_proxy mlflow:5000
+	}
+	handle {
+		respond "Use https://mlflow.nghodki.ai" 403
 	}
 }

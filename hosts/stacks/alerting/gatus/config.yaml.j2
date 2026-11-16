@@ -45,6 +45,7 @@ endpoints:
   # MLflow in the ml stack (plan P6.5, runbooks/mlflow.md). Signed out, the door answers 302 to Pocket ID; the job API's
   # /health is the one path without basic auth.
   - {name: mlflow.nghodki.ai, group: ml, url: "https://192.168.86.11/", headers: {Host: mlflow.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
+  - {name: MLflow gate refuses direct access, group: ml, url: "http://192.168.86.36:4181/", interval: 5m, conditions: ["[STATUS] == 403"], alerts: [{type: ntfy}]}
   - {name: MLflow job API, group: ml, url: "http://192.168.86.36:5000/health", interval: 1m, conditions: ["[STATUS] == 200", "[BODY] == OK"], alerts: [{type: ntfy}]}
   - {name: NATS (TLS), group: bus, url: "tcp://192.168.86.44:4222", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: NATS MQTT (picoclaw), group: bus, url: "tcp://192.168.86.44:8883", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}

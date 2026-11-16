@@ -24,11 +24,6 @@ clients:
     launchURL: https://temporal.nghodki.ai
     pkce: false        # Temporal UI 2.58 doesn't send PKCE
     groups: [admins]
-  - id: mlflow
-    name: MLflow
-    callbackURLs: [https://mlflow.nghodki.ai/oauth2/callback]
-    launchURL: https://mlflow.nghodki.ai
-    groups: [admins]      # oauth2-proxy also checks allowed_groups = admins; PKCE S256
   - id: argocd
     name: Argo CD
     callbackURLs: [https://argocd.nghodki.ai/auth/callback]
@@ -48,3 +43,4 @@ removedClients:
   - docs
   - ops
   - gatus
+  - mlflow
