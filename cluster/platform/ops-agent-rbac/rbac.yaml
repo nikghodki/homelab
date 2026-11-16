@@ -1,0 +1,89 @@
+# The ops agent's Kubernetes reader (decision 0013, design §5.1/§9.4): get/list/watch on what an investigation needs,
+# and nothing that reveals secrets or gives a shell. RBAC can't say "everything except", so the list is explicit:
+# no secrets, no serviceaccounts/token, no pods/exec|attach|portforward|proxy, no nodes/proxy, no services/proxy.
+# The ServiceAccount lives in the ops app (cluster/apps/ops); kubernetes-mcp-server and ops-ingest use it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ops-agent-read
+rules:
+  - apiGroups: [""]
+    resources: [pods, pods/log, pods/status, services, endpoints, configmaps, events, nodes, nodes/status, namespaces,
+                persistentvolumeclaims, persistentvolumes, replicationcontrollers, serviceaccounts, limitranges,
+                resourcequotas, componentstatuses]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets, controllerrevisions]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch]
+  - apiGroups: [policy]
+    resources: [poddisruptionbudgets]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies, ingresses, ingressclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses, csidrivers, csinodes, volumeattachments]
+    verbs: [get, list, watch]
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [get, list, watch]
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs: [get, list, watch]
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods, nodes]
+    verbs: [get, list, watch]
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [validatingwebhookconfigurations, mutatingwebhookconfigurations, validatingadmissionpolicies,
+                validatingadmissionpolicybindings]
+    verbs: [get, list, watch]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings, clusterroles, clusterrolebindings]
+    verbs: [get, list, watch]
+  - apiGroups: [argoproj.io]
+    resources: [applications, applicationsets, appprojects]
+    verbs: [get, list, watch]
+  - apiGroups: [kyverno.io]
+    resources: [clusterpolicies, policies, policyexceptions, cleanuppolicies, clustercleanuppolicies, updaterequests]
+    verbs: [get, list, watch]
+  - apiGroups: [policies.kyverno.io]
+    resources: [validatingpolicies, imagevalidatingpolicies, mutatingpolicies, generatingpolicies, deletingpolicies,
+                namespacedvalidatingpolicies, policyexceptions]
+    verbs: [get, list, watch]
+  - apiGroups: [wgpolicyk8s.io]
+    resources: [policyreports, clusterpolicyreports]
+    verbs: [get, list, watch]
+  - apiGroups: [reports.kyverno.io]
+    resources: [ephemeralreports, clusterephemeralreports]
+    verbs: [get, list, watch]
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters, backups, scheduledbackups, poolers, databases]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ops-agent-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ops-agent-read
+subjects:
+  - kind: ServiceAccount
+    name: ops-agent-read
+    namespace: ops

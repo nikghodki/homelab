@@ -1,0 +1,17 @@
+# kubernetes-mcp-server v0.1.3 (Apache-2.0), read-only, as ServiceAccount ops/ops-agent-read (no Secrets, no exec:
+# cluster/platform/ops-agent-rbac). Tools hidden here are a second layer; RBAC is what holds.
+port = "8080"
+read_only = true
+toolsets = ["core"]
+disabled_tools = ["nodes_log", "nodes_stats_summary", "projects_list"]
+stateless = true
+cluster_provider_strategy = "in-cluster"
+cluster_auth_mode = "kubeconfig"
+disable_localhost_protection = false
+max_result_bytes = 262144
+log_level = 1
+
+[[denied_resources]]
+group = ""
+version = "v1"
+kind = "Secret"

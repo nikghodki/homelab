@@ -1,0 +1,18 @@
+# The ops agent's cluster-wide read-only ClusterRole (cluster-scoped, so in project platform; the app itself is in
+# apps). cluster/platform/ops-agent-rbac.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ops-agent-rbac
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: platform
+  source:
+    repoURL: git@github.com:nikghodki/homelab.git
+    targetRevision: main
+    path: cluster/platform/ops-agent-rbac
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
