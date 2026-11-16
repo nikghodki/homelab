@@ -6,7 +6,7 @@ Durable workflows for scheduled and long-running homelab jobs. For now it's a Do
 | Piece | Where |
 |---|---|
 | Stack `jobs` | dgx-2 `/opt/homelab/jobs`, from `hosts/stacks/jobs`, deployed by `hosts/playbooks/jobs.yml` |
-| Temporal server 1.32.2 (all four services in one container) | `temporal`; frontend gRPC on **192.168.86.36:7233** (LAN only, **mTLS required**). Image `homelab/temporal-server:1.32.2-homelab.1`, built on dgx-2 from `temporal/build/` (upstream plus one claim mapper, below); config `temporal/config.yaml` |
+| Temporal server 1.32.2 (all four services in one container) | `temporal`; frontend gRPC on **192.168.86.36:7233** (LAN only, **mTLS required**). Image `homelab/temporal-server:1.32.2-homelab.2`, built on dgx-2 from `temporal/build/` (upstream plus one claim mapper, below); config `temporal/config.yaml` |
 | PostgreSQL 17 | `postgresql`, volume `jobs_pg-data`; databases `temporal` and `temporal_visibility`; not published |
 | admin-tools 1.32.2 | `admin-tools`: creates/upgrades the schemas on start, then idles for the `temporal` CLI |
 | Web UI 2.58.1 | `ui`, 192.168.86.36:8233 (LAN), served as **https://temporal.nghodki.ai** by dgx-1's Caddy |

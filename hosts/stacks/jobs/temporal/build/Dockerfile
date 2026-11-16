@@ -22,3 +22,5 @@ RUN CGO_ENABLED=0 go test -tags disable_grpc_modules -run TestTLSURIClaims ./cmd
 
 FROM temporalio/server:1.32.2@sha256:7bf69188a6232fea14869b9cef3d94aa82a1601d99517f7e86c71f22da4e0670
 COPY --from=build --chmod=755 /out/temporal-server /usr/local/bin/temporal-server
+# The base image runs as temporal (uid 1000); said again here for scanners.
+USER temporal

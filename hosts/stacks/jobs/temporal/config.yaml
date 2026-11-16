@@ -18,7 +18,7 @@ persistence:
                 connectAddr: "postgresql:5432"
                 connectProtocol: tcp
                 user: temporal
-                password: "{{ env "POSTGRES_PWD" }}"
+                password: '{{ env "POSTGRES_PWD" }}'
                 maxConns: 20
                 maxIdleConns: 20
                 maxConnLifetime: 1h
@@ -29,7 +29,7 @@ persistence:
                 connectAddr: "postgresql:5432"
                 connectProtocol: tcp
                 user: temporal
-                password: "{{ env "POSTGRES_PWD" }}"
+                password: '{{ env "POSTGRES_PWD" }}'
                 maxConns: 10
                 maxIdleConns: 10
                 maxConnLifetime: 1h
@@ -79,23 +79,23 @@ services:
         rpc:
             grpcPort: 7233
             membershipPort: 6933
-            bindOnIP: "{{ env "BIND_ON_IP" }}"
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
             httpPort: 7243
     matching:
         rpc:
             grpcPort: 7235
             membershipPort: 6935
-            bindOnIP: "{{ env "BIND_ON_IP" }}"
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
     history:
         rpc:
             grpcPort: 7234
             membershipPort: 6934
-            bindOnIP: "{{ env "BIND_ON_IP" }}"
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
     worker:
         rpc:
             grpcPort: 7239
             membershipPort: 6939
-            bindOnIP: "{{ env "BIND_ON_IP" }}"
+            bindOnIP: '{{ env "BIND_ON_IP" }}'
 
 clusterMetadata:
     enableGlobalNamespace: false
@@ -107,8 +107,8 @@ clusterMetadata:
             enabled: true
             initialFailoverVersion: 1
             rpcName: frontend
-            rpcAddress: "{{ env "BIND_ON_IP" }}:7233"
-            httpAddress: "{{ env "BIND_ON_IP" }}:7243"
+            rpcAddress: '{{ env "BIND_ON_IP" }}:7233'
+            httpAddress: '{{ env "BIND_ON_IP" }}:7243'
 
 dcRedirectionPolicy:
     policy: noop
@@ -140,7 +140,7 @@ namespaceDefaults:
 
 # With an authorizer the system worker reaches the frontend as a client (with its certificate above).
 publicClient:
-    hostPort: "{{ env "BIND_ON_IP" }}:7233"
+    hostPort: '{{ env "BIND_ON_IP" }}:7233'
 
 dynamicConfigClient:
     filepath: /run/temporal/dynamicconfig.yaml

@@ -55,7 +55,7 @@ services:
   # ./temporal/build; bump the tag when anything in that folder changes. Config: ./temporal/config.yaml.
   temporal:
     <<: *restart
-    image: homelab/temporal-server:1.32.2-homelab.1
+    image: homelab/temporal-server:1.32.2-homelab.2
     build:
       context: ./temporal/build
     environment:
