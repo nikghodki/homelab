@@ -10,7 +10,8 @@ spec:
   policyTypes: [Ingress]
 ---
 # The MCP servers: only the agent's own pods (worker, ingest) and the replay harness on the Sparks' hosts (host
-# traffic arrives from a Docker bridge, the node's flannel address or the direct cable; runbooks/ops-agent.md).
+# traffic arrives from a Docker bridge, the direct cable, or a node's flannel.1 (10.42.N.0) / cni0 (10.42.N.1) address,
+# never from another pod's address; runbooks/ops-agent.md).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -23,7 +24,14 @@ spec:
     - from:
         - podSelector:
             matchLabels: {ops.nghodki.ai/role: agent}
-        - ipBlock: {cidr: 10.42.0.0/16}
+        - ipBlock: {cidr: 10.42.0.0/32}
+        - ipBlock: {cidr: 10.42.0.1/32}
+        - ipBlock: {cidr: 10.42.1.0/32}
+        - ipBlock: {cidr: 10.42.1.1/32}
+        - ipBlock: {cidr: 10.42.2.0/32}
+        - ipBlock: {cidr: 10.42.2.1/32}
+        - ipBlock: {cidr: 10.42.3.0/32}
+        - ipBlock: {cidr: 10.42.3.1/32}
         - ipBlock: {cidr: 10.100.136.0/24}
 ---
 # The database: the agent's pods, CNPG's own instances and operator, and the replay harness on the Sparks' hosts.
@@ -43,7 +51,14 @@ spec:
             matchLabels: {cnpg.io/cluster: ops-db}
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: cnpg-system}
-        - ipBlock: {cidr: 10.42.0.0/16}
+        - ipBlock: {cidr: 10.42.0.0/32}
+        - ipBlock: {cidr: 10.42.0.1/32}
+        - ipBlock: {cidr: 10.42.1.0/32}
+        - ipBlock: {cidr: 10.42.1.1/32}
+        - ipBlock: {cidr: 10.42.2.0/32}
+        - ipBlock: {cidr: 10.42.2.1/32}
+        - ipBlock: {cidr: 10.42.3.0/32}
+        - ipBlock: {cidr: 10.42.3.1/32}
         - ipBlock: {cidr: 10.100.136.0/24}
       ports:
         - {port: 5432, protocol: TCP}
@@ -100,3 +115,123 @@ spec:
           podSelector:
             matchLabels: {k8s-app: kube-dns}
       ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+---
+# The portal: only the front door's Caddy pods (they add the origin token after sign-in).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ops-portal-from-front-door
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: ops-portal}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: edge}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: edge-caddy}
+      ports: [{port: 8080, protocol: TCP}]
+  egress:
+    - to: [{podSelector: {matchLabels: {cnpg.io/cluster: ops-db}}}]
+      ports: [{port: 5432, protocol: TCP}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+---
+# ops-ingest: Alertmanager's webhook and VictoriaMetrics' scrapes arrive from Docker on the hosts (a Docker bridge,
+# a node's flannel address or the direct cable).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ops-ingest
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: ops-ingest}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - ipBlock: {cidr: 10.42.0.0/32}
+        - ipBlock: {cidr: 10.42.0.1/32}
+        - ipBlock: {cidr: 10.42.1.0/32}
+        - ipBlock: {cidr: 10.42.1.1/32}
+        - ipBlock: {cidr: 10.42.2.0/32}
+        - ipBlock: {cidr: 10.42.2.1/32}
+        - ipBlock: {cidr: 10.42.3.0/32}
+        - ipBlock: {cidr: 10.42.3.1/32}
+        - ipBlock: {cidr: 172.16.0.0/12}
+        - ipBlock: {cidr: 10.100.136.0/24}
+      ports: [{port: 8080, protocol: TCP}, {port: 9100, protocol: TCP}]
+  egress:
+    - to: [{podSelector: {matchLabels: {cnpg.io/cluster: ops-db}}}]
+      ports: [{port: 5432, protocol: TCP}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    # Temporal on dgx-2 (Docker; on dgx-2 itself the DNAT to the jobs bridge happens first)
+    - to: [{ipBlock: {cidr: 192.168.86.36/32}}, {ipBlock: {cidr: 172.16.0.0/12}}]
+      ports: [{port: 7233, protocol: TCP}]
+    # the k3s API (Warning events, Argo CD applications)
+    - to: [{ipBlock: {cidr: 10.100.136.0/30}}]
+      ports: [{port: 6443, protocol: TCP}]
+    # GitHub: the read-only clone (ssh) and the public Actions API (https)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16]
+      ports: [{port: 22, protocol: TCP}, {port: 443, protocol: TCP}]
+---
+# ops-worker: the investigator. Model, read-only tools, Temporal, its database, ntfy and the Gatus heartbeat; no
+# general internet (only GitHub's API for the ci tool).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ops-worker
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: ops-worker}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - ipBlock: {cidr: 10.42.0.0/32}
+        - ipBlock: {cidr: 10.42.0.1/32}
+        - ipBlock: {cidr: 10.42.1.0/32}
+        - ipBlock: {cidr: 10.42.1.1/32}
+        - ipBlock: {cidr: 10.42.2.0/32}
+        - ipBlock: {cidr: 10.42.2.1/32}
+        - ipBlock: {cidr: 10.42.3.0/32}
+        - ipBlock: {cidr: 10.42.3.1/32}
+        - ipBlock: {cidr: 172.16.0.0/12}
+        - ipBlock: {cidr: 10.100.136.0/24}
+      ports: [{port: 9100, protocol: TCP}]
+  egress:
+    - to: [{podSelector: {matchLabels: {cnpg.io/cluster: ops-db}}}]
+      ports: [{port: 5432, protocol: TCP}]
+    - to: [{podSelector: {matchLabels: {ops.nghodki.ai/role: mcp}}}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+          podSelector: {matchLabels: {k8s-app: kube-dns}}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to: [{ipBlock: {cidr: 192.168.86.36/32}}, {ipBlock: {cidr: 172.16.0.0/12}}]
+      ports: [{port: 7233, protocol: TCP}]
+    # LiteLLM on dgx-1 (direct cable; on dgx-1 itself Docker's DNAT comes first)
+    - to: [{ipBlock: {cidr: 10.100.136.1/32}}, {ipBlock: {cidr: 172.16.0.0/12}}]
+      ports: [{port: 4000, protocol: TCP}]
+    # ntfy and the Gatus heartbeat on the Dell
+    - to: [{ipBlock: {cidr: 192.168.86.49/32}}]
+      ports: [{port: 8085, protocol: TCP}, {port: 8081, protocol: TCP}]
+    # ops-ro over SSH to the five hosts
+    - to:
+        - ipBlock: {cidr: 192.168.86.44/32}
+        - ipBlock: {cidr: 192.168.86.36/32}
+        - ipBlock: {cidr: 192.168.86.211/32}
+        - ipBlock: {cidr: 192.168.86.49/32}
+        - ipBlock: {cidr: 192.168.86.39/32}
+      ports: [{port: 22, protocol: TCP}]
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 169.254.0.0/16]
+      ports: [{port: 443, protocol: TCP}]
