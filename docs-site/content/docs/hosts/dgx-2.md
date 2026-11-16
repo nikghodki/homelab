@@ -57,7 +57,7 @@ Deploy any stack from dgx-1: `cd ~/homelab/hosts && ~/.venvs/ansible/bin/ansible
 
 - Its Docker uses the containerd image store, which drops compressed layers, so `docker save` fails. The AIBOM job
   falls back to copying files out of a created container.
-- Temporal's gRPC (7233) and MLflow's job API (5000) have no strong auth; they are published on the LAN address only.
+- MLflow's job API (5000) has no strong auth; it is published on the LAN address only. Temporal's gRPC (7233) requires mTLS (runbooks/temporal.md).
 - If dgx-2 is down, metric alerts stop. Gatus on the Dell still alerts on dgx-2's checks, and the missing Watchdog
   heartbeat alerts after 15 minutes.
 - Old volumes `observe_gatus-data` and `observe_ntfy-data` from before the move to the Dell may still be here;

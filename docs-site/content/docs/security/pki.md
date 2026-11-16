@@ -1,20 +1,23 @@
 ---
-title: PKI (two CAs) and certificate renewal
-description: The internal homelab CA and the name-constrained web CA, what each signs, who trusts which, and how to renew.
+title: PKI (three CAs) and certificate renewal
+description: The internal homelab CA, the name-constrained web CA and the Temporal CA, what each signs, who trusts which, and how to renew.
 ---
 
-## The two CAs
+## The three CAs
 
 | CA | File (public cert) | Private key (SOPS) | Constraint | Signs | Trusted by |
 |---|---|---|---|---|---|
 | **Internal homelab CA** | `hosts/files/pki/homelab-ca.crt` | `secrets/pki.enc.yaml` → `pki_homelab_ca_key` | none | NATS (`nats.crt`), the Fleet broker and API (`fleet.crt`), the backup server (`backup.crt`) | fleet hosts only (role `homelab_ca`). **Never** install it on phones or family devices |
 | **Homelab web CA** (D25) | `hosts/files/pki/web-ca.crt` (same as `hosts/files/web-ca/nghodki-web-ca.crt`) | `secrets/pki.enc.yaml` → `pki_web_ca_key` | name-constrained to `nghodki.ai` (critical), `pathlen:0`, ECDSA P-256, 10 years | the `nghodki.ai` + `*.nghodki.ai` wildcard (`web.crt`, 397 days) | fleet hosts, plus phones and computers that installed it from `ca.nghodki.ai` |
+| **Homelab Temporal CA** (2026-11-16, decision 0013) | `hosts/files/pki/temporal/ca.crt` | `secrets/pki.enc.yaml` → `pki_temporal_ca_key` | `pathlen:0`, ECDSA P-256, 10 years | Temporal's frontend certificate and its client certificates (roles as URI SANs) | Temporal's frontend (client CA) and its clients only; never a system store |
 
 Leaf keys: `pki_nats_key`, `pki_fleet_key`, `pki_backup_key`, `pki_web_key`, all in `secrets/pki.enc.yaml`. They are
 rendered into stacks by templates (`*.key.j2`) at deploy time.
 
-Why two: the web CA can only vouch for `nghodki.ai` names, so even if its key leaked it couldn't impersonate any other
-site. The internal CA has no constraint, so it stays on fleet hosts.
+Why separate CAs: the web CA can only vouch for `nghodki.ai` names, so even if its key leaked it couldn't impersonate any other
+site. The internal CA has no constraint, so it stays on fleet hosts. The Temporal CA is trusted by Temporal alone, so its
+client certificates can't authenticate anywhere else and other leaked keys can't reach Temporal. Issue and renew its
+certificates with `hosts/files/pki/temporal/issue.sh` (`runbooks/temporal.md`).
 
 ## Where the certs are used
 
@@ -51,6 +54,7 @@ Settings (standard iOS step; unverified wording in the page). Install only the *
 | Fleet API cert | (unverified date) | Gatus `Fleet API` fails under 14 days (336 h) | re-issue `fleet.crt` from the internal CA, commit, `playbooks/fleet.yml` |
 | k3s API serving cert | managed by k3s | Gatus `API dgx-1/dgx-2` fail under 30 days | k3s rotates its own certs on restart within 90 days of expiry |
 | `nats.crt`, `backup.crt` | (unverified date) | none | re-issue, commit, `playbooks/bus.yml` / `backups.yml` |
+| Temporal server and client certs | 2028-11-15 | Temporal logs a warning 30 days ahead | `hosts/files/pki/temporal/issue.sh server` / `client <name> <roles>`, commit, `playbooks/jobs.yml` (and the ops app's KSOPS Secret) |
 | Web CA | 2036 | none | new CA = reinstall on every device |
 
 Renew the web wildcard:

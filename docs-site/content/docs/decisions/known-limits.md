@@ -12,7 +12,7 @@ description: Limits of the fleet as built, and the eight upstream issue drafts (
 | Availability | Alerting needs the Dell or dgx-2; both down = silence | accepted |
 | Network | Everything is on Wi-Fi; a router reboot hits every host | P0.11 for the Sparks |
 | Network | No UPS: a power cut hard-stops everything (R10) | buy a UPS; NUT order in architecture §17.3 |
-| Security | Temporal gRPC (no mTLS), Zenoh (no auth), MLflow job API (basic auth over HTTP), fleet-metrics (open) on the LAN | LAN-only binding; mTLS before Tailscale exposure |
+| Security | Zenoh (no auth), MLflow job API (basic auth over HTTP), fleet-metrics (open) on the LAN | LAN-only binding; mTLS before Tailscale exposure |
 | Security | The car's HTTP API accepts anyone on the LAN (including picoclaw's own `exec`/`web_fetch` and the Jetson's MCP copy); picoclaw's MCP motion tools are governed since #73 | [picoclaw gaps](../agents/picoclaw.md) |
 | Security | The age key is in the cluster and decrypts everything | a cluster-only key (decision 0006) |
 | Security / availability | Kyverno Enforces with failurePolicy Fail: if both admission replicas are down (both Sparks), new pods in enforced namespaces are refused; our own images are refused until the GHCR packages are public | break-glass B; make the packages public |

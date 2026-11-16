@@ -28,10 +28,12 @@ together; admin-tools applies schema changes before the server starts.
 ## Workers
 
 ```python
-client = await temporalio.client.Client.connect("192.168.86.36:7233", namespace="homelab")
+client = await Client.connect("192.168.86.36:7233", namespace="homelab", tls=TLSConfig(...))  # client cert: runbooks/temporal.md
 ```
 
-There's **no mTLS and no authorization**: anyone on the LAN can start or terminate workflows. Add mTLS (and a claim
+**mTLS and per-namespace authorization** since 2026-11-16 (runbooks/temporal.md, "mTLS and authorization"): every
+client needs a certificate from the homelab Temporal CA, whose URI SANs name its roles; a small claim mapper in the
+server image maps them, Temporal's default authorizer enforces them. Older note, now resolved: add mTLS (and a claim
 mapper) before exposing it on Tailscale or off the LAN. No workers exist yet.
 
 ## CLI

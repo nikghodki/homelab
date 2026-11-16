@@ -38,7 +38,7 @@ Tailscale if the [policy](tailscale.md) grants it. Checked with `ss -tln` and `d
 | 4317, 4318 | all | otel-defenseclaw (OTLP gRPC/HTTP) |
 | 4319, 4320 | all | otel-fleet (OTLP gRPC/HTTP), host collectors push here |
 | 1411 | 192.168.86.36 | Pocket ID |
-| 7233 | 192.168.86.36 | Temporal frontend gRPC (no mTLS) |
+| 7233 | 192.168.86.36 | Temporal frontend gRPC (mTLS required) |
 | 8233 | 192.168.86.36 | Temporal Web UI |
 | 9233 | 192.168.86.36 | Temporal Prometheus metrics |
 | 4181 | 192.168.86.36 | MLflow UI gate (the `api` Caddy; front door token, else 403) |
