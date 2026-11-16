@@ -1,0 +1,30 @@
+---
+title: "Services"
+description: "Every service in the fleet in one table: URL, host, port, how it is deployed, its health check and what it depends on."
+---
+
+| Service | URL | Host | Port(s) | Deployed by | Health check | Page |
+|---|---|---|---|---|---|---|
+| LiteLLM | `model.nghodki.ai`, `litellm-admin.nghodki.ai` | dgx-1 | 4000 | hand (`~/litellm-setup`) | Gatus `model.nghodki.ai (LiteLLM)` | [LiteLLM](litellm.mdx) |
+| DGXMM | `dgxmanager.nghodki.ai` | dgx-1 | 127.0.0.1:8090 | DGXMM project | Gatus `dgxmanager.nghodki.ai` | [Model plane](../agents/model-plane.mdx) |
+| Open WebUI | `webui.nghodki.ai` | dgx-1 | 3100 | hand | Gatus `webui.nghodki.ai` | [Open WebUI](open-webui.mdx) |
+| NATS | `nats.nghodki.ai` | dgx-1 | 4222, 8883 | `bus.yml` | Gatus `NATS (TLS)`, `NATS MQTT` | [NATS](nats.mdx) |
+| Fleet broker and API | `fleet.nghodki.ai` | dgx-1 | 8884, 8971 | `fleet.yml` | Gatus `Fleet MQTT`, `Fleet API` | [Fleet broker](fleet-broker.mdx) |
+| Pocket ID | `id.nghodki.ai` | dgx-2 | 1411 | `console.yml` | Homepage monitor `/healthz` | [Pocket ID](pocket-id.mdx) |
+| Homepage | `ops.nghodki.ai` | Dell | 4180 | `ops.yml` | Gatus `ops.nghodki.ai` (302) | [Homepage](homepage.mdx) |
+| Grafana, VictoriaMetrics, Loki, Tempo, vmalert, Alertmanager | `grafana.nghodki.ai` | dgx-2 | 3000 (+ internal) | `observe.yml` | Gatus `Grafana`, heartbeat | [Observe stack](observe-stack.mdx) |
+| Phoenix | `phoenix.nghodki.ai` | dgx-2 | 6006 | `observe.yml` | Gatus `Phoenix` | [Phoenix](phoenix.mdx) |
+| Gatus, ntfy | `status.nghodki.ai`, `ntfy.nghodki.ai` | Dell | 8081, 8085 | `alerting.yml` | dead man `AlertingHostDown` | [Gatus and ntfy](gatus-ntfy.mdx) |
+| Temporal | `temporal.nghodki.ai` | dgx-2 | 7233, 8233, 9233 | `jobs.yml` | Gatus `Temporal frontend`, `temporal.nghodki.ai` | [Temporal](temporal.mdx) |
+| MLflow | `mlflow.nghodki.ai` | dgx-2 | 4181, 5000 | `ml.yml` | Gatus `mlflow.nghodki.ai`, `MLflow job API` | [MLflow](mlflow.mdx) |
+| Home Assistant | `ha.nghodki.ai` | Jetson | 8123 | hand (container) | Gatus `Home Assistant (direct)`, `ha.nghodki.ai` | [Home Assistant](home-assistant.mdx) |
+| LiveKit, control center, voice page | `voice-agent.nghodki.ai`, `controlcenter.nghodki.ai` | Jetson, dgx-1 | 7880, 8200 | hand | none | [Voice](voice.mdx) |
+| Coolify | `coolify.nghodki.ai` | dgx-1 | 8000, 6001, 6002 | Coolify | none | [Coolify](coolify.mdx) |
+| restic rest-server | `backup.nghodki.ai:8000` | dgx-2 | 8000 | `backups.yml` | none | [Backup server](backup-server.mdx) |
+| Zenoh router | — | Jetson | 7447 | `robot.yml` | Gatus `Zenoh router` | [ROS 2 and Zenoh](../robotics/ros-zenoh.mdx) |
+| Safety governor | — | Pi | 127.0.0.1:9113 | `robot.yml` | `SafetyGovernorStatusStale` | [Safety governor](../robotics/safety-governor.mdx) |
+| Hermes | (A2A later) | Jetson | 8642, 8643 | hand | none | [Hermes](../agents/hermes.mdx) |
+| picoclaw | — | Pi | — | hand | none | [picoclaw](../agents/picoclaw.mdx) |
+| k3s platform (Argo CD, Kyverno, CNPG) | `argocd.nghodki.ai` | Sparks | — | Argo CD | Gatus `API ...`, `etcd ...`; gitops alerts | [Platform](../platform/index.mdx) |
+
+Every web UI also has a tile on Homepage (`hosts/stacks/ops/homepage/services.yaml`).

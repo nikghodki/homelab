@@ -1,0 +1,43 @@
+---
+title: Host hardening and Lynis
+description: The base role (SSH, journald, security-only upgrades, time zone), the weekly Lynis audit, and what is still open.
+---
+
+## Base role (`hosts/roles/base`, `playbooks/site.yml`)
+
+| Setting | Value | File on the host |
+|---|---|---|
+| Supported OS | Debian family or Arch (the role asserts this) | — |
+| Time zone | America/Los_Angeles (`base_timezone`) | — |
+| sshd drop-in | `PermitRootLogin no`, `X11Forwarding no`, `MaxAuthTries 4`; password auth stays **on** until every admin path has a key (`base_ssh_disable_password_auth: false`) | `/etc/ssh/sshd_config.d/50-homelab.conf`; `Include` added to the top of `sshd_config` (validated with `sshd -t`) |
+| Journal cap | `SystemMaxUse` 1G (Jetson 500M, Pi 300M) | `/etc/systemd/journald.conf.d/50-homelab.conf` |
+| Security-only upgrades (Debian/Ubuntu) | `unattended-upgrades` with `-security` origins only, **no automatic reboot** | `/etc/apt/apt.conf.d/52homelab-unattended-upgrades` |
+
+Omarchy (Arch) gets no unattended upgrades; update it in the monthly window. Reboots happen in the monthly window
+(architecture §17.1: Omarchy → Jetson → dgx-2 → dgx-1 → Pi, after a snapshot).
+
+`site.yml` also runs `tailscale` (installed, running, report login state), `fleet_metrics`, and imports
+`always-on.yml`.
+
+## Lynis (`hosts/roles/lynis`, `playbooks/lynis.yml`)
+
+- `lynis-audit.timer`: Sunday 03:30 + up to 30 min, `Persistent=true`. Service at `Nice=19`, idle CPU and I/O.
+- `/usr/local/sbin/lynis-audit` runs `lynis audit system --quiet` and logs to the journal with tag `lynis`:
+  one summary line `hardening_index=N warnings=W suggestions=S tests=T lynis=V exit=E` and one line per warning
+  (`warning test=ID text`). Report in `/var/log/lynis-report.dat`.
+- The host collector ships the journal to Loki; Fleet Home shows the latest index per host and the warnings.
+- First results: hardening index 59–68 across the 5 hosts (P1.3).
+
+The distro's own `lynis.timer` also exists on Debian/Ubuntu hosts (installed by the package). It is separate from
+`lynis-audit.timer` (unverified whether both should run).
+
+## Other controls
+
+| Control | Status |
+|---|---|
+| Kyverno in k3s | 6 policies in Enforce ([Kyverno](../platform/kyverno.mdx)) |
+| Tetragon / DefenseClaw kernel controls | not installed (P3.6) |
+| kube-bench | not set up |
+| CrowdSec on the front door | not deployed |
+| SSH password auth off | waiting (see above) |
+| Memory guards on the Sparks | `earlyoom` and `gpu-oom-guard` run, but are not in the repo ([discrepancies](../decisions/discrepancies.mdx)) |

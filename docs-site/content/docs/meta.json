@@ -1,0 +1,23 @@
+{
+  "title": "Homelab fleet",
+  "pages": [
+    "index",
+    "---Start here---",
+    "overview",
+    "hosts",
+    "network",
+    "---Security---",
+    "security",
+    "---Running it---",
+    "observability",
+    "platform",
+    "services",
+    "agents",
+    "robotics",
+    "operations",
+    "---Building it---",
+    "development",
+    "decisions",
+    "history"
+  ]
+}

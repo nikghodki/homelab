@@ -1,0 +1,39 @@
+---
+title: "picoclaw"
+description: "The robot agent on the Pi: how it runs, its MQTT input over NATS, its MCP server that drives the car, and its DefenseClaw hooks."
+---
+
+picoclaw is the small agent on the Pi that does robot skills. It runs as the login user and is not managed by Ansible
+(its config is backed up and AIBOM-scanned, not deployed from the repo).
+
+| | |
+|---|---|
+| Unit | user `picoclaw-gateway` (`~/.local/bin/picoclaw gateway`) |
+| Config | `~/.picoclaw`, `~/.config/picoclaw` |
+| Input | MQTT over TLS to NATS on dgx-1 (`nats.nghodki.ai:8883`) as NATS user `picoclaw` (fixes F3: the broker used to be the Pi's old IP and open to anyone). Topic `/picoclaw/...` = NATS subject `/.picoclaw...` |
+| Tools | MCP server `picoclaw-hardware` (stdio, Node, `~/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js`): `drive`, `turn`, `stop`, `explore`, `go_to_room`, `follow_nearest`, `map_room`, … → HTTP to `ROBOCLAW_API` (`http://roboclaw.local`) on the ESP32 car |
+| DefenseClaw | in-process hook `~/.defenseclaw/bin/picoclaw_hook.py` (FFI into the Edge engine, strict); the Edge Connector daemon runs next to it for Fleet ([Edge Connector](../security/edge-connector.mdx)) |
+| AIBOM | `~/.picoclaw` and `~/workspace/roboclaw` scanned nightly |
+| NATS rights | publish `/.picoclaw.>`, `robot.pi.>` (may latch the e-stop), **not** `robot.pi.safety.reset` |
+
+## Safety gap (must close before the robot drives on its own)
+
+picoclaw's motion tools call the car **directly** (`/drive`, `/turn`), bypassing the [safety governor](../robotics/safety-governor.mdx).
+Today `roboclaw.local` doesn't resolve, so they can't reach the car either. Before autonomy:
+
+1. Point the MCP server's motion tools at the governor: publish `geometry_msgs/Twist` on `/cmd_vel_in` plus a heartbeat,
+   instead of calling `/drive` and `/turn`. Keep `stop` calling `/stop` directly as a second stop path.
+2. Give the car's firmware one caller (the governor's address or a shared token) for `/drive`, `/turn`, `/velocity`.
+3. Run picoclaw under its own unprivileged user (today it can sudo, so it could read the operator's NATS file or stop
+   the governor).
+
+## Edge Connector limits that affect picoclaw
+
+The C engine's fixed tool table lacks `message`, `i2c`, `serial`, `spawn`, `cron` (they fail closed with
+`INVALID_INPUT`), and the OSS Fleet gateway denies every escalated call. So picoclaw keeps its in-process hook, and calls
+the engine can't decide locally are blocked (strict).
+
+## Waiting
+
+End-to-end reply over NATS (needs the qwen3.8 engine, busy in the DGXMM session); `robot.*` tools registered in the
+LiteLLM MCP gateway with approval rules (P5.5).

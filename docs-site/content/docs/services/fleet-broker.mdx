@@ -1,0 +1,26 @@
+---
+title: "Fleet broker and API proxy"
+description: "The DefenseClaw Fleet stack on dgx-1: the Mosquitto MQTT 5 broker on 8884 and the Caddy TLS proxy on 8971."
+---
+
+Stack `fleet` on dgx-1 (`hosts/stacks/fleet`, `playbooks/fleet.yml`, `/opt/homelab/fleet`), decision D24.
+
+| Service | Image | Port | Config |
+|---|---|---|---|
+| `mosquitto` | `eclipse-mosquitto:2.1.2-alpine` | 0.0.0.0:8884 (MQTT over TLS 1.2+, no anonymous) | `mosquitto/mosquitto.conf`, `passwd.j2`, `acl.j2`, `certs/fleet.crt`, `certs/fleet.key.j2` |
+| `caddy` | `caddy:2.11.9-alpine`, host network | `https://fleet.nghodki.ai:8971` | `caddy/Caddyfile`: `admin off`, `auto_https off`, only `/api/v1/fleet/*` → 127.0.0.1:18970 with `X-Forwarded-Proto: https`; anything else 404 |
+
+| | |
+|---|---|
+| Name | `fleet.nghodki.ai` → dgx-1 |
+| TLS | `fleet.crt` from the internal homelab CA; key `pki_fleet_key` |
+| Secrets | `secrets/fleet.enc.yaml`: `mosquitto_dclaw_fleet_password_hash`, `mosquitto_dclaw_device_1_1_1_password_hash` |
+| Private templates | mosquitto files render 0600 for uid 1883; caddy for root |
+| Health | Gatus `Fleet MQTT (Edge Connector)` (tcp 8884) and `Fleet API` (401 without a token, cert > 14 days) |
+| Tailscale | `tag:robot` may reach 8884, not 8971 |
+| k3s target | `security`, pinned to dgx-1 (the proxy needs the gateway's loopback; the broker port is a host port for the Pi) |
+
+Why the proxy: the Fleet gateway (inside dgx-1's DefenseClaw) serves its whole API on 127.0.0.1:18970. Caddy exposes
+only the Fleet part, with TLS, and the gateway trusts proxy headers only from loopback (`fleet.trust_proxy_headers`).
+
+Users and ACLs, device registration and policy push: [Edge Connector and Fleet](../security/edge-connector.mdx).

@@ -1,0 +1,112 @@
+---
+title: Changelog
+description: Every merged PR to nikghodki/homelab, grouped by day and phase, with what it changed.
+---
+
+All times are PST, from `git log` on `main`. The work before the repo (2026-11-14: inventory, findings F1–F10, the Pi
+backup, the DGXMM KServe draft, the first design docs) is in `docs/project-plan.md` §2.
+
+## 2026-11-14
+
+| Commit | What |
+|---|---|
+| `46f6c0f` | Initial commit (23:53) |
+
+## 2026-11-15, night: repo, CI, Ansible baseline (00:01–01:33)
+
+| PR | What |
+|---|---|
+| `055332f` | Repo set up: docs, layout, CI and Renovate |
+| #2 | CI: hash-locked Python tools, scoped OSV exceptions |
+| #4 | P1.2: SOPS + age for `secrets/` |
+| #3 | P1.3: Ansible inventory and baseline roles |
+| #5 | Ansible: the tailscale role works in check mode on hosts without Tailscale |
+| #6 | Ansible base: create drop-in folders; make sure sshd reads `sshd_config.d` |
+| #7 | Ansible: task name casing; skip the Tailscale install on Omarchy until a full system update |
+| #8 | Plan: status (P0.1–P0.17, P1.1–P1.3, P1.8) |
+
+## Night: observability, bus, backups, first DefenseClaw pieces (02:05–04:20)
+
+| PR | What |
+|---|---|
+| #9 | P1.6: observability stack on dgx-2 and host collectors |
+| #10 | P1.15: Fleet Home as Grafana's home page |
+| #11 | Gatus exposes `/metrics` (ObservabilityComponentDown fired for it) |
+| #12 | compose_stack restarts services whose mounted config changed |
+| #13 | fleet-metrics in the repo, with a Prometheus endpoint, on every host |
+| #14 | P1.11: nightly DefenseClaw AIBOM on hosts with a connected agent; GPU panels |
+| #15 | P1.5: NATS with MQTT over TLS; the homelab CA |
+| #16 | compose_stack writes `.env` only when the stack has variables |
+| #17 | P1.10: nightly restic backups for every host, append-only server on dgx-2 |
+| #18 | P2.6: Phoenix on dgx-2 (login on; secrets in SOPS); Gatus check |
+| #19 | P2.4: DefenseClaw guardrail plugin for LiteLLM (agent-gateway route) |
+| #20 | P1.4: Tailscale access policy (tags, grants, tests) |
+| #21 | Plan: end-of-day status |
+| #22 | P1.11: DefenseClaw fleet policy in Git, deployed and activated by Ansible |
+| #23 | P1.11: keep DefenseClaw dashboards and rules in step with its releases |
+| #24 | P1.12: DefenseClaw Fleet gateway on dgx-1 with its own MQTT broker and TLS API proxy |
+| #25 | P1.12: Edge Connector daemon on the Pi reporting to Fleet; signed policy v1 |
+| #26 | Gatus: checks for NATS, the Fleet broker and the Fleet API |
+| #27 | Plan: P0.4 and P1.12 status, new upstream findings |
+
+## Morning: HTTPS, sign-in, Hermes, GPU metrics (09:38–12:19)
+
+| PR | What |
+|---|---|
+| #28 | Tailscale README: add `tagOwners` before tagging |
+| #29 | Tailscale policy: robot may reach the Fleet broker (8884); drop the retired Jetson gateway rule |
+| #30 | HTTPS for `*.nghodki.ai` with a name-constrained web CA (D25) |
+| #31 | homelab_ca: every fleet host also trusts the web CA |
+| #32 | P1.13: Pocket ID at `id.nghodki.ai`; Grafana, Gatus and Phoenix with passkeys |
+| #33 | P0.15: second Hermes profile as its own Linux user with its own DefenseClaw |
+| #34 | Rotate the LiveKit key (it had been printed); new key in `secrets/voice.enc.yaml` |
+| #35 | GPU metrics: dcgm-exporter on the Sparks, thermal and power in fleet-metrics; Jetson CDI fix |
+| #36 | Phoenix requests the `groups` scope from Pocket ID |
+| #37 | P4.9: a2a-scanner on agent cards and Agentic Radar in CI |
+| #38 | Decisions 0001 (GitHub Free) and 0002 (backups stay off) |
+| #39 | Fleet Home: GPU temperature/power, hottest sensor, Jetson rails; thermal alerts |
+| #40 | docs: planned k3s layout aligned with what is built and decided |
+
+## Midday: launcher, Temporal, ROS, sims, AIBOM (12:32–14:30)
+
+| PR | What |
+|---|---|
+| #41 | Homepage at `ops.nghodki.ai` behind oauth2-proxy and Pocket ID (P1.15) |
+| #42 | Fleet metrics into VictoriaMetrics, Edge alerts, weekly Lynis |
+| #43 | Upstream issue drafts; decision proposal 0004 (OpenBot licensing, P4.1) |
+| #45 | DefenseClaw gateway PATH drop-in in Ansible; skill recovery runbook |
+| #44 | P4.7: Temporal on dgx-2 (jobs stack, PostgreSQL, UI behind Pocket ID) |
+| #46 | MCP tool definitions pinned and scanned; Cisco AIBOM in pr-checks |
+| #47 | P5.1: ROS 2 Kilted with rmw_zenoh on the Jetson and the Pi; `/scan` reaches the Jetson |
+| #48 | P6.2/P6.4: Isaac Lab 3.0 and MuJoCo Playground sim jobs on dgx-2 |
+| #49 | Cisco AIBOM fleet inventory, AI inventory dashboard; model supply-chain note; decision 0003 |
+| #50 | cisco_aibom: the Jetson starts at 01:30 with 3 h per target |
+| #51 | Plan: status after #37–#50; stale LiteLLM version and dgx-2 lines fixed |
+
+## Afternoon and evening: the OOM, k3s, alerting off the Sparks, GitOps, Enforce (15:28–18:00)
+
+Both Sparks went down from GPU memory exhaustion around 14:46–15:00 ([incident](../operations/incident-gpu-oom.mdx)).
+
+| PR | What |
+|---|---|
+| #52 | P6.5: MLflow on dgx-2 behind Pocket ID; MuJoCo PPO logs runs to it |
+| #53 | P5.2: robot safety governor on the Pi |
+| #54 | P3.2: k3s over Wi-Fi: Sparks servers, etcd-only Jetson, Omarchy agent (decision 0005) |
+| #55 | Alerting path on the Dell: Gatus, ntfy, Homepage off the Sparks; the Dell never sleeps |
+| #56 | Tailscale policy: dgx-1 may reach `tag:agent` on 443 (the Dell's ntfy over Tailscale HTTPS) |
+| #57 | P3.4, P3.5 audit: Argo CD + KSOPS, Kyverno (Audit), CNPG operator (decision 0006) |
+| #58 | smoke: bump the sync-test label (P3.4 acceptance: a merge deploys without manual steps) |
+| #59 | Argo CD runbook: measured merge-to-deploy time (178 s) |
+| #61 | Decision 0009: no dedicated services box for now |
+| #60 | Hardening: AIBOM memory cap and guard, human-only e-stop reset, dead man for the Dell |
+| #62 | P3.5: `build-sign.yml` builds mlflow and ros-zenoh (amd64 + arm64), pushes to GHCR, cosign keyless + SBOM (decision 0008) |
+| #63 | build-sign: plain buildx/cosign/binfmt pinned by SHA-256/digest instead of third-party actions |
+| #64 | build-sign: package-level SBOM attestation (Rekor refuses the 28 MB ROS SPDX); retry cosign on 5xx |
+| #65 | P3.5: Kyverno Enforce: signed `ghcr.io/nikghodki` images, digests, limits, no latest, registries, no privileged; 2 admission replicas |
+| #66 | sim: Isaac Lab RSL-RL and `measure.sh` log to MLflow; MLflow on Homepage (P6.5) |
+| #67 | P4.3: MCP admission from Git (DefenseClaw `asset_policy` registry), nightly MCP tool drift check; dead Hermes MCP servers removed |
+| #68 | P3.5 acceptance results, break-glass B (scale to 0 first), cosign verify prints the certificate identity |
+| #69 | build-sign: the run summary states the verified identity and the refused wrong one |
+
+PR numbers skipped above (#1) were not merged to `main` (unverified). Open work at the time of writing: P3.3
+(edge in the cluster), on its own branch.
