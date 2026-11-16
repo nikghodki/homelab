@@ -54,7 +54,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (fleet_host) (last_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", total=\"total\", added=\"added\", removed=\"removed\" | event=\"aibom\" | unwrap total [2d]))",
+          "expr": "sum by (fleet_host) (max by (fleet_host, scanned_on) (last_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", total=\"total\", added=\"added\", removed=\"removed\", aibom_host=\"host\" | event=\"aibom\" | label_format scanned_on=\"{{.fleet_host}}\" | label_format fleet_host=\"{{ or .aibom_host .fleet_host }}\" | unwrap total [2d])))",
           "datasource": {
             "type": "loki",
             "uid": "defenseclaw-loki"
@@ -109,7 +109,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (fleet_host) (count_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.new\" [24h]))",
+          "expr": "sum by (fleet_host) (count_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\", aibom_host=\"host\" | event=\"aibom.new\" | label_format scanned_on=\"{{.fleet_host}}\" | label_format fleet_host=\"{{ or .aibom_host .fleet_host }}\" [24h]))",
           "datasource": {
             "type": "loki",
             "uid": "defenseclaw-loki"
@@ -164,7 +164,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (fleet_host) (count_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.removed\" [24h]))",
+          "expr": "sum by (fleet_host) (count_over_time({host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\", aibom_host=\"host\" | event=\"aibom.removed\" | label_format scanned_on=\"{{.fleet_host}}\" | label_format fleet_host=\"{{ or .aibom_host .fleet_host }}\" [24h]))",
           "datasource": {
             "type": "loki",
             "uid": "defenseclaw-loki"
@@ -220,7 +220,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", total=\"total\", added=\"added\", removed=\"removed\" | event=\"aibom\"",
+          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", total=\"total\", added=\"added\", removed=\"removed\", aibom_host=\"host\" | event=\"aibom\" | label_format scanned_on=\"{{.fleet_host}}\" | label_format fleet_host=\"{{ or .aibom_host .fleet_host }}\"",
           "datasource": {
             "type": "loki",
             "uid": "defenseclaw-loki"
@@ -254,7 +254,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.new\" | line_format \"{{.fleet_host}}  {{.target}}  {{.type}}  {{.name}}  {{.file}}\"",
+          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\", aibom_host=\"host\" | event=\"aibom.new\" | label_format scanned_on=\"{{.fleet_host}}\" | label_format fleet_host=\"{{ or .aibom_host .fleet_host }}\" | line_format \"{{.fleet_host}}  {{.target}}  {{.type}}  {{.name}}  {{.file}}\"",
           "datasource": {
             "type": "loki",
             "uid": "defenseclaw-loki"
@@ -288,7 +288,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\" | event=\"aibom.removed\" | line_format \"{{.fleet_host}}  {{.target}}  {{.type}}  {{.name}}  {{.file}}\"",
+          "expr": "{host_name=~\".+\"} |= \"cisco-aibom\" | json syslog=\"SYSLOG_IDENTIFIER\", msg=\"MESSAGE\" | syslog=\"cisco-aibom\" | line_format \"{{.msg}}\" | json event=\"event\", target=\"target\", type=\"type\", name=\"name\", file=\"file\", aibom_host=\"host\" | event=\"aibom.removed\" | label_format scanned_on=\"{{.fleet_host}}\" | label_format fleet_host=\"{{ or .aibom_host .fleet_host }}\" | line_format \"{{.fleet_host}}  {{.target}}  {{.type}}  {{.name}}  {{.file}}\"",
           "datasource": {
             "type": "loki",
             "uid": "defenseclaw-loki"

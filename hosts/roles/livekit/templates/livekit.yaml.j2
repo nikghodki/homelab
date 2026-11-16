@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (roles/livekit). Key from secrets/voice.enc.yaml. runbooks/jetson-services.md
+port: {{ livekit_port }}
+bind_addresses: {{ livekit_bind_addresses | to_json }}
+rtc:
+  tcp_port: {{ livekit_rtc_tcp_port }}
+  udp_port: {{ livekit_rtc_udp_port }}
+  use_external_ip: false
+keys:
+  {{ livekit_api_key | to_json }}: {{ livekit_api_secret | to_json }}
+logging:
+  level: {{ livekit_log_level }}

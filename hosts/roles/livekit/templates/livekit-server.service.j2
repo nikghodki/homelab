@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (roles/livekit). runbooks/jetson-services.md
+[Unit]
+Description=LiveKit server (control center)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+ExecStart={{ livekit_prefix }}/{{ livekit_version }}/livekit-server --config %h/.config/livekit/livekit.yaml
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

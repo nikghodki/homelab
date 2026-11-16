@@ -1,0 +1,25 @@
+# Home services on the Jetson: Home Assistant (compose stack) and the LiveKit server (user unit) used by the
+# control center. runbooks/jetson-services.md. Always --check --diff first.
+- name: Home Assistant
+  hosts: jetson_group
+  become: true
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: home-assistant
+        compose_stack_src: "{{ playbook_dir }}/../stacks/home-assistant"
+
+- name: LiveKit server (control center)
+  hosts: jetson_group
+  become: true
+  pre_tasks:
+    - name: Load the LiveKit key from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/voice.enc.yaml"
+        name: voice_secrets
+      no_log: true
+  roles:
+    - role: livekit
+      vars:
+        livekit_api_key: "{{ voice_secrets.livekit_api_key }}"
+        livekit_api_secret: "{{ voice_secrets.livekit_api_secret }}"
