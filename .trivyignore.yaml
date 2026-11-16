@@ -22,3 +22,82 @@ misconfigurations:
   - id: KSV-0108
     paths: ["cluster/platform/edge/coredns.yaml", "cluster/platform/edge/caddy.yaml"]
     statement: edge-dns-tailnet / edge-caddy-tailnet answer on the Sparks' Tailscale IPs by design
+
+# Image vulnerabilities with no fixed upstream image yet (nightly-scan.yml scans every pinned image with this file).
+# Each one is scoped to the vulnerable package version (purls), has a reason, and expires 30 days out at most:
+# .github/scripts/check-trivy-ignores.py fails the nightly on an expired entry. On expiry: bump the image if a fix
+# exists (and drop the entry), or re-check and extend with a fresh reason. Added 2026-11-15 (code review #15).
+vulnerabilities:
+  - id: CVE-2026-31789
+    purls:
+      - pkg:apk/alpine/libcrypto3@3.5.5-r0
+      - pkg:apk/alpine/libssl3@3.5.5-r0
+      - pkg:apk/alpine/libcrypto3@3.5.0-r0
+      - pkg:apk/alpine/libssl3@3.5.0-r0
+    expired_at: 2026-12-15
+    statement: >-
+      OpenSSL heap overflow on 32-bit systems only; every host and runner is 64-bit. In gitleaks v8.30.1 and
+      actionlint 1.7.12 (CI only, read-only checkout) and rest-server 0.14.0; all are the latest releases
+  - id: CVE-2026-123158
+    purls:
+      - pkg:apk/alpine/openssh-client-common@10.0_p1-r10
+      - pkg:apk/alpine/openssh-client-default@10.0_p1-r10
+      - pkg:apk/alpine/openssh-keygen@10.0_p1-r10
+      - pkg:apk/alpine/openssh-client-common@10.3_p1-r1
+      - pkg:apk/alpine/openssh-client-default@10.3_p1-r1
+      - pkg:apk/alpine/openssh-keygen@10.3_p1-r1
+    expired_at: 2026-12-15
+    statement: >-
+      OpenSSH password-auth bypass in the server's password check; these images ship only the ssh client. gitleaks
+      v8.30.1 (latest; maintenance-only) never runs ssh in CI; Home Assistant 2026.11.1 (latest stable) has no sshd
+  - id: CVE-2026-119618
+    purls:
+      - pkg:apk/alpine/apache2-utils@2.4.63-r4
+    expired_at: 2026-12-15
+    statement: >-
+      httpd mod_http2 RCE; rest-server 0.14.0 (latest) ships apache2-utils only for htpasswd, no httpd or mod_http2
+  - id: CVE-2025-68121
+    purls:
+      - pkg:golang/stdlib@v1.24.3
+      - pkg:golang/stdlib@v1.25.0
+      - pkg:golang/stdlib@v1.24.6
+    expired_at: 2026-12-15
+    statement: >-
+      Go crypto/tls certificate validation on session resumption. gosu in postgres 17.12-alpine (newest digest) does
+      no TLS; ksops/kustomize v4.5.1 (latest) render local Git in Argo CD's repo server; rest-server 0.14.0 (latest)
+      serves TLS on the LAN with no client certificates. No fixed release of any of them
+  - id: CVE-2026-63825
+    purls: [pkg:deb/ubuntu/linux-libc-dev@6.8.0-149.149]
+    expired_at: 2026-12-15
+    statement: &kernel-headers >-
+      Kernel CVE reported against linux-libc-dev (kernel headers) in ros:kilted-ros-base (newest digest); no kernel
+      code runs from the image (containers use the host kernel) and Ubuntu has no fix yet
+  - id: CVE-2026-64523
+    purls: [pkg:deb/ubuntu/linux-libc-dev@6.8.0-149.149]
+    expired_at: 2026-12-15
+    statement: *kernel-headers
+  - id: CVE-2026-68426
+    purls: [pkg:deb/ubuntu/linux-libc-dev@6.8.0-149.149]
+    expired_at: 2026-12-15
+    statement: *kernel-headers
+  - id: CVE-2026-90162
+    purls: [pkg:deb/ubuntu/linux-libc-dev@6.8.0-149.149]
+    expired_at: 2026-12-15
+    statement: *kernel-headers
+  - id: CVE-2026-93221
+    purls: [pkg:deb/ubuntu/linux-libc-dev@6.8.0-149.149]
+    expired_at: 2026-12-15
+    statement: *kernel-headers
+  # Home Assistant 2026.11.1 (latest stable, pinned on 2026-11-15 to what was running; hosts/stacks/home-assistant)
+  - id: CVE-2026-96760
+    purls: [pkg:pypi/authlib@1.7.2]
+    expired_at: 2026-12-15
+    statement: >-
+      Authlib signature-verification bypass, a dependency bundled for some integrations. Fixed in Authlib 1.9.0 but
+      in no Home Assistant release yet; take the HA release that has it (Renovate PR)
+  - id: CVE-2026-85394
+    purls: [pkg:pypi/python-jose@3.5.0]
+    expired_at: 2026-12-15
+    statement: >-
+      python-jose algorithm confusion, bundled for integrations; no fixed python-jose and no HA release without it.
+      HA is LAN/tailnet only behind the front door

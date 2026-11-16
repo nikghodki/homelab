@@ -489,7 +489,7 @@ Every agent has:
 |---|---|---|
 | 1 | Network | Tailscale ACL tags; LAN exposure rules (§4.3); CrowdSec on the HTTPS proxy; HTTPS everywhere |
 | 2 | Identity | One identity per agent and device; 90-day key rotation; single-use Tailscale auth keys |
-| 3 | Supply chain (CI) | gitleaks, TruffleHog, OSV-Scanner, Syft + Grype, Semgrep CE, CodeGuard, Trivy, kubeconform, Kyverno CLI, ansible-lint, skill-scanner, mcp-scanner (static), a2a-scanner, Agentic Radar, ModelScan; cosign keyless signing |
+| 3 | Supply chain (CI) | gitleaks, TruffleHog, OSV-Scanner, Syft + Grype, Semgrep CE, CodeGuard, Trivy (no secret scanner), shellcheck, kubeconform, Kyverno CLI, ansible-lint, skill-scanner, mcp-scanner (static), a2a-scanner, Agentic Radar, ModelScan; cosign keyless signing |
 | 4 | Admission (home) | Kyverno: signed images only, no privileged pods (except an allowlist: Zenoh, ROS drivers), no `latest`, limits required |
 | 5 | Agent runtime | DefenseClaw 1.0.9 hooks (strict or managed tier) in every framework; DefenseClaw guardrail plugin in LiteLLM (model and MCP calls); guard models; LiteLLM tool permissions and approvals |
 | 6 | Host runtime | Tetragon with DefenseClaw kernel controls; DefenseClaw sensor, hook guardian, foreign-hook guard; kube-bench + Lynis monthly |
