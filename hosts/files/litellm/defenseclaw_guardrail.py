@@ -79,7 +79,7 @@ class DefenseClawGuardrail(CustomGuardrail):
             r = await client.post(f"{self.api_base}/api/v1/agent-gateway/hook", json=event, headers=headers)
         r.raise_for_status()
         answer = r.json()
-        if answer.get("action") not in ("allow", "alert", "block"):
+        if not isinstance(answer, dict) or answer.get("action") not in ("allow", "alert", "block"):
             raise ValueError(f"no verdict in answer: {str(answer)[:200]}")
         return answer
 

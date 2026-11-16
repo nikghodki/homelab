@@ -92,3 +92,24 @@ def test_every_client_is_https_and_restricted():
     for c in REAL_SPEC["clients"]:
         assert c["groups"], c["id"]
         assert all(u.startswith("https://") and ".nghodki.ai/" in u for u in c["callbackURLs"]), c["id"]
+
+
+def test_changed_logout_callback_updates_client(stored):
+    api = FakeAPI()
+    sync_mod.sync(api, REAL_SPEC, log=lambda *_: None)
+    spec = yaml.safe_load(yaml.safe_dump(REAL_SPEC))
+    cid = spec["clients"][0]["id"]
+    spec["clients"][0]["logoutCallbackURLs"] = ["https://example.nghodki.ai/logged-out"]
+    api.writes.clear()
+    sync_mod.sync(api, spec, log=lambda *_: None)
+    assert ("PUT", f"/oidc/clients/{cid}") in api.writes
+    assert api.clients[cid]["logoutCallbackURLs"] == ["https://example.nghodki.ai/logged-out"]
+
+
+def test_sops_set_keeps_the_secret_off_the_command_line(monkeypatch):
+    calls = []
+    monkeypatch.setattr(sync_mod.subprocess, "run", lambda cmd, **kw: calls.append((cmd, kw)))
+    sync_mod.sops_set("oidc_x_secret", "s3cret-value")
+    (cmd, kw), = calls
+    assert not any("s3cret-value" in part for part in cmd)
+    assert "--value-stdin" in cmd and kw["input"] == '"s3cret-value"' and kw["check"] is True

@@ -84,3 +84,15 @@ def test_committed_tools_are_pinned():
     root = Path(__file__).parents[3] / "tools"
     for f in sorted(root.glob("*/tools.json")):
         assert hashes.diff(f) == [], f
+
+
+def test_check_fails_when_tools_json_is_missing(server, monkeypatch, capsys):
+    server.unlink()  # tools.sha256 stays
+    monkeypatch.setattr(hashes.sys, "argv", ["mcp-tool-hashes.py", "check", str(server.parents[1])])
+    assert hashes.main() == 1
+    assert "tools.sha256 without tools.json" in capsys.readouterr().out
+
+
+def test_check_passes_for_pinned_servers(server, monkeypatch):
+    monkeypatch.setattr(hashes.sys, "argv", ["mcp-tool-hashes.py", "check", str(server.parents[1])])
+    assert hashes.main() == 0

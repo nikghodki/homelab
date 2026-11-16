@@ -6,7 +6,7 @@
       - k3s_node_ip | length > 0
       - k3s_token | length > 0
       - k3s_cluster_init or k3s_server_url | length > 0
-      - ansible_architecture in k3s_sha256
+      - ansible_facts['architecture'] in k3s_sha256
     quiet: true
 
 - name: Is k3s installed yet
@@ -17,8 +17,8 @@
 - name: Enough free memory for a first install
   when: k3s_min_mem_available_mb | int > 0 and not k3s_unit.stat.exists
   ansible.builtin.assert:
-    that: ansible_memory_mb.nocache.free | int >= k3s_min_mem_available_mb | int
-    fail_msg: "Only {{ ansible_memory_mb.nocache.free }} MiB available; k3s needs {{ k3s_min_mem_available_mb }} MiB here"
+    that: ansible_facts['memory_mb']['nocache']['free'] | int >= k3s_min_mem_available_mb | int
+    fail_msg: "Only {{ ansible_facts['memory_mb']['nocache']['free'] }} MiB available; k3s needs {{ k3s_min_mem_available_mb }} MiB here"
     quiet: true
 
 - name: Reverse-path filter on the LAN interface
@@ -75,7 +75,7 @@
   ansible.builtin.get_url:
     url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s_version | urlencode }}/k3s{{ k3s_arch_suffix }}"
     dest: /usr/local/bin/k3s
-    checksum: "sha256:{{ k3s_sha256[ansible_architecture] }}"
+    checksum: "sha256:{{ k3s_sha256[ansible_facts['architecture']] }}"
     owner: root
     group: root
     mode: "0755"

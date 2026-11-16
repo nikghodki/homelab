@@ -21,10 +21,11 @@
         checksum: "sha256:{{ restic_install_url }}/SHA256SUMS"
         dest: "/opt/restic/{{ restic_install_version }}/restic.bz2"
         mode: "0644"
-    - name: Unpack
+    - name: Unpack (to a temp name, then renamed, so an interrupted run leaves no truncated binary for creates)
       ansible.builtin.command:
         cmd: >-
-          python3 -c "import bz2,shutil,sys; shutil.copyfileobj(bz2.open(sys.argv[1]), open(sys.argv[2],'wb'))"
+          python3 -c "import bz2,os,shutil,sys; t = sys.argv[2] + '.tmp';
+          shutil.copyfileobj(bz2.open(sys.argv[1]), open(t, 'wb')); os.replace(t, sys.argv[2])"
           /opt/restic/{{ restic_install_version }}/restic.bz2 /opt/restic/{{ restic_install_version }}/restic
         creates: "/opt/restic/{{ restic_install_version }}/restic"
     - name: Executable

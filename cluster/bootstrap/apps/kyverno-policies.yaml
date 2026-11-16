@@ -1,4 +1,4 @@
-# policies/kyverno (Audit mode, runbooks/kyverno.md). Retries until the Kyverno CRDs exist.
+# policies/kyverno (Deny since P3.5, runbooks/kyverno.md). Retries until the Kyverno CRDs exist.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

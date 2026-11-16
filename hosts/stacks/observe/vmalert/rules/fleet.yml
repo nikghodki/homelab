@@ -3,7 +3,10 @@ groups:
   - name: fleet-hosts
     rules:
       - alert: FleetHostSilent
-        expr: max by (host_name) (time() - timestamp(system_memory_usage_bytes{state="used"})) > 300
+        # lag() over a long window: an instant selector only sees samples inside the query step (5m), so a silent
+        # host dropped out of `time() - timestamp(...)` before it reached 300 s and the alert could never fire.
+        # Resolves after a day of silence; the Gatus ssh checks still cover that.
+        expr: max by (host_name) (lag(system_memory_usage_bytes{state="used"}[1d])) > 300
         for: 2m
         labels: {severity: critical}
         annotations:

@@ -31,7 +31,9 @@ def sops_get(key):
 
 
 def sops_set(key, value):
-    subprocess.run(["sops", "set", str(SECRETS), f'["{key}"]', json.dumps(value)], check=True)
+    # the value goes in on stdin, not argv, so the new client secret never shows in `ps`
+    subprocess.run(["sops", "set", "--value-stdin", str(SECRETS), f'["{key}"]'], input=json.dumps(value),
+                   text=True, check=True)
 
 
 class PocketID:
@@ -92,7 +94,9 @@ def sync(api, spec, log=print):
             log(f"client {c['id']}: created")
         else:
             cur = clients[c["id"]]
-            if (sorted(cur.get("callbackURLs") or []) != sorted(c["callbackURLs"]) or cur.get("name") != c["name"]
+            if (sorted(cur.get("callbackURLs") or []) != sorted(c["callbackURLs"])
+                    or sorted(cur.get("logoutCallbackURLs") or []) != sorted(body["logoutCallbackURLs"])
+                    or cur.get("name") != c["name"]
                     or cur.get("pkceEnabled") != body["pkceEnabled"] or cur.get("launchURL") != body["launchURL"]):
                 update = {k: v for k, v in body.items() if k != "id"}
                 api.send("PUT", f"/oidc/clients/{c['id']}", update)

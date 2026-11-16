@@ -83,6 +83,16 @@ def test_bad_answer_fails_closed_for_tools():
         run(g.async_pre_call_hook(Key(), None, {"name": "x", "arguments": {}}, "call_mcp_tool"))
 
 
+@pytest.mark.parametrize("body", [None, [], "allow", 1])
+def test_non_object_answer_is_no_verdict(body):
+    # JSON that isn't an object must take the no-verdict path: open for prompts, closed for tools
+    g = make(lambda r: httpx.Response(200, json=body))
+    data = {"messages": [{"role": "user", "content": "hi"}]}
+    assert run(g.async_pre_call_hook(Key(), None, data, "acompletion")) is data
+    with pytest.raises(dg.GuardrailBlocked):
+        run(g.async_pre_call_hook(Key(), None, {"name": "x", "arguments": {}}, "call_mcp_tool"))
+
+
 def test_multimodal_user_content_is_flattened():
     seen = {}
     g = make(lambda r: (seen.setdefault("b", json.loads(r.content)), httpx.Response(200, json={"action": "allow"}))[1])

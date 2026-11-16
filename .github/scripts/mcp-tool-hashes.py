@@ -64,6 +64,11 @@ def main() -> int:
             print(f"::error file={f}::{p}")
         print(f"{f}: {'CHANGED' if problems else 'ok'}")
         failed |= bool(problems)
+    # a pinned server whose tools.json is gone would otherwise drop out of the check without a word
+    for lock in sorted(root.glob("*/tools.sha256")):
+        if sys.argv[1] == "check" and not lock.with_name("tools.json").exists():
+            print(f"::error file={lock}::tools.sha256 without tools.json")
+            failed = True
     return 1 if failed else 0
 
 
