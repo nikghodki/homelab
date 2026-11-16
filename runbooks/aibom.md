@@ -17,7 +17,7 @@ secrets. Decision: decisions/0003-cisco-ai-defense-tools.md.
 
 | Host | Code dirs (read in place) | Container images (of the running containers) |
 |---|---|---|
-| dgx-1 | DGXMM `~/workspace/dgx-model-manager`, LiteLLM config `~/litellm-setup` | `litellm-proxy`, `open-webui` |
+| dgx-1 | DGXMM `~/workspace/dgx-model-manager`, LiteLLM stack `/opt/homelab/litellm` | `litellm-proxy`, `open-webui` |
 | dgx-2 | — | `observe-phoenix-1`; and the **Jetson's** Home Assistant image by digest (below) |
 | jetson | Hermes `~nikjetson/.hermes/hermes-agent`, Hermes `~hermes-nikhil/.hermes/hermes-agent`, `~/workspace/roboclaw` | none here (`cisco_aibom_image_scans: false`); scanned on dgx-2 |
 | pi | PicoClaw `/var/lib/picoclaw/.picoclaw` (config, workspace, skills) and its MCP server `/var/lib/picoclaw/roboclaw` (own user since 2026-11-15, runbooks/robot-safety.md), `~/workspace/roboclaw` | — |
@@ -106,11 +106,13 @@ sudo journalctl -t cisco-aibom --since today -o cat | grep '"scanned_on"'
 sudo ls /var/lib/cisco-aibom/jetson-*.json     # on dgx-2
 ```
 
-**No LLM.** `cisco-aibom analyze` requires `--llm-model`; its agentic stage confirms or drops each candidate and adds
-identifiers. The job points it at a closed port, so it falls back to its deterministic scanners (`agentic_status:
-degraded` in the reports). Expect some false positives (test fixtures, model names in tests). Turning enrichment on
-needs a dedicated LiteLLM virtual key for AIBOM (owned by the LiteLLM session) and then `--llm-provider openai
---llm-api-base <LiteLLM URL>/v1 --llm-model <alias>` with the key from a root-only env file.
+**LLM (since 2026-11-15).** `cisco-aibom analyze` requires `--llm-model`; its agentic stage confirms or drops each
+candidate and adds identifiers. The role writes `/etc/cisco-aibom/llm.env` (root 0600: `AIBOM_LLM_*`, read by
+cisco-aibom itself so the key never shows in the process list) from the dedicated LiteLLM key `cisco-aibom`
+(`qwen3.8-27b` only, 10 rpm, 1 in flight; `secrets/litellm.enc.yaml`, loaded by `playbooks/aibom.yml`), with
+`AIBOM_LLM_REASONING=off`, 0.2 requests/s and a 900 s batch timeout (the first request may start the on-demand model).
+dgx-1 uses `http://127.0.0.1:4000/v1`, the others `http://model.nghodki.ai/v1`. Without a key the job points it at a
+closed port and falls back to its deterministic scanners (`agentic_status: degraded`), as before.
 
 ## Two AIBOMs on the Jetson
 

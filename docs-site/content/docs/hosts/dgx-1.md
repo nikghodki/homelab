@@ -33,9 +33,10 @@ dgxmanager), NATS and Fleet still go down with dgx-1 (see
 | `edge-caddy` | `caddy:2.11` | **stopped 2026-11-15** (`restart: no`), kept until 2026-11-22 for a rollback | hand, `~/edge-gateway` |
 | `edge-dnsmasq` | `edge-dnsmasq:local` | **stopped 2026-11-15** (`restart: no`), kept until 2026-11-22 | hand, `~/edge-gateway` |
 | `nginx-gateway` | `nginx:alpine` | **stopped 2026-11-15** (`restart: no`; its routes are in the k3s Caddyfile) | hand, `~/voice-assistant/nginx` |
-| `litellm-proxy` | `ghcr.io/berriai/litellm:v1.109.1` (digest-pinned, P0.13) | 0.0.0.0:4000 | hand, `~/litellm-setup` |
-| `litellm-postgres` | `postgres:16-alpine` | 127.0.0.1:5432 | hand |
-| `litellm-redis` | `redis:7-alpine` | 127.0.0.1:6379 | hand |
+| `litellm-proxy` | `ghcr.io/berriai/litellm:v1.109.1` (digest-pinned, P0.13) | 0.0.0.0:4000 | Ansible, `hosts/stacks/litellm` |
+| `litellm-postgres` | `postgres:16-alpine` (by digest) | 127.0.0.1:5432 | Ansible |
+| `litellm-redis` | `redis:7-alpine` (by digest) | 127.0.0.1:6379 | Ansible |
+| `litellm-defenseclaw-bridge` | `alpine/socat:1.8.0.3` (by digest) | 172.17.0.1:18970 (host network) | Ansible |
 | `open-webui` | `ghcr.io/open-webui/open-webui:v0.13.3` | 0.0.0.0:3100 | hand |
 | `dgxmm` | `dgxmm:latest` | 127.0.0.1:8090 | DGXMM project |
 | `bus-nats-1` | `nats:2.15.3-alpine` | 0.0.0.0:4222, :8883; 127.0.0.1:8222 | `playbooks/bus.yml` |

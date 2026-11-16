@@ -12,6 +12,8 @@ ExecStart=/usr/bin/python3 {{ cisco_aibom_prefix }}/cisco-aibom-fleet /etc/cisco
 SyslogIdentifier=cisco-aibom
 Environment=HOME={{ cisco_aibom_state }}
 Environment=AIBOM_LOG_LEVEL=WARNING
+# LLM for the agentic stage (AIBOM_LLM_*), when the role has a key; without it the job runs deterministic-only
+EnvironmentFile=-/etc/cisco-aibom/llm.env
 Nice=19
 IOSchedulingClass=idle
 MemoryMax={{ cisco_aibom_memory_max }}

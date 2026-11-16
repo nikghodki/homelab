@@ -516,6 +516,7 @@ Memory figures are measured unless marked (e). Effort: S = under an hour, M = an
 | 1 | **Finish the P3.3 edge cutover; retire `edge-caddy` (Docker), `nginx-gateway` and `edge-dnsmasq`** after porting nginx's `model.`/`ha.`/`voice-agent.` path routes into the k3s Caddy (§2.1, §2.15) | ~26 MiB | **Biggest**: front door fully in Git, 2 fewer hops, 1 DNS server, F6/F7 closed | M | Cutover timing |
 | 2 | **Retire Coolify** (0 apps), with its Postgres 15 and Redis 7.4; export `/data/coolify` first (§2.8) | ~177 MiB on dgx-1 | 4 containers, 1 Postgres, 1 RSAL Redis, a Docker-socket holder and a route gone | S | **Yes** |
 | 3 | **Replace LiteLLM's Redis 7.4 with Valkey** (pinned by digest), as part of moving LiteLLM into the repo (§4) | 0 | Licence back to BSD; one less "could stop being free" | S | No |
+|   | Item 3 declined 2026-11-15: Redis 7.4 under RSALv2/SSPL is free for private use; revisit only if licensing needs change. | | | | |
 | 4 | **Move Cisco AIBOM image scans off the Jetson and Pi** (scan their images by digest from dgx-2; keep code scans light) (§2.7) | ~1.1 GiB peak on the Jetson | Removes the main nightly OOM risk on the tightest host | S–M | No |
 | 5 | **One oauth2-proxy** behind Caddy `forward_auth` for every OIDC-less UI, and **Gatus native OIDC** (§2.2) | ~20 MiB | 3 → 1 proxy; new protected app = one Caddy line | M | No |
 | 6 | **Narrow scanner scopes**: Trivy `fs --scanners vuln,misconfig`; add standalone shellcheck; keep digest pins (§2.6) | CI only | Fewer duplicate secret findings; closes the shell-script lint gap | S | No |

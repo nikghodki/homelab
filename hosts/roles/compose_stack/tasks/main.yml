@@ -48,7 +48,10 @@
         mode: "0755"
       vars:
         compose_stack_all_paths: "{{ (compose_stack_files.files + compose_stack_templates.files) | map(attribute='path') }}"
-      loop: "{{ compose_stack_all_paths | map('relpath', compose_stack_src) | map('dirname') | reject('equalto', '') | unique }}"
+        compose_stack_extra_dirs: "{{ compose_stack_extra_files | map(attribute='dest') | map('dirname') | list }}"
+      loop: >-
+        {{ (compose_stack_all_paths | map('relpath', compose_stack_src) | map('dirname') | list + compose_stack_extra_dirs)
+           | reject('equalto', '') | unique }}
 
     - name: Copy plain files
       ansible.builtin.copy:
@@ -60,6 +63,17 @@
       loop: "{{ compose_stack_files.files }}"
       loop_control: {label: "{{ item.path | relpath(compose_stack_src) }}"}
       register: compose_stack_copied
+
+    - name: Copy files kept elsewhere in the repo
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ compose_stack_root }}/{{ compose_stack_name }}/{{ item.dest }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ compose_stack_extra_files }}"
+      loop_control: {label: "{{ item.dest }}"}
+      register: compose_stack_extra_copied
 
     - name: Render templates (secrets come from SOPS)
       vars:
@@ -102,8 +116,9 @@
     - name: Restart services whose config changed (a sub-folder is named after its service)
       vars:
         compose_stack_changed_dirs: >-
-          {{ ((compose_stack_copied.results | default([])) + (compose_stack_rendered.results | default([])))
-             | selectattr('changed') | map(attribute='item.path') | map('relpath', compose_stack_src)
+          {{ (((compose_stack_copied.results | default([])) + (compose_stack_rendered.results | default([])))
+              | selectattr('changed') | map(attribute='item.path') | map('relpath', compose_stack_src) | list
+              + (compose_stack_extra_copied.results | default([]) | selectattr('changed') | map(attribute='item.dest') | list))
              | map('dirname') | reject('equalto', '') | map('split', '/') | map('first') | unique }}
       community.docker.docker_compose_v2:
         project_src: "{{ compose_stack_root }}/{{ compose_stack_name }}"

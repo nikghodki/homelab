@@ -12,7 +12,8 @@ that the host collector ships to Loki:
   {"event": "aibom.skipped", "reason": "skipped: low memory", ...}  an image target not scanned because MemAvailable
                                    was below its threshold (image_min_mem_gib / image_min_mem_gib_by_container, keyed by container
                                    or remote image name)
-Secret findings are counted, never named. No LLM is configured, so the BOM is deterministic-only (runbooks/aibom.md).
+Secret findings are counted, never named. The agentic stage uses LiteLLM when /etc/cisco-aibom/llm.env exists
+(runbooks/aibom.md), else the BOM is deterministic-only.
 Managed by homelab Ansible (roles/cisco_aibom). Usage: cisco-aibom-fleet <targets.json>
 """
 import datetime
@@ -30,6 +31,14 @@ HIDDEN_TYPES = {"secret"}
 # scanners at once (agentic_status "degraded").
 NO_LLM = ["--llm-model", "none", "--llm-provider", "openai", "--llm-api-base", "http://127.0.0.1:9",
           "--llm-api-key", "unused", "--agentic-max-retry-seconds", "0", "--agentic-timeout", "5"]
+
+
+def llm_args(environ=os.environ) -> list[str]:
+    """The LLM comes from AIBOM_LLM_* (the root-only /etc/cisco-aibom/llm.env, read by cisco-aibom itself, so the key
+    never shows up in the process list). Without a base URL and key: the closed port above, deterministic-only."""
+    if environ.get("AIBOM_LLM_API_BASE") and environ.get("AIBOM_LLM_API_KEY"):
+        return ["--agentic-timeout", environ.get("AIBOM_AGENTIC_TIMEOUT", "900"), "--agentic-concurrency", "1"]
+    return NO_LLM
 
 
 def log(event: str, **fields) -> None:
@@ -88,7 +97,7 @@ def scan(exe: str, source: str, is_image: bool, timeout: int, workdir: pathlib.P
     out = workdir / "report.json"
     out.unlink(missing_ok=True)
     cmd = [exe, "analyze", source, "-o", "json", "-O", str(out), "--no-progress", "--no-show-summary",
-           "--cache-dir", str(workdir / "cache"), *NO_LLM]
+           "--cache-dir", str(workdir / "cache"), *llm_args()]
     if is_image:
         cmd += ["--container-extraction-tier", "docker"]
     run = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, cwd=workdir)

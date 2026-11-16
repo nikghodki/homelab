@@ -1,0 +1,40 @@
+# LiteLLM on dgx-1 (runbooks/litellm.md): proxy, Postgres and Redis from hosts/stacks/litellm, keys from
+# secrets/litellm.enc.yaml. Always --check --diff first.
+- name: LiteLLM
+  hosts: litellm
+  become: true
+  pre_tasks:
+    - name: Load LiteLLM secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/litellm.enc.yaml"
+        name: litellm_secrets
+      no_log: true
+  vars:
+    # Extra vars override these only during a key rotation (runbooks/litellm.md).
+    litellm_master_key: "{{ litellm_secrets.litellm_master_key }}"
+    litellm_salt_key: "{{ litellm_secrets.litellm_salt_key }}"
+    litellm_postgres_password: "{{ litellm_secrets.litellm_postgres_password }}"
+    litellm_ui_password: "{{ litellm_secrets.litellm_ui_password }}"
+    # dgx-1's DefenseClaw gateway token (DEFENSECLAW_GATEWAY_TOKEN in ~/.defenseclaw/.env; update both together)
+    litellm_defenseclaw_token: "{{ litellm_secrets.defenseclaw_dgx1_gateway_token }}"
+    litellm_phoenix_api_key: "{{ litellm_secrets.phoenix_api_key }}"   # Phoenix system key "litellm-dgx-1"
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: litellm
+        compose_stack_src: "{{ playbook_dir }}/../stacks/litellm"
+        compose_stack_private_templates:
+          litellm-proxy: 0   # litellm.env: root 0600, read by docker compose
+        compose_stack_extra_files:
+          - {src: "{{ playbook_dir }}/../files/litellm/defenseclaw_guardrail.py", dest: litellm-proxy/defenseclaw_guardrail.py}
+        compose_stack_env:
+          POSTGRES_PASSWORD: "{{ litellm_postgres_password }}"
+  tasks:
+    - name: LiteLLM is ready (database connected)
+      ansible.builtin.uri:
+        url: http://127.0.0.1:4000/health/readiness
+      register: litellm_ready
+      until: litellm_ready.status == 200 and (litellm_ready.json.db | default('')) == 'connected'
+      retries: 40
+      delay: 3
+      when: not ansible_check_mode

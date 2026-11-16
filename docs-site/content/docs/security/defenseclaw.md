@@ -150,10 +150,10 @@ All 19 DefenseClaw dashboards and its alert rules are vendored ([Dashboards](../
 | Capability | Status |
 |---|---|
 | Webhooks (HITL → WhatsApp/ntfy) | dropped: DefenseClaw refused private receivers (P1.11) |
-| LLM judge | off until LiteLLM is back (`DEFENSECLAW_LLM_KEY` via LiteLLM, after DGXMM) |
+| LLM judge | on since 2026-11-15 (`guardrail.judge.enabled`) on the Jetson (both users, key `defenseclaw-jetson-judge`) and dgx-1 (key `defenseclaw-dgx1`), model `qwen3.8-27b` via LiteLLM |
 | OpenShell sandboxes | not set up (`Sandbox: off`) |
 | Tetragon kernel controls | not installed (P3.6) |
-| Agent-gateway route for LiteLLM | the guardrail plugin is written (`hosts/files/litellm/defenseclaw_guardrail.py`, 8 tests) and loads in LiteLLM 1.109.1, but is not enabled (P2.4, P0.14 window) |
+| Agent-gateway route for LiteLLM | on since 2026-11-15 on dgx-1 (`connectors.agent_gateway.enabled`, action mode); LiteLLM's global guardrail (`hosts/files/litellm/defenseclaw_guardrail.py`, 10 tests) blocks prompt injection with HTTP 400 (P2.4) |
 | ACP guard, semantic routing, Splunk/Galileo | not used |
 
 ## Upgrade DefenseClaw

@@ -2,5 +2,14 @@
 - name: Cisco AIBOM
   hosts: all
   become: true
+  pre_tasks:
+    - name: Load the AIBOM LiteLLM key from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/litellm.enc.yaml"
+        name: litellm_secrets
+      no_log: true
+      when: cisco_aibom_enabled | default(false)
   roles:
     - role: cisco_aibom
+      vars:
+        cisco_aibom_llm_api_key: "{{ litellm_secrets.cisco_aibom_litellm_key | default('') }}"

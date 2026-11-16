@@ -46,6 +46,10 @@ all:
     bus:
       hosts:
         dgx-1:
+    # LiteLLM, the model/MCP/A2A gateway (runbooks/litellm.md)
+    litellm:
+      hosts:
+        dgx-1:
     observe:
       hosts:
         dgx-2:

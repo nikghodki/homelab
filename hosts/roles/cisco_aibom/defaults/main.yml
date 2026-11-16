@@ -22,3 +22,11 @@ cisco_aibom_unit_timeout: 6h  # whole run
 cisco_aibom_prefix: /opt/cisco-aibom
 cisco_aibom_state: /var/lib/cisco-aibom
 cisco_aibom_requirements: "{{ playbook_dir }}/../../.github/requirements-aibom.txt"
+# LLM for the agentic stage (confirms or drops candidates). Off while the key is empty: the job then points it at a
+# closed port and runs deterministic-only. The key is LiteLLM's dedicated `cisco-aibom` key (qwen3.8-27b only, 10 rpm,
+# 1 in flight), loaded from secrets/litellm.enc.yaml by playbooks/aibom.yml; it lands in a root-only env file.
+cisco_aibom_llm_api_key: ""
+cisco_aibom_llm_api_base: http://model.nghodki.ai/v1
+cisco_aibom_llm_model: qwen3.8-27b   # decisions/0011-default-model.md
+cisco_aibom_llm_rate_limit: 0.2      # requests/second, client side (LiteLLM's key limit is the hard cap)
+cisco_aibom_llm_timeout_s: 900       # per agentic batch; the first request may start the on-demand model

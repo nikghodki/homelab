@@ -1,0 +1,44 @@
+# LiteLLM proxy on dgx-1 (hosts/stacks/litellm, runbooks/litellm.md). No response cache; traces go to Phoenix.
+
+# Every route lives in the DB: DGXMM registers its on-demand models there (runbooks/litellm.md). The two static
+# routes (qwen3.6-35b on vllm-qwen, whisper-large-v3-turbo on vllm-whisper) were removed on 2026-11-15 (P0.7).
+model_list: []
+
+# DefenseClaw checks every chat prompt (fails open) and every MCP tool call (fails closed) through dgx-1's
+# DefenseClaw gateway, agent-gateway route (P2.4; hosts/files/litellm/defenseclaw_guardrail.py). Global on purpose:
+# per-key guardrails are a LiteLLM enterprise feature. The judge and scanner keys are skipped (their prompts quote
+# what they judge).
+guardrails:
+  - guardrail_name: defenseclaw
+    litellm_params:
+      guardrail: defenseclaw_guardrail.DefenseClawGuardrail
+      mode: [pre_call, pre_mcp_call]
+      default_on: true
+      api_base: os.environ/DEFENSECLAW_URL
+      api_key: os.environ/DEFENSECLAW_TOKEN
+      timeout: 10
+      skip_key_aliases: [defenseclaw-dgx1, defenseclaw-jetson, defenseclaw-jetson-judge, cisco-aibom]
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 600
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  store_model_in_db: true
+  telemetry: false
+  stream_response: true
+  max_parallel_requests: 100
+  disable_spend_logs: true
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  json_logs: true
+  # arize_phoenix: OTLP traces to Phoenix on dgx-2 (P2.6), PHOENIX_* in the environment
+  callbacks: [qwen_system_merge.proxy_handler_instance, arize_phoenix]
+  cache: false
+  success_callback: []
+  failure_callback: []

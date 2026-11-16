@@ -1,0 +1,91 @@
+# LiteLLM on dgx-1 (model, MCP and A2A gateway; runbooks/litellm.md). Deployed by playbooks/litellm.yml.
+# Moved here from the hand-run ~/litellm-setup on 2026-11-15 with the same images, config and data.
+name: litellm
+
+services:
+  litellm-redis:
+    # Redis 7.4 (RSALv2/SSPL) is kept on purpose: free for private use (docs/reviews/tool-review-2026-11.md item 3).
+    image: redis:7-alpine@sha256:7b1753b4c5ad8458906c272a8132b8c15f5557b000379eb115fb239706a384b7
+    container_name: litellm-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - litellm-redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+
+  litellm-postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    container_name: litellm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}   # only read when the data folder is empty
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - litellm-postgres-data:/var/lib/postgresql/data
+
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:v1.109.1@sha256:11175975a3093e05e92faee2fe2fe3412a3ae2fcaa849eb0fe25d5f0d8bcb2e9
+    container_name: litellm-proxy   # DGXMM and Open WebUI use this name
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: ./litellm-proxy/litellm.env   # keys and passwords (rendered from secrets/litellm.enc.yaml, root 0600)
+    environment:
+      REDIS_HOST: litellm-redis
+      REDIS_PORT: "6379"
+      STORE_MODEL_IN_DB: "True"
+      LITELLM_LOG: INFO
+      PYTHONPATH: /app
+      # DefenseClaw guardrail (P2.4): dgx-1's gateway listens on 127.0.0.1 only; defenseclaw-bridge relays it to
+      # docker0 (172.17.0.1 = host-gateway = host.docker.internal), not to the LAN.
+      DEFENSECLAW_URL: http://host.docker.internal:18970
+      # Traces to Phoenix on dgx-2 over the LAN (P2.6); PHOENIX_API_KEY is in litellm.env
+      PHOENIX_COLLECTOR_HTTP_ENDPOINT: http://192.168.86.36:6006/v1/traces
+      PHOENIX_PROJECT_NAME: litellm
+    volumes:
+      - ./litellm-proxy/config.yaml:/app/config.yaml:ro
+      - ./litellm-proxy/qwen_system_merge.py:/app/qwen_system_merge.py:ro
+      - ./litellm-proxy/defenseclaw_guardrail.py:/app/defenseclaw_guardrail.py:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    depends_on:
+      - litellm-redis
+      - litellm-postgres
+    networks:
+      - default
+      - gateway
+
+  # Relays DefenseClaw's loopback-only API (127.0.0.1:18970) to the docker0 address, so containers reach it as
+  # host.docker.internal:18970 while it stays off the LAN. The gateway token is still required.
+  defenseclaw-bridge:
+    image: alpine/socat:1.8.0.3@sha256:beb4a68d9e4fe6b0f21ea774a0fde6c31f580dde6368939ed70100c5385b015e
+    container_name: litellm-defenseclaw-bridge
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: ["TCP-LISTEN:18970,bind=172.17.0.1,fork,reuseaddr", "TCP:127.0.0.1:18970"]
+
+volumes:
+  # The volumes of the old hand-run project (litellm-setup), kept as they are.
+  litellm-redis-data:
+    external: true
+    name: litellm-setup_litellm-redis-data
+  litellm-postgres-data:
+    external: true
+    name: litellm-setup_litellm-postgres-data
+
+networks:
+  # The old project's network: Open WebUI (~/open-webui) joins it to reach litellm-proxy.
+  default:
+    external: true
+    name: litellm-setup_default
+  gateway:
+    external: true
