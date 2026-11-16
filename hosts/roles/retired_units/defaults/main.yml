@@ -1,0 +1,4 @@
+# Units that were found running but that nothing uses (tool review 2026-11, docs-site "Docs vs live state" #4, #12).
+# They are stopped and disabled, not removed: re-enable by hand if needed (each reason says when). host_vars/*.
+retired_units_system: []       # [{unit: iperf3.service, reason: "..."}]  system units
+retired_units_user: []  # [{user: login, unit: x.service, reason: "..."}]  systemd --user units of a login account

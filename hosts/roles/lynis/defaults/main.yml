@@ -6,3 +6,10 @@ lynis_randomized_delay: 30min
 # Each entry needs a reason; set per host in host_vars.
 lynis_skip_tests: []         # - {id: PKGS-7388, reason: "..."}
 lynis_promisc_interfaces: [] # - {name: usb0, reason: "..."}
+# Debian family: the upstream release (the distro has 3.0.9 / 3.1.4), hash-locked, in /opt/lynis/<version> with
+# /usr/local/lynis and /usr/local/sbin/lynis pointing at it. The distro package is purged (it also shipped a second,
+# daily lynis.timer next to ours). Arch (the Dell) keeps its package, which is current. Bump both lines together;
+# the SHA-256 is the one cisofy.com/downloads/lynis publishes.
+lynis_version: 3.1.7
+lynis_tarball_sha256: b5314a07fd85fa3ffc7da57b508f0108ec3280d84e4af823f805d95cbbc2428c
+lynis_upstream: "{{ ansible_facts['os_family'] == 'Debian' }}"

@@ -1,0 +1,41 @@
+- name: Installed system services
+  ansible.builtin.service_facts:
+  when: retired_units_system | length > 0
+
+- name: Retired system units are stopped and disabled
+  ansible.builtin.systemd_service:
+    name: "{{ item.unit }}"
+    state: stopped
+    enabled: false
+  loop: "{{ retired_units_system }}"
+  loop_control: {label: "{{ item.unit }}: {{ item.reason }}"}
+  # a .socket counts as installed when its .service is
+  when: (item.unit | regex_replace('\.socket$', '.service')) in ansible_facts['services']
+
+- name: Retired user units
+  when: retired_units_user | length > 0
+  block:
+    - name: Look up the users
+      ansible.builtin.getent:
+        database: passwd
+
+    - name: Is the user unit there
+      ansible.builtin.stat:
+        path: "{{ ansible_facts['getent_passwd'][item.user][4] }}/.config/systemd/user/{{ item.unit }}"
+      loop: "{{ retired_units_user }}"
+      loop_control: {label: "{{ item.user }} {{ item.unit }}"}
+      register: retired_units_user_files
+
+    - name: Retired user units are stopped and disabled
+      become: true
+      become_user: "{{ item.item.user }}"
+      ansible.builtin.systemd_service:
+        name: "{{ item.item.unit }}"
+        scope: user
+        state: stopped
+        enabled: false
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts['getent_passwd'][item.item.user][1] }}"
+      loop: "{{ retired_units_user_files.results }}"
+      loop_control: {label: "{{ item.item.user }} {{ item.item.unit }}: {{ item.item.reason }}"}
+      when: item.stat.exists

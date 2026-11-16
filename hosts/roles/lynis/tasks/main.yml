@@ -1,7 +1,81 @@
-- name: Install Lynis
+- name: Install Lynis (distro package)
   ansible.builtin.package:
     name: lynis
     state: present
+  when: not lynis_upstream | bool
+
+- name: Install Lynis (upstream release)
+  when: lynis_upstream | bool
+  block:
+    - name: No distro package (older; its own lynis.timer duplicated lynis-audit.timer)
+      ansible.builtin.apt:
+        name: lynis
+        state: absent
+        purge: true
+
+    - name: Is this release unpacked
+      ansible.builtin.stat:
+        path: "/opt/lynis/{{ lynis_version }}/lynis"
+      register: lynis_release
+
+    - name: Release folder
+      ansible.builtin.file:
+        path: "/opt/lynis/{{ lynis_version }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Download the release (hash-locked)
+      ansible.builtin.get_url:
+        url: "https://downloads.cisofy.com/lynis/lynis-{{ lynis_version }}.tar.gz"
+        checksum: "sha256:{{ lynis_tarball_sha256 }}"
+        # downloads.cisofy.com answers 403 to the default "ansible-httpget" agent
+        http_agent: curl/8.5.0
+        dest: "/opt/lynis/lynis-{{ lynis_version }}.tar.gz"
+        owner: root
+        group: root
+        mode: "0644"
+      # a first install can't be simulated in check mode (the folder doesn't exist yet)
+      when: not (ansible_check_mode and not lynis_release.stat.exists)
+
+    - name: Unpack (root-owned files; Lynis refuses others when it runs as root)
+      ansible.builtin.unarchive:
+        src: "/opt/lynis/lynis-{{ lynis_version }}.tar.gz"
+        dest: "/opt/lynis/{{ lynis_version }}"
+        remote_src: true
+        extra_opts: [--strip-components=1]
+        owner: root
+        group: root
+        creates: "/opt/lynis/{{ lynis_version }}/lynis"
+      when: not ansible_check_mode
+
+    - name: Current version, on PATH, and its default profile ahead of any distro /etc/lynis/default.prf
+      ansible.builtin.file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - {src: "/opt/lynis/{{ lynis_version }}", dest: /usr/local/lynis}
+        - {src: /usr/local/lynis/lynis, dest: /usr/local/sbin/lynis}
+      when: not ansible_check_mode
+
+    - name: Profile folder searched first (custom.prf stays in /etc/lynis)
+      ansible.builtin.file:
+        path: /usr/local/etc/lynis
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Default profile of this release
+      ansible.builtin.file:
+        src: /usr/local/lynis/default.prf
+        dest: /usr/local/etc/lynis/default.prf
+        state: link
+        force: true
+      when: not ansible_check_mode
 
 - name: Audit wrapper
   ansible.builtin.template:

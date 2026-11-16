@@ -37,3 +37,13 @@ k3s_node_external_ip: 192.168.86.44
 k3s_kubeconfig_user: nikghodki-dgx
 # The LAN IP, not k8s.nghodki.ai: edge-dnsmasq answers AAAA with NXDOMAIN, which Go's resolver (kubectl) treats as no such host
 k3s_kubeconfig_server: https://192.168.86.44:6443
+# Found running, unused (checked 2026-11-15: /etc/exports empty, no NFS clients or mounts on any host, iperf3 never
+# accepted a connection). nfs-kernel-server came with the Jetson reflash tools (2026-11-12; re-enable nfs-server and
+# rpcbind for the next reflash), iperf3 with a one-off link test (2026-11-14). roles/retired_units
+retired_units_system:
+  - {unit: nfs-server.service, reason: "no exports, no clients; only for a Jetson reflash"}
+  - {unit: nfs-blkmap.service, reason: "pNFS client helper; no NFS mounts"}
+  - {unit: fsidd.service, reason: "NFS server helper"}
+  - {unit: rpcbind.socket, reason: "NFS only"}
+  - {unit: rpcbind.service, reason: "NFS only"}
+  - {unit: iperf3.service, reason: "one-off link test; run iperf3 -s by hand when needed"}

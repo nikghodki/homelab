@@ -132,7 +132,7 @@ unless noted. P3.7 moves each into its k3s namespace and removes the Docker copy
 | `observe` | dgx-2 | VictoriaMetrics, vmalert, Alertmanager, Loki, Tempo, two OTel gateways, Grafana, Phoenix | `observe` |
 | `alerting` | Omarchy (the Dell, never sleeps) | Gatus 5.38.0 behind oauth2-proxy 7.15.6, ntfy 2.38.0 (phone over Tailscale HTTPS). Off the Sparks so alerts still arrive when a Spark or dgx-1's front door is down ([alerting](../runbooks/alerting.md)) | Stays on the Dell, outside the cluster (alerting must not depend on it) |
 | `ops` | Omarchy | Homepage 2.8.0 behind oauth2-proxy 7.15.6 (`ops.nghodki.ai`, LAN port 4180) | `console` |
-| `console` | dgx-2 | Pocket ID 2.19.2 (LAN port 1411; dgx-1 Caddy terminates TLS) | `console` |
+| `console` | dgx-2 | Pocket ID 2.19.3 (LAN port 1411; dgx-1 Caddy terminates TLS) | `console` |
 | `bus` | dgx-1 | NATS 2.15.3 (4222 TLS, MQTT 8883 TLS) | `bus` (3 replicas) |
 | `fleet` | dgx-1 | Mosquitto 2.1.2 (8884 TLS), Caddy Fleet API proxy (host network, `:8971`) | `security` |
 | `gpu` | dgx-1, dgx-2 | dcgm-exporter (loopback 9400) | `observe` (DaemonSet) |

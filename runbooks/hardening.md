@@ -7,6 +7,21 @@ hardening index and warnings to Loki (journal tag `lynis`). This runbook covers 
 Ansible: role `hardening` (`hosts/playbooks/hardening.yml`, also part of `site.yml` after `base`) and the lynis
 role's custom profile `/etc/lynis/custom.prf` (vars `lynis_skip_tests`, `lynis_promisc_interfaces` in host_vars).
 
+**Lynis version.** Since 2026-11-15 the Debian/Ubuntu hosts (dgx-1, dgx-2, Jetson, Pi) run the upstream release
+(`lynis_version` 3.1.7; the distros ship 3.0.9 and 3.1.4), hash-locked (`lynis_tarball_sha256`, the SHA-256
+cisofy.com publishes) in `/opt/lynis/<version>`, with `/usr/local/lynis`, `/usr/local/sbin/lynis` and
+`/usr/local/etc/lynis/default.prf` pointing at it. The distro package is purged: it also shipped a daily
+`lynis.timer` that ran next to our weekly `lynis-audit.timer`. The Dell (Arch) keeps its package, which is current.
+To upgrade, set `lynis_version` and `lynis_tarball_sha256` together and run `playbooks/lynis.yml`. The first 3.1.7
+audit on dgx-2: hardening index 72 (68 with 3.0.9), 0 warnings.
+
+**Retired units.** Units that were running but unused are stopped and disabled (not removed) by role
+`retired_units` (`playbooks/retired.yml`; `retired_units_system` / `retired_units_user` in host_vars, each with its
+reason). dgx-1: the NFS server (`nfs-server`, `nfs-blkmap`, `fsidd`, `rpcbind`; installed with the Jetson reflash
+tools on 2026-11-12, `/etc/exports` empty, no clients) and `iperf3` (a one-off link test, it never accepted a
+connection). Re-enable `nfs-server` and `rpcbind.socket` for the next Jetson reflash, and run `iperf3 -s` by hand for
+a link test. The Pi: the user unit `dclaw-tunnel` (P1.12).
+
 ## Results (2026-11-15)
 
 | Host | OS | Index before | Warnings before | Index after | Warnings after |
