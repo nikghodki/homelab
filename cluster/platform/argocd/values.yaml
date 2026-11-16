@@ -1,6 +1,8 @@
 # Argo CD: chart argo-cd 10.18.0 (Argo CD v3.6.1), namespace argocd. Used by the `argocd` Application
 # (cluster/bootstrap/apps/argocd.yaml) and once by the bootstrap (runbooks/argocd.md), so both render the same.
-# Sparks only, one replica of everything, small requests and limits (decision 0006).
+# Sparks only, small requests and limits (decision 0006). server and repo-server: 2 replicas, one per Spark (required
+# anti-affinity), a PDB of minAvailable 1, and rollouts that replace one pod at a time (a surge pod could never schedule:
+# there are only two Sparks). Controller and redis stay single (runbooks/argocd.md "High availability").
 global:
   domain: argocd.nghodki.ai
   nodeSelector:
@@ -77,7 +79,23 @@ controller:
     limits: {cpu: "1", memory: 768Mi}
 
 repoServer:
-  replicas: 1
+  replicas: 2
+  # One per Spark. Rolling updates take one pod down first: with two nodes and required anti-affinity a surge pod
+  # would stay Pending forever.
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: argocd
+              app.kubernetes.io/name: argocd-repo-server
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
+  pdb:
+    enabled: true
+    minAvailable: 1
   resources:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {cpu: "1", memory: 512Mi}
@@ -114,7 +132,23 @@ repoServer:
     - {name: sops-age, mountPath: /sops-age, readOnly: true}
 
 server:
-  replicas: 1
+  replicas: 2
+  # One per Spark. Rolling updates take one pod down first: with two nodes and required anti-affinity a surge pod
+  # would stay Pending forever.
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/instance: argocd
+              app.kubernetes.io/name: argocd-server
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
+  pdb:
+    enabled: true
+    minAvailable: 1
   resources:
     requests: {cpu: 20m, memory: 64Mi}
     limits: {cpu: 500m, memory: 256Mi}

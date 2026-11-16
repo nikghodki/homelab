@@ -10,7 +10,7 @@ read-only deploy key. Nothing pushes into the cluster (D15). Decision 0006; runb
 |---|---|
 | Version | Argo CD v3.6.1, Helm chart `argo-cd` 10.18.0, KSOPS v4.5.1 (digest-pinned init container) |
 | Values | `cluster/platform/argocd/values.yaml` (used by the bootstrap and by the `argocd` Application, so both render the same) |
-| Runs | namespace `argocd`, Sparks only (`nghodki.ai/role=gpu`), one replica each: application controller, repo-server, server, redis. No Dex, notifications, ApplicationSet (0 replicas) or commit server |
+| Runs | namespace `argocd`, Sparks only (`nghodki.ai/role=gpu`), **server and repo-server 2 replicas, one per Spark** (required anti-affinity, PDB minAvailable 1); application controller and redis one replica. No Dex, notifications, ApplicationSet (0 replicas) or commit server |
 | UI | `https://argocd.nghodki.ai` → edge-caddy → fixed ClusterIP 10.43.0.100:80 (server in insecure mode) |
 | Sign-in | Pocket ID client `argocd` (PKCE S256); `admins` → `role:admin`, no default role; built-in `admin` **off** |
 | CLI | on dgx-1: `argocd --core --kube-context argocd app list` (uses the admin kubeconfig; no Argo CD login) |

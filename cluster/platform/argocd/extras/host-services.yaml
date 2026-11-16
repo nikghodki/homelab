@@ -3,6 +3,9 @@
 #   edge-caddy on dgx-1  -> 10.43.0.100:80   (argocd.nghodki.ai)
 #   VictoriaMetrics dgx-2 -> 10.43.0.100:8083 (server), 10.43.0.101:8082 (application controller),
 #                            10.43.0.102:8084 (repo-server)
+# server and repo-server run 2 replicas (one per Spark). ClientIP affinity keeps each client on one replica, so a
+# scrape sees the same pod every time (no counters flipping between two pods); when that pod goes, kube-proxy drops
+# its endpoint and the client lands on the other one. The in-cluster Caddy pods are spread over both replicas.
 apiVersion: v1
 kind: Service
 metadata:
@@ -11,6 +14,7 @@ metadata:
 spec:
   type: ClusterIP
   clusterIP: 10.43.0.100
+  sessionAffinity: ClientIP
   selector:
     app.kubernetes.io/instance: argocd
     app.kubernetes.io/name: argocd-server
@@ -40,6 +44,7 @@ metadata:
 spec:
   type: ClusterIP
   clusterIP: 10.43.0.102
+  sessionAffinity: ClientIP
   selector:
     app.kubernetes.io/instance: argocd
     app.kubernetes.io/name: argocd-repo-server
