@@ -6,6 +6,10 @@ global:
   nodeSelector:
     nghodki.ai/role: gpu
   revisionHistoryLimit: 3
+  # fsGroup lets the repo-server (uid 999) read the age key mounted with mode 0440.
+  securityContext:
+    seccompProfile: {type: RuntimeDefault}
+    fsGroup: 999
 
 crds:
   install: true
@@ -81,7 +85,7 @@ repoServer:
     - name: sops-age
       secret:
         secretName: sops-age
-        defaultMode: 256  # 0400
+        defaultMode: 288  # 0440, group 999 via fsGroup
   initContainers:
     - name: install-ksops
       image: quay.io/viaductoss/ksops:v4.5.1@sha256:4def9fdd4e2f850265740ebe9592c5455d19b76891e88e602df8b52d74b95334
