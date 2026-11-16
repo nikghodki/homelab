@@ -51,3 +51,11 @@ retired_units_system:
   - {unit: rpcbind.socket, reason: "NFS only"}
   - {unit: rpcbind.service, reason: "NFS only"}
   - {unit: iperf3.service, reason: "one-off link test; run iperf3 -s by hand when needed"}
+# ops-ro `certs` and `defenseclaw` (roles/ops_agent_access; k3s certs are added by group)
+ops_agent_access_certs:
+  - /opt/homelab/bus/nats/certs/nats.crt
+  - /opt/homelab/fleet/caddy/certs/fleet.crt
+  - /opt/homelab/fleet/mosquitto/certs/fleet.crt
+  - /usr/local/share/ca-certificates/homelab-ca.crt
+  - /usr/local/share/ca-certificates/nghodki-web-ca.crt
+ops_agent_access_defenseclaw_ports: [18970]

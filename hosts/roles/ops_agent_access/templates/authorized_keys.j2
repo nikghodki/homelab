@@ -1,0 +1,3 @@
+# Managed by homelab Ansible (roles/ops_agent_access). One key: the ops agent's read-only tool.
+# restrict = no pty, no port/agent/X11 forwarding, no ~/.ssh/rc; every session runs ops-ro whatever was asked.
+restrict,command="/usr/local/sbin/ops-ro",from="{{ ops_agent_access_from | join(',') }}" {{ ops_agent_access_pubkey }}

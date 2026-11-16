@@ -1,0 +1,152 @@
+# Read-only SSH access for the ops agent (runbooks/ops-agent.md). Always --check --diff first.
+- name: Check the OS is one we support
+  ansible.builtin.assert:
+    that: ansible_facts['os_family'] in ['Debian', 'Archlinux']
+    fail_msg: "Unsupported OS family {{ ansible_facts['os_family'] }}"
+
+- name: The key is one ed25519 public key and the groups are safe
+  ansible.builtin.assert:
+    that:
+      - ops_agent_access_pubkey is match('^ssh-ed25519 [A-Za-z0-9+/=]+( [^\n]*)?$')
+      - ops_agent_access_groups | intersect(ops_agent_access_forbidden_groups) | length == 0
+      - ops_agent_access_from | length > 0
+    fail_msg: ops_agent_access_pubkey must be one ed25519 key, and opsro must not join docker/sudo/wheel/adm
+
+- name: Group for the read-only ops user
+  ansible.builtin.group:
+    name: "{{ ops_agent_access_user }}"
+    system: true
+
+- name: Read-only ops user (no password, journal group only)
+  ansible.builtin.user:
+    name: "{{ ops_agent_access_user }}"
+    group: "{{ ops_agent_access_user }}"
+    groups: "{{ ops_agent_access_groups }}"
+    append: false
+    system: true
+    home: "{{ ops_agent_access_home }}"
+    create_home: false
+    # sshd runs the forced command through the login shell, so it can't be nologin; restrict + command= stop a shell
+    shell: /bin/sh
+    password_lock: true
+    comment: ops agent read-only (ops-ro)
+
+- name: Home and .ssh are root-owned (opsro can't change its own key)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ ops_agent_access_home }}"
+    - "{{ ops_agent_access_home }}/.ssh"
+
+- name: The one authorised key, forced command and source addresses
+  ansible.builtin.template:
+    src: authorized_keys.j2
+    dest: "{{ ops_agent_access_home }}/.ssh/authorized_keys"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Helper folder
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Dispatcher and root helper
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - {src: ops-ro.py, dest: /usr/local/sbin/ops-ro}
+    - {src: ops-ro-root.py, dest: /usr/local/libexec/ops-ro-root}
+
+- name: Sudo for the root helper only
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: /etc/sudoers.d/ops-ro
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Rate-limit folder, now and after every boot
+  ansible.builtin.template:
+    src: tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/ops-ro.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Rate-limit folder exists
+  ansible.builtin.file:
+    path: /run/ops-ro
+    state: directory
+    owner: "{{ ops_agent_access_user }}"
+    group: "{{ ops_agent_access_user }}"
+    mode: "0700"
+
+- name: Configuration folder
+  ansible.builtin.file:
+    path: /etc/ops-agent
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Certificates to report
+  ansible.builtin.template:
+    src: certs.j2
+    dest: /etc/ops-agent/certs
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    ops_agent_access_cert_list: >-
+      {{ ops_agent_access_certs
+         + (ops_agent_access_k3s_server_certs if inventory_hostname in groups.get('k3s_servers', []) else [])
+         + (ops_agent_access_k3s_node_certs if inventory_hostname in groups.get('k3s', []) else []) }}
+
+- name: DefenseClaw gateways to summarise
+  ansible.builtin.template:
+    src: defenseclaw.j2
+    dest: /etc/ops-agent/defenseclaw
+    owner: root
+    group: root
+    mode: "0644"
+  when: ops_agent_access_defenseclaw_ports | length > 0
+
+- name: No DefenseClaw list where there is no gateway
+  ansible.builtin.file:
+    path: /etc/ops-agent/defenseclaw
+    state: absent
+  when: ops_agent_access_defenseclaw_ports | length == 0
+
+- name: Effective sshd settings for opsro
+  ansible.builtin.command: /usr/sbin/sshd -T -C "user={{ ops_agent_access_user }},host=ops-agent,addr=192.168.86.36"
+  register: ops_agent_access_sshd
+  changed_when: false
+  check_mode: false
+
+- name: The sshd configuration admits opsro (no AllowUsers/AllowGroups list that leaves it out)
+  ansible.builtin.assert:
+    that:
+      - allow_users | length == 0 or ops_agent_access_user in allow_users
+      - allow_groups | length == 0 or (allow_groups | intersect([ops_agent_access_user] + ops_agent_access_groups) | length > 0)
+      - deny_users | select('equalto', ops_agent_access_user) | list | length == 0
+      - "'pubkeyauthentication yes' in sshd_lines"
+    fail_msg: >-
+      sshd would not admit {{ ops_agent_access_user }}: extend the AllowUsers/AllowGroups list (roles/hardening)
+  vars:
+    sshd_lines: "{{ ops_agent_access_sshd.stdout_lines | map('lower') | list }}"
+    allow_users: "{{ sshd_lines | select('match', '^allowusers ') | map('regex_replace', '^allowusers ', '') | join(' ') | split }}"
+    allow_groups: "{{ sshd_lines | select('match', '^allowgroups ') | map('regex_replace', '^allowgroups ', '') | join(' ') | split }}"
+    deny_users: "{{ sshd_lines | select('match', '^denyusers ') | map('regex_replace', '^denyusers ', '') | join(' ') | split }}"

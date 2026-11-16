@@ -37,3 +37,8 @@ Omarchy; pinned version, checksum-verified binary. See [runbooks/k3s.md](../runb
 `lynis` (`playbooks/lynis.yml`): weekly `lynis-audit.timer` (Sunday 03:30, idle CPU and I/O priority). The wrapper
 `/usr/local/sbin/lynis-audit` logs `hardening_index=N warnings=W ...` and one line per warning to the journal with tag
 `lynis`; the host collector ships them to Loki, and Fleet Home shows the latest index per host.
+
+`ops_agent_access` (`playbooks/ops-agent-access.yml`, decision 0013): the ops agent's read-only user `opsro` on every
+host, with the forced-command allowlist `/usr/local/sbin/ops-ro` (redacted, capped, rate-limited, logged with tag
+`ops-ro`) and a re-validating root helper for Docker and certificate expiry. No act user. See
+[runbooks/ops-agent.md](../runbooks/ops-agent.md#host-access-opsro).

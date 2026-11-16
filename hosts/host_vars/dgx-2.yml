@@ -21,3 +21,13 @@ k3s_cluster_init: true
 # connection ever). Same as dgx-1's. roles/retired_units
 retired_units_system:
   - {unit: iperf3.service, reason: "unused; run iperf3 -s by hand for a link test"}
+# ops-ro `certs` (roles/ops_agent_access; k3s certs are added by group)
+ops_agent_access_certs:
+  - /opt/homelab/backup/rest-server/backup.crt
+  - /opt/homelab/jobs/temporal/tls/ca.crt
+  - /opt/homelab/jobs/temporal/tls/server.crt
+  - /opt/homelab/jobs/temporal/tls/system-worker.crt
+  - /opt/homelab/jobs/admin-tools/tls/admin-tools.crt
+  - /opt/homelab/jobs/ui/tls/ui.crt
+  - /usr/local/share/ca-certificates/homelab-ca.crt
+  - /usr/local/share/ca-certificates/nghodki-web-ca.crt

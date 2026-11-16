@@ -249,6 +249,8 @@ jobs:
         run: python -m pytest -q robots/sim/tests
       - name: LiteLLM usage exporter
         run: python -m pytest -q hosts/roles/litellm_usage_exporter/files/tests
+      - name: Ops agent host access (ops-ro dispatcher and root helper)
+        run: python -m pytest -q hosts/roles/ops_agent_access/files/tests
       - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
         run: python -m pytest -q .github/scripts/tests
       - name: DefenseClaw dashboards and rules match the pinned release

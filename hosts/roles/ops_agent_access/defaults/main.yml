@@ -1,0 +1,34 @@
+# Read-only SSH access for the ambient ops agent (decision 0013, design §5.1 and Appendix B, runbooks/ops-agent.md).
+# User `opsro`: forced command /usr/local/sbin/ops-ro (an allowlist of read verbs), no password, no sudo except the
+# re-validating root helper, journal read through systemd-journal. The private key is `opsro_ssh_key` in
+# secrets/ops-agent.enc.yaml; only the agent's ops-ro tool holds it.
+ops_agent_access_user: opsro
+ops_agent_access_home: /var/lib/opsro
+# Supplementary groups: journal read only. Never docker, sudo, wheel or adm.
+ops_agent_access_groups: [systemd-journal]
+ops_agent_access_forbidden_groups: [docker, sudo, wheel, adm, root, lxd, disk, shadow]
+ops_agent_access_pubkey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJdbzAK1y4DPlmfGw84+2lCysaU38IEJ867gYYTUtMxD opsro@ops-agent
+# Where the key may be used from. The agent's pods run on the Sparks: pod traffic to the LAN is masqueraded to the
+# node's LAN address (flannel FLANNEL-POSTRTG), to the other Spark's direct link to 10.100.136.x, and to the pod's
+# own node it keeps its pod address (10.42.0.0/16). 127.0.0.1 is for tests on the host itself.
+# Tailscale addresses are deliberately not listed: the agent connects to LAN addresses.
+ops_agent_access_from:
+  - 192.168.86.44     # dgx-1 (LAN)
+  - 192.168.86.36     # dgx-2 (LAN)
+  - 10.42.0.0/16      # k3s pod network
+  - 10.100.136.1      # dgx-1, Spark-to-Spark link
+  - 10.100.136.2      # dgx-2, Spark-to-Spark link
+  - 127.0.0.1
+# Certificates whose expiry `certs` reports (/etc/ops-agent/certs). Host-specific ones in host_vars; the k3s ones are
+# added by group. Missing files are reported as missing. Never list keys: the root helper refuses key-like paths.
+ops_agent_access_certs: []
+ops_agent_access_k3s_server_certs:
+  - /var/lib/rancher/k3s/server/tls/serving-kube-apiserver.crt
+  - /var/lib/rancher/k3s/server/tls/client-admin.crt
+  - /var/lib/rancher/k3s/server/tls/etcd/server-client.crt
+  - /var/lib/rancher/k3s/server/tls/etcd/peer-server-client.crt
+ops_agent_access_k3s_node_certs:
+  - /var/lib/rancher/k3s/agent/serving-kubelet.crt
+  - /var/lib/rancher/k3s/agent/client-kubelet.crt
+# Loopback ports of DefenseClaw gateways whose /health summary `defenseclaw` shows (empty: the verb says none)
+ops_agent_access_defenseclaw_ports: []

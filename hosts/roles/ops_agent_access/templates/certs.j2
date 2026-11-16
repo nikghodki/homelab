@@ -1,0 +1,4 @@
+# Managed by homelab Ansible (roles/ops_agent_access). Certificates whose expiry `ops-ro certs` reports.
+{% for path in ops_agent_access_cert_list %}
+{{ path }}
+{% endfor %}

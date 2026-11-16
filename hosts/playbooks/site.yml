@@ -10,3 +10,6 @@
 
 - name: Hosts that never sleep
   ansible.builtin.import_playbook: always-on.yml
+
+- name: Ops agent read-only access
+  ansible.builtin.import_playbook: ops-agent-access.yml
