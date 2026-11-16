@@ -1,0 +1,26 @@
+# k3s's CoreDNS (kube-dns, 10.43.0.10) runs ONE replica from k3s's packaged manifest. The failover drill on 2026-11-16
+# (runbooks/edge.md) stopped k3s on dgx-2, where it ran: every pod lost its DNS until the node was evicted (5 min),
+# which broke the front door's sign-in, Argo CD and anything that resolves a name. Two replicas, one per Spark.
+#
+# This is a PATCH, not the whole Deployment: Argo CD server-side-applies only these fields (its own field manager);
+# k3s owns the rest. k3s's manifest sets neither replicas nor affinity, so a k3s restart keeps them. Never pruned or
+# deleted from here (the Deployment is k3s's). CI skips *.ssa-patch.yaml in kubeconform (not a whole object).
+# Spread: k3s's own topologySpreadConstraints (one per hostname); the node affinity keeps both on the Sparks (not the
+# Dell over Wi-Fi; the Jetson is tainted anyway).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=true,Prune=false,Delete=false
+spec:
+  replicas: 2
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - {key: nghodki.ai/role, operator: In, values: [gpu]}

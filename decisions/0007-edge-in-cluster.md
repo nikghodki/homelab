@@ -54,7 +54,7 @@ constraints that shaped it, all measured on 2026-11-15:
   routes, including the http→https redirects (id, ops, mlflow, temporal, argocd), the `ca.nghodki.ai` file server
   (a ConfigMap copy of `hosts/files/web-ca`, checked by CI). Differences, all forced by
   running in a pod: nginx-gateway's routes go through edge-caddy on dgx-1 (`192.168.86.44:80`), which hands them to
-  nginx-gateway; Argo CD by Service name. The wildcard cert and key are the TLS Secret `edge/web-tls` (KSOPS,
+  nginx-gateway; Argo CD by its fixed ClusterIP (by Service name until the 2026-11-16 drill showed the door then depends on kube-dns). The wildcard cert and key are the TLS Secret `edge/web-tls` (KSOPS,
   `web-tls.enc.yaml`). Non-root, read-only root filesystem, no capabilities: :80/:443 via the namespaced sysctl
   `net.ipv4.ip_unprivileged_port_start=0`.
 - **kube-state-metrics v2.20.0** (`kube-system`, fixed ClusterIP `10.43.0.120:8080`, scraped by VictoriaMetrics on

@@ -25,7 +25,7 @@ All in `cluster/platform/edge/caddy/Caddyfile`, on :80 and :443 (wildcard from t
 | `ops.nghodki.ai` | ops stack Caddy gate → Homepage, 192.168.86.49:4180 (Dell) | `signed_in` (edge-auth, admins) | yes | |
 | `ca.nghodki.ai` | static files in `/etc/caddy/ca` | none | no | `.mobileconfig` and `.crt` get the right content types; in k3s a ConfigMap copy of `hosts/files/web-ca` (checked by CI) |
 | `docs.nghodki.ai` | docs Caddy → this site, 192.168.86.49:4181 (Dell) | `signed_in` (edge-auth, admins) | yes | `runbooks/docs-site.md` |
-| `auth.nghodki.ai` | `edge/edge-auth` (oauth2-proxy in k3s): `/oauth2/*`, `/ping`; anything else → Homepage | it *is* the sign-in (callback for every `signed_in` route) | yes | decision 0011 |
+| `auth.nghodki.ai` | `edge/edge-auth` (oauth2-proxy in k3s, by the fixed ClusterIP of `edge-auth-ip`, 10.43.0.54:4180): `/oauth2/*`, `/ping`; anything else → Homepage | it *is* the sign-in (callback for every `signed_in` route) | yes | decision 0011 |
 | `model.nghodki.ai` | the `(model_plane)` snippet: `/v1/*`, `/health*` → LiteLLM 10.100.136.1:4000; `/dgxmm*` → 308 to `dgxmanager.nghodki.ai` (DGXMM is only there, behind sign-in, since 2026-11-16); `/v1` → 301 with a slash; else a JSON 404 | LiteLLM keys | no | LiteLLM: 30 min read/write timeouts, no buffering (cold starts). (nginx-gateway until 2026-11-15; `/tts/` dropped, D26) |
 | `grafana.nghodki.ai` | 192.168.86.36:3000 | Pocket ID (Grafana's own OAuth) | no | |
 | `status.nghodki.ai` | status-gate → Gatus, 192.168.86.49:8081 (Dell) | `signed_in` (edge-auth, admins) | yes | `/health` passes without a session (and `/metrics`, the heartbeat POST on the gate itself) |
@@ -33,7 +33,7 @@ All in `cluster/platform/edge/caddy/Caddyfile`, on :80 and :443 (wildcard from t
 | `phoenix.nghodki.ai` | 192.168.86.36:6006 | Pocket ID (Phoenix OAuth) | no | |
 | `mlflow.nghodki.ai` | ml stack Caddy gate, 192.168.86.36:4181 → MLflow | `signed_in` (edge-auth, admins) | yes | |
 | `temporal.nghodki.ai` | Temporal UI, 192.168.86.36:8233 | Pocket ID (Temporal UI OIDC) | yes | |
-| `argocd.nghodki.ai` | `argocd-server.argocd.svc.cluster.local:80` | Pocket ID (Argo CD OIDC) | yes | Argo CD runs in insecure mode; TLS ends here |
+| `argocd.nghodki.ai` | `argocd/argocd-server-host`, fixed ClusterIP 10.43.0.100:80 | Pocket ID (Argo CD OIDC) | yes | Argo CD runs in insecure mode; TLS ends here |
 | `litellm-admin.nghodki.ai` | 100.65.137.82:4000 (LiteLLM on dgx-1, by its Tailscale IP) | `session_check` (edge-auth, admins), then the LiteLLM UI login | yes | Host header rewritten to the upstream |
 | `controlcenter.nghodki.ai` | 192.168.86.211:8200 (Jetson, RoboClaw control center) | none in Caddy (unverified in the app) | no | old :9119 route was dead |
 | `dgxmanager.nghodki.ai` | the `(dgxmm_ui)` snippet: `/dgxmm/*` → DGXMM 10.100.136.1:8090, `/dgxmm/ondemand/*` 404; `/` → 302 `/dgxmm/`; else a JSON 404 pointing at model.nghodki.ai | `session_check` (edge-auth, admins); DGXMM has no login of its own | yes | `/dgxmm/healthz` (the SPA shell) is open for Gatus and Homepage. SSE unbuffered, 1 h reads, 1 MB request limit |

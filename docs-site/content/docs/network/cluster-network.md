@@ -53,8 +53,9 @@ the static band 10.43.0.0–10.43.0.255, which the API server doesn't hand out d
 
 | IP:port | Service | Used by |
 |---|---|---|
-| 10.43.0.10:53 | kube-dns | pods |
+| 10.43.0.10:53 | kube-dns (2 replicas, one per Spark, since 2026-11-16) | pods |
 | 10.43.0.53:53 | `edge/edge-dns-lan` (also on the VIP 192.168.86.11) | kube-system's CoreDNS for `nghodki.ai` (since the P3.3 cutover) |
+| 10.43.0.54:4180 | `edge/edge-auth-ip` | the in-cluster Caddy's forward auth (the door doesn't use cluster DNS) |
 | 10.43.0.100:80, :8083 | `argocd/argocd-server-host` | edge-caddy (`argocd.nghodki.ai`), VictoriaMetrics |
 | 10.43.0.101:8082 | `argocd/argocd-controller-host` | VictoriaMetrics |
 | 10.43.0.102:8084 | `argocd/argocd-repo-server-host` | VictoriaMetrics |

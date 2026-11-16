@@ -33,7 +33,8 @@ architecture §4.4 and §5. Ansible: role `k3s`, `hosts/playbooks/k3s.yml`, inve
   through `cni0` and `flannel.1`.
 - Pod CIDR 10.42.0.0/16, services 10.43.0.0/16, flannel VXLAN (MTU 1450).
 - Disabled: traefik, servicelb (80/443 belong to edge-caddy on dgx-1), metrics-server. Kept: CoreDNS,
-  local-path storage. Secrets encryption at rest is on.
+  local-path storage. k3s's CoreDNS runs **2 replicas, one per Spark** (Argo CD app `cluster-dns` server-side-applies
+  `replicas` and a node affinity onto k3s's Deployment; k3s's manifest sets neither, so its restarts keep them). Secrets encryption at rest is on.
 - Kubelet reservations: Sparks `system-reserved=cpu=2,memory=8Gi`, `kube-reserved=cpu=1,memory=2Gi` (scheduling
   budget only; the DGXMM engines run in Docker and the kubelet doesn't count them). Jetson
   `system-reserved=cpu=1500m,memory=4Gi`, `kube-reserved=cpu=500m,memory=768Mi`, eviction at 300 MiB available,

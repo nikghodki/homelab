@@ -49,8 +49,9 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 
 | IP:port | Service | Used by |
 |---|---|---|
-| 10.43.0.10:53 | kube-dns (k3s) | pods |
+| 10.43.0.10:53 | kube-dns (k3s; 2 replicas, one per Spark: `cluster-dns/coredns-replicas.ssa-patch.yaml`) | pods |
 | 10.43.0.53:53 | `edge/edge-dns-lan` (also on the VIP 192.168.86.11) | kube-system's CoreDNS for `nghodki.ai` |
+| 10.43.0.54:4180 | `edge/edge-auth-ip` | edge-caddy's forward auth (no cluster DNS on the door's path) |
 | 10.43.0.100:80, :8083 | `argocd/argocd-server-host` | edge-caddy (`argocd.nghodki.ai`), VictoriaMetrics |
 | 10.43.0.101:8082 | `argocd/argocd-controller-host` | VictoriaMetrics |
 | 10.43.0.102:8084 | `argocd/argocd-repo-server-host` | VictoriaMetrics |
@@ -59,7 +60,8 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 | 10.43.0.120:8080 | `kube-system/kube-state-metrics-host` | VictoriaMetrics |
 
 Pick the next free address here and add a row. If the pods behind one have a NetworkPolicy, allow the hosts
-(`argocd/extras/host-scrape-netpol.yaml`). After the P3.3 cutover the in-cluster Caddy reaches Argo CD by Service name.
+(`argocd/extras/host-scrape-netpol.yaml`). The in-cluster Caddy uses these addresses too (Argo CD, edge-auth), never Service names: the front door must keep
+working while kube-dns is down.
 
 ## Addresses outside the cluster
 
