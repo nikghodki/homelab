@@ -16,7 +16,7 @@ constraints that shaped it, all measured on 2026-11-15:
 - **Ports in use on dgx-1:** edge-caddy (docker-proxy) on `0.0.0.0:80/443`, edge-dnsmasq on `192.168.86.44:53` and
   `100.65.137.82:53`. On dgx-1, `nat PREROUTING` jumps to `KUBE-SERVICES` before `DOCKER` (kube-proxy keeps its jump
   first), so a kube-proxy DNAT for an address takes that address from Docker and dnsmasq before they see a packet.
-- **nginx-gateway** (model, dgxmanager, ha, voice-agent, the default route) has no published port: it is only on
+- **nginx-gateway** (model, dgxmanager, ha, the default route) has no published port: it is only on
   dgx-1's Docker network `gateway`.
 - **A dead Tailscale peer blackholes connections.** From the MacBook Air, `curl --resolve host:443:<offline peer>,<live
   Spark>` took **75 s** (curl's connect timeout) before it tried the second address. Answering with both Sparks'
@@ -52,7 +52,7 @@ constraints that shaped it, all measured on 2026-11-15:
   exactly (`edge-zone.py diff-dnsmasq`).
 - **Caddy 2.11.9 (`edge-caddy`, 2 replicas, one per Spark)** with a Git-managed Caddyfile that mirrors edge-caddy's
   routes, including the http→https redirects (id, ops, mlflow, temporal, argocd), the `ca.nghodki.ai` file server
-  (a ConfigMap copy of `hosts/files/web-ca`, checked by CI) and voice-agent's own site. Differences, all forced by
+  (a ConfigMap copy of `hosts/files/web-ca`, checked by CI). Differences, all forced by
   running in a pod: nginx-gateway's routes go through edge-caddy on dgx-1 (`192.168.86.44:80`), which hands them to
   nginx-gateway; Argo CD by Service name. The wildcard cert and key are the TLS Secret `edge/web-tls` (KSOPS,
   `web-tls.enc.yaml`). Non-root, read-only root filesystem, no capabilities: :80/:443 via the namespaced sysctl
@@ -75,7 +75,7 @@ Air over the LAN (new = the VIP), and from the Air over Tailscale (old = dgx-1's
 | Route | http | https |
 |---|---|---|
 | model | 404 | 404 |
-| litellm-admin, controlcenter, voice-agent, webui, ha, ntfy, ca, phoenix | 200 | 200 |
+| litellm-admin, controlcenter, webui, ha, ntfy, ca, phoenix | 200 | 200 |
 | dgxmanager | 302 → /dgxmm/ | 302 → /dgxmm/ |
 | coolify | 302 → /login | 302 → /login |
 | grafana | 302 → /login | 302 → /login |
@@ -83,7 +83,7 @@ Air over the LAN (new = the VIP), and from the Air over Tailscale (old = dgx-1's
 | id, temporal, argocd | 308 → https | 200 |
 | ops, mlflow | 308 → https | 302 → Pocket ID |
 
-**DNS**: all 27 names returned the zone's A records, AAAA NOERROR/0 answers, `no-such-name` NXDOMAIN, on the LAN
+**DNS**: all 27 names (26 after voice-agent was retired) returned the zone's A records, AAAA NOERROR/0 answers, `no-such-name` NXDOMAIN, on the LAN
 view (VIP) and the tailnet view (dgx-2's Tailscale IP; 20 queries from the Air: 11 answered dgx-2, 9 dgx-1).
 
 **ARP failover over Wi-Fi works.** The Air (a LAN client that is not a node; the Dell and the Jetson are nodes, so
@@ -106,6 +106,10 @@ behaviour with two split-DNS nameservers when one is dead (needs the admin-conso
 **Memory** (cgroup working set, 2026-11-15): kube-vip 12 + 9 MiB, edge-dns 11 + 32 MiB, edge-caddy 14 + 14 MiB,
 kube-state-metrics 13 MiB: **~105 MiB** in total. Requests 240 Mi, limits 960 Mi.
 
+**Retired since** (2026-11-15, by the user, on both doors): `voice-agent.nghodki.ai` (its Caddy site and DNS
+records; the comparison now covers 17 routes and 26 names). Nothing for the retired Jetson vision service was ever
+routed.
+
 ## Alternatives considered
 
 - **Subnet route for the VIP** (above). Kept as the fallback if per-Spark Tailscale IPs ever misbehave.
@@ -120,7 +124,7 @@ kube-state-metrics 13 MiB: **~105 MiB** in total. Requests 240 Mi, limits 960 Mi
 
 - Clients keep using edge-dnsmasq and edge-caddy until the cutover (runbooks/edge.md "Cutover"); the new door is live
   on the VIP and on dgx-2's Tailscale IP for testing.
-- **edge-caddy stays** after the cutover as the relay to nginx-gateway (model, dgxmanager, ha, voice-agent), and as
+- **edge-caddy stays** after the cutover as the relay to nginx-gateway (model, dgxmanager, ha), and as
   the instant rollback. It goes away when those services move into the cluster (P3.7).
 - Routes now live in Git (`cluster/platform/edge/caddy/Caddyfile`, `names.txt`). Until the cutover a route change
   goes to both doors (runbooks/edge.md).

@@ -17,7 +17,6 @@ esp32              192.168.86.50
 model              edge
 litellm-admin      edge
 controlcenter      edge
-voice-agent        edge
 dgxmanager         edge
 webui              edge
 coolify            edge
