@@ -84,7 +84,8 @@ objects); it was OOM-killed once at 512 Mi during the first sync, so it has 768 
   rotate both together.
 - **2026-11-16: Argo CD server and repo-server went to 2 replicas**, one per Spark (required anti-affinity,
   PDB minAvailable 1, one-at-a-time rollouts), because `argocd.nghodki.ai` went down with dgx-2 in the P3.3 Spark
-  drill (runbooks/edge.md). The host Services got ClientIP affinity so scrapes stay on one replica. Controller and
-  redis stay single (runbooks/argocd.md "High availability").
+  drill (runbooks/edge.md). The host Services got ClientIP affinity so scrapes stay on one replica; a 10 s preStop
+  sleep lets kube-proxy drop a stopping pod first. Cost: +192 Mi requests, +768 Mi limits (Argo CD 784 Mi / 2400 Mi),
+  ~90 MiB used at start. Controller and redis stay single (runbooks/argocd.md "High availability").
 - Next: P3.3 (kube-vip, DNS and Caddy in the cluster; the fixed-ClusterIP Caddy path goes away), P3.5 Enforce
   (build-sign.yml, signed-image policy, 2 Kyverno replicas, failurePolicy Fail), P3.7 (workloads into `cluster/apps`).

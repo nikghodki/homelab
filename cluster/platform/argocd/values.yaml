@@ -80,6 +80,11 @@ controller:
 
 repoServer:
   replicas: 2
+  # Keep serving for 10 s after the pod is told to stop, while kube-proxy on every node drops its endpoint; without
+  # it a request already routed to the stopping pod hung (measured 2026-11-16, runbooks/argocd.md "High availability").
+  lifecycle:
+    preStop:
+      sleep: {seconds: 10}
   # One per Spark. Rolling updates take one pod down first: with two nodes and required anti-affinity a surge pod
   # would stay Pending forever.
   affinity:
@@ -133,6 +138,11 @@ repoServer:
 
 server:
   replicas: 2
+  # Keep serving for 10 s after the pod is told to stop, while kube-proxy on every node drops its endpoint; without
+  # it a request already routed to the stopping pod hung (measured 2026-11-16, runbooks/argocd.md "High availability").
+  lifecycle:
+    preStop:
+      sleep: {seconds: 10}
   # One per Spark. Rolling updates take one pod down first: with two nodes and required anti-affinity a surge pod
   # would stay Pending forever.
   affinity:

@@ -206,6 +206,13 @@ What survives one Spark being down, and what doesn't:
   10.43.0.102): each client (each edge-caddy pod, VictoriaMetrics) sticks to one replica, so a scrape always sees the
   same pod and counters don't flip between two processes. Metrics therefore cover the replica the scrape landed on
   (like Kyverno's admission replicas); when it goes, the scrape moves to the other one.
+- **preStop sleep 10 s** on both: the pod keeps serving while kube-proxy removes its endpoint. Without it, deleting
+  a server pod while probing `argocd.nghodki.ai` through the VIP at 2 Hz made one request hang (3 s timeout) per
+  deletion, 239/241 answered 200 (2026-11-16).
+- **Measured cost of the second replicas (2026-11-16, cgroup, a few minutes after start):** server 43 MiB anon
+  (48 MiB incl. cache), repo-server 43 MiB anon at start, growing with Git/Helm page cache like the first one
+  (≈70 MiB anon, 150–370 MiB incl. cache). Requests +192 Mi (64 + 128), limits +768 Mi (256 + 512), split over both
+  Sparks. Argo CD total now 784 Mi requests / 2400 Mi limits.
 - Controller HA (sharding) and redis HA (redis-ha: 3 redis + sentinels + HAProxy) are not worth the memory here.
 
 ## Resources (measured 2026-11-15, cgroup `memory.current`; anon = process memory without page cache)
