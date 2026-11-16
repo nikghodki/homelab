@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Owner | nikghodki |
-| Status | **Draft for review, 2026-11-16. Nothing here is built.** |
+| Status | **Approved 2026-11-16** ([decision 0013](../decisions/0013-ambient-ops-agent.md)); being built up to S1 shadow mode. Answers to §13 are in the table there |
 | Related | [design.md](design.md) (D12, D20, D22, D23), [architecture.md](architecture.md) (§7, §13, §13a, §15.4), [project-plan.md](project-plan.md), [runbooks/alerting.md](../runbooks/alerting.md), decisions [0001](../decisions/0001-github-free-plan.md), [0002](../decisions/0002-backups-off-for-now.md), [0011](../decisions/0011-one-sign-in-proxy.md), [0012](../decisions/0012-default-model.md) |
 
 Numbers marked "est." are estimates. Numbers marked "measured" come from the live fleet on 2026-11-16 (read-only
@@ -39,7 +39,7 @@ the evaluation harness. Skip Keep, Robusta, k8sgpt and Grafana Sift (§10).
 **Rollout.** Shadow mode first (diagnose only, nothing executes), scored against six real incidents from the last two
 days plus whatever happens during the shadow weeks. Then PRs, then one opt-in live action class at a time.
 
-**Effort:** est. 16 to 22 two-hour sessions over 6 phases (§12). **15 decisions for you** are in §13.
+**Effort:** est. 16 to 22 two-hour sessions over 6 phases (§12). The 15 decisions are answered in §13 ([decision 0013](../decisions/0013-ambient-ops-agent.md)).
 
 ---
 
@@ -895,6 +895,11 @@ paragraph each).
 | MTTR for repeat incident classes | lower than before the agent (baseline from S1) |
 | LLM tokens per day | within the budget you set |
 
+### 11.5 A1 head-to-head (Q5)
+
+HolmesGPT and our own loop on the replay set (§11.2), same model, same read-only tools, same budget per
+incident. Result and choice: recorded here when the A0/A1 replay has run.
+
 ---
 
 ## 12. Phased build plan
@@ -918,25 +923,25 @@ LiteLLM into k3s: not required, the agent works with them as Docker services).
 
 ---
 
-## 13. Decisions for you
+## 13. Decisions (answered 2026-11-16)
 
-| # | Decision | Options | Recommendation |
-|---|---|---|---|
-| **Q1** | The agent's GitHub identity | A: fine-grained PAT of nikghodki, only in the broker, commits as nikghodki, you approve merges · B: GitHub App (bot-authored PRs; squash commits likely authored by the bot) · C: machine user · D: no GitHub write | **A**. It meets "commits only as nikghodki"; the merge gate is the broker plus your passkey. Consider GitHub Pro later for server-side protection |
-| **Q2** | Auto-merge classes | none · docs-only PRs by the agent · Renovate digest-only bumps with CI green · Gatus/alert threshold tweaks | **None at start**; revisit after S2 |
-| **Q3** | Which T3 classes may ever be "Ask"/"Auto", and may the agent run Ansible | per class (§3.1, §6.5); Ansible: never · `--check` only · run approved low-risk roles | Start with `github.rerun_failed` (infra) and `k8s.delete_pod` (≥2 replicas) on "Ask"; Ansible `--check` only |
-| **Q4** | Portal hostname and relation to the Fleet Console (D23) | standalone `ops-agent.nghodki.ai` · pages inside the Fleet Console at `ops.nghodki.ai` (replacing Homepage later) | Standalone now, built as the first slice of the Fleet Console (same stack, same sign-in) so it can fold in |
-| **Q5** | Investigation engine | HolmesGPT · own loop (pydantic-ai or plain SDK) | Decide on the bake-off results in A1 |
-| **Q6** | Fallback model when `qwen3.8-27b` or LiteLLM is down | deterministic only · small always-on model on dgx-2 · cloud model break-glass | Deterministic + small dgx-2 model after P2.0; no cloud |
-| **Q7** | Keep `qwen3.8-27b` warm | on demand (4.5 min cold start) · always on (memory on dgx-1) | Your call with the P2.0 memory budget; the first look hides most of the cold start |
-| **Q8** | The Dell and the Pi | read-only on both (recommended) · restarts of allowlisted containers on the Dell · may the agent **engage** (never reset) the robot e-stop | Read-only on both; no e-stop |
-| **Q9** | ntfy buttons | `view` only · plus `http` Deny/Snooze · plus `http` Approve for low-risk | `view` + Deny/Snooze; never Approve |
-| **Q10** | Quiet hours and family-impact rules | times; which services count as family-impact | 22:30-07:30; HA, Open WebUI, DNS and the front door always notify |
-| **Q11** | Incident memory and backups | DB only (backups off, decision 0002) · postmortem PRs for warning+ · for critical only | Postmortem PRs for critical and family-impact incidents |
-| **Q12** | Temporal mTLS before any action | yes (A0) · accept LAN-only risk | Yes: approvals depend on it |
-| **Q13** | LLM budget and concurrency | tokens/day, in-flight | 1 M tokens/day, 2 in flight, revisit after S1 |
-| **Q14** | Renovate and CI triage | comments only · may re-run infra failures · may merge (Q2) | Comments + infra reruns |
-| **Q15** | Chat scope | read-only + proposals (recommended) · chat may trigger T3 directly | Read-only + proposals |
+| # | Decision | Options | Recommendation | Decided (2026-11-16, decision 0013) |
+|---|---|---|---|---|
+| **Q1** | The agent's GitHub identity | A: fine-grained PAT of nikghodki, only in the broker, commits as nikghodki, you approve merges · B: GitHub App (bot-authored PRs; squash commits likely authored by the bot) · C: machine user · D: no GitHub write | **A**. It meets "commits only as nikghodki"; the merge gate is the broker plus your passkey. Consider GitHub Pro later for server-side protection | **A**, but not created yet: in shadow mode no GitHub write at all; a read-only deploy key for the repo (docs-dell pattern) |
+| **Q2** | Auto-merge classes | none · docs-only PRs by the agent · Renovate digest-only bumps with CI green · Gatus/alert threshold tweaks | **None at start**; revisit after S2 | **None** |
+| **Q3** | Which T3 classes may ever be "Ask"/"Auto", and may the agent run Ansible | per class (§3.1, §6.5); Ansible: never · `--check` only · run approved low-risk roles | Start with `github.rerun_failed` (infra) and `k8s.delete_pod` (≥2 replicas) on "Ask"; Ansible `--check` only | No live actions yet. Later CI reruns and pod restarts on "Ask"; Ansible `--check` only |
+| **Q4** | Portal hostname and relation to the Fleet Console (D23) | standalone `ops-agent.nghodki.ai` · pages inside the Fleet Console at `ops.nghodki.ai` (replacing Homepage later) | Standalone now, built as the first slice of the Fleet Console (same stack, same sign-in) so it can fold in | **Standalone `ops-agent.nghodki.ai`** |
+| **Q5** | Investigation engine | HolmesGPT · own loop (pydantic-ai or plain SDK) | Decide on the bake-off results in A1 | Decided by the A1 head-to-head (HolmesGPT vs own loop) on the replay set; result in §11.5 |
+| **Q6** | Fallback model when `qwen3.8-27b` or LiteLLM is down | deterministic only · small always-on model on dgx-2 · cloud model break-glass | Deterministic + small dgx-2 model after P2.0; no cloud | **Fixed queries only**, no cloud model |
+| **Q7** | Keep `qwen3.8-27b` warm | on demand (4.5 min cold start) · always on (memory on dgx-1) | Your call with the P2.0 memory budget; the first look hides most of the cold start | **No**, on demand for now |
+| **Q8** | The Dell and the Pi | read-only on both (recommended) · restarts of allowlisted containers on the Dell · may the agent **engage** (never reset) the robot e-stop | Read-only on both; no e-stop | **Read-only on both; no e-stop access** |
+| **Q9** | ntfy buttons | `view` only · plus `http` Deny/Snooze · plus `http` Approve for low-risk | `view` + Deny/Snooze; never Approve | `view` + Deny/Snooze; never Approve |
+| **Q10** | Quiet hours and family-impact rules | times; which services count as family-impact | 22:30-07:30; HA, Open WebUI, DNS and the front door always notify | 22:30-07:30; HA, Open WebUI, DNS and the front door always notify |
+| **Q11** | Incident memory and backups | DB only (backups off, decision 0002) · postmortem PRs for warning+ · for critical only | Postmortem PRs for critical and family-impact incidents | Postmortem PRs later; in shadow mode postmortems go to the agent's own database |
+| **Q12** | Temporal mTLS before any action | yes (A0) · accept LAN-only risk | Yes: approvals depend on it | **Yes**, done first (A0) |
+| **Q13** | LLM budget and concurrency | tokens/day, in-flight | 1 M tokens/day, 2 in flight, revisit after S1 | 1 M tokens/day, 2 at once |
+| **Q14** | Renovate and CI triage | comments only · may re-run infra failures · may merge (Q2) | Comments + infra reruns | Comments and reruns later; in shadow mode only reports |
+| **Q15** | Chat scope | read-only + proposals (recommended) · chat may trigger T3 directly | Read-only + proposals | **Read-only + proposals** |
 
 ## 14. Open questions (to find out, not to decide)
 
