@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck over every shell script in the repo: tracked *.sh files, and *.j2 templates whose first line is a
+# Runs shellcheck over every shell script in the repo: tracked *.sh files, and *.j2 templates whose first line is a
 # sh/bash shebang (rendered for the check by stripping Jinja: {{ expr }} becomes a plain word, {% %} and {# #} tags
 # are dropped). Warnings and errors fail; info and style notes are printed but don't (--severity=warning).
 # Usage: shellcheck.sh <shellcheck image pinned by digest>
