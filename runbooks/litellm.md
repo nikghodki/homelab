@@ -210,3 +210,12 @@ Kept as Redis 7.4 (`redis:7-alpine`, pinned to the digest it ran): RSALv2/SSPL i
 - Spend logs keep no prompts or replies (`store_prompts_in_spend_logs: false`); Phoenix has those.
 - Skill and plugin scans send many parallel requests: with 2 to 4 in flight the scanners hit 429s and, after 4
   retries, fail closed ("the LLM judge did not run"), which quarantines what they scan.
+
+## File attachments (PDFs) and qwen
+
+vLLM accepts no file parts, so a client that sends one (Claude Code reading a PDF, an OpenAI `file` / `input_file` part)
+got `400 Unsupported chat content part type: 'input_file'`. Since 2026-11-16 the pre-call hook in
+`hosts/stacks/litellm/litellm-proxy/qwen_system_merge.py` turns them into text first:
+text documents as they are, PDFs as their extracted text (pypdf, per page, truncated at 160k characters), and
+scanned PDFs, URLs, file ids and other types as a one-line note to the model. Images are unchanged.
+Tests: `hosts/stacks/litellm/litellm-proxy/tests` (run in CI).
