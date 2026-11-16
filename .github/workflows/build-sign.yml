@@ -119,10 +119,17 @@ jobs:
           TAGS: ${{ steps.spec.outputs.tags }}
           IMAGE: ${{ matrix.image }}
         run: |
-          cosign verify "$REF" --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > verify.json
-          # What was checked, from the verified certificate (not from our own inputs).
-          jq -r '.[0].optional | "Subject: \(.Subject)\nIssuer: \(.Issuer)\nWorkflow ref: \(.githubWorkflowRef)\nWorkflow SHA: \(.githubWorkflowSha)"' verify.json \
-            | tee identity.txt
+          cosign verify "$REF" --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" \
+            --output text > verify.txt 2> verify.err
+          # The certificate's own fields (not our inputs). If cosign's text format changes, show what it printed.
+          grep -E "Certificate (subject|issuer URL)|GitHub Workflow (Ref|SHA|Trigger|Repository)" verify.txt | sort -u > identity.txt \
+            || { cat verify.err; head -c 3000 verify.txt; echo; }
+          cat identity.txt
+          # The identity check is real: the same signature with another branch's identity must fail.
+          if cosign verify "$REF" --certificate-identity "${CERT_IDENTITY%main}not-main" \
+               --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null 2>&1; then
+            echo "::error::cosign verify accepted a wrong certificate identity"; exit 1
+          fi
           cosign verify-attestation "$REF" --type spdxjson \
             --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null
           {
