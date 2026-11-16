@@ -2,7 +2,7 @@
 
 What Argo CD deploys into k3s (plans P3.4/P3.5, [runbooks/argocd.md](../runbooks/argocd.md),
 [decision 0006](../decisions/0006-gitops-platform.md)). Argo CD pulls `git@github.com:nikghodki/homelab.git`
-(`main`) with a read-only deploy key every 2 minutes; nothing pushes into the cluster.
+(`main`) with a read-only deploy key every 2 minutes (plus up to 1 minute of jitter); nothing pushes into the cluster.
 
 ```
 cluster/

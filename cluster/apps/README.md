@@ -10,6 +10,6 @@ Add an app:
    generator, like `_smoke/`.
 2. `cluster/bootstrap/apps/<name>.yaml`: an Application (`project: apps`, `targetRevision: main`, automated sync
    with prune and selfHeal; copy `smoke.yaml`).
-3. PR. CI runs kubeconform and the Kyverno CLI. After the merge, `root` picks it up within about 2 minutes.
+3. PR. CI runs kubeconform and the Kyverno CLI. After the merge, `root` picks it up within about 3 minutes.
 
 `_smoke/` is the SOPS canary: a Namespace and a KSOPS-decrypted Secret, no pods (runbooks/argocd.md).
