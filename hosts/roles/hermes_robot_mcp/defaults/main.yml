@@ -14,7 +14,7 @@ hermes_robot_mcp_gateway_unit: hermes-gateway
 # Pi's motion integration test (run-hermes-motion-integration-test) builds the patched file from the same original
 # with the same patch and checks the same hash, so the test runs exactly the code deployed here.
 hermes_robot_mcp_original_sha256: b19cdeb9535dbe793f1dd752c7b7575b5d48e892e7b6fb883b58b922f7a4a4d5
-hermes_robot_mcp_patched_sha256: 0ed1f77f34c3cfaa00210f83881d9da848526fba6a05ee1da30c05f4b39856ea
+hermes_robot_mcp_patched_sha256: 44138cbcea9cb38f11c1ff0c0a248ee609821a77161bdae66e9159ff668a9302
 
 # The direct-motion guard: one pattern, shared with the nightly mcp-drift check (drift_check.picoclaw_only).
 hermes_robot_mcp_policy: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../../policies/defenseclaw/mcp-servers.yaml') | from_yaml }}"

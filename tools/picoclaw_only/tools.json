@@ -33,7 +33,7 @@
     {
       "name": "stop",
       "title": "Stop",
-      "description": "Emergency stop — halt all motion immediately. Latches the robot's safety governor e-stop over NATS (a person must run safety-reset before the robot can move again) and also sends the car its own stop.",
+      "description": "Emergency stop — halt all motion immediately. Latches the robot's safety governor e-stop over NATS (a person must run safety-reset before the robot can move again), then calls the car's own stop endpoint.",
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
