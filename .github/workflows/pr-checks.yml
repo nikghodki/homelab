@@ -247,6 +247,8 @@ jobs:
         run: python -m pytest -q hosts/roles/defenseclaw_aibom/files/tests
       - name: Sim job sampler and watchdog (measure.sh, stub docker/nvidia-smi)
         run: python -m pytest -q robots/sim/tests
+      - name: LiteLLM usage exporter
+        run: python -m pytest -q hosts/roles/litellm_usage_exporter/files/tests
       - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
         run: python -m pytest -q .github/scripts/tests
       - name: DefenseClaw dashboards and rules match the pinned release

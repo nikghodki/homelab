@@ -1,0 +1,33 @@
+# Managed by homelab Ansible (roles/litellm_usage_exporter). runbooks/litellm.md "Who called the model API"
+[Unit]
+Description=LiteLLM usage exporter (spend log and key aliases as metrics on 127.0.0.1:{{ litellm_usage_exporter_port }})
+After=network-online.target docker.service
+
+[Service]
+DynamicUser=true
+ExecStart=/usr/bin/python3 {{ litellm_usage_exporter_prefix }}/litellm-usage-exporter
+Environment=PORT={{ litellm_usage_exporter_port }}
+Environment=POLL_S={{ litellm_usage_exporter_poll_s }}
+Environment=PGHOST=127.0.0.1
+Environment=PGDATABASE={{ litellm_usage_exporter_db_name }}
+Environment=PGUSER={{ litellm_usage_exporter_db_role }}
+Environment="SRC_NODES={% for k, v in litellm_usage_exporter_src_nodes.items() %}{{ k }}={{ v }}{{ ',' if not loop.last }}{% endfor %}"
+Environment="SRC_LOCAL={{ inventory_hostname }} (local)"
+LoadCredential=db-password:/etc/litellm-usage-exporter/db-password
+Restart=always
+RestartSec=10
+MemoryMax=96M
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
