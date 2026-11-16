@@ -1,0 +1,86 @@
+# LiteLLM's database (runbooks/litellm.md "In k3s"): CNPG cluster litellm-db, Postgres 17, 2 instances, one per Spark.
+# The primary is placed on dgx-2 (dgx-1 carries the models); the standby on dgx-1 streams from it (asynchronous).
+# Restored from a pg_dump of the Docker copy (litellm-postgres on dgx-1) at the move. Spend logs dominate its size
+# (~100 MB per day of traffic, 30 days kept by LiteLLM's cleanup job).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: litellm-db
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12-standard-trixie@sha256:b6d31545fc2c500cc56af2cff91bbc37408deff6815b84446da0a2c9a54b3d1c
+  primaryUpdateStrategy: unsupervised
+  storage:
+    storageClass: local-path
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: litellm
+      owner: litellm
+      secret:
+        name: litellm-db-app
+  postgresql:
+    parameters:
+      shared_buffers: 128MB
+      max_connections: "100"
+      work_mem: 8MB
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  affinity:
+    nodeSelector: {nghodki.ai/role: gpu}
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+    # The first instance (the initial primary) goes to dgx-2; anti-affinity puts the second on dgx-1. After a
+    # failover the primary stays where it is; switch back as in runbooks/litellm.md.
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - {key: kubernetes.io/hostname, operator: In, values: [dgx-2]}
+  monitoring:
+    enablePodMonitor: false
+---
+# Fixed ClusterIP (static band, cluster/README.md) for the primary: the LiteLLM pods (no cluster DNS on the model
+# path) and the usage exporter on dgx-1 (a host process, through kube-proxy).
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm-db-host
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.151
+  selector:
+    cnpg.io/cluster: litellm-db
+    cnpg.io/instanceRole: primary
+  ports:
+    - {name: postgres, port: 5432, targetPort: 5432, protocol: TCP}
+---
+# In: the LiteLLM pods, CNPG's own instances and operator, and host processes on the Sparks (the usage exporter on
+# dgx-1). Host traffic through a ClusterIP is masqueraded to the node's cni0 (10.42.N.1) or flannel (10.42.N.0)
+# address, which no pod has: 10.42.0.0/31 is dgx-2, 10.42.1.0/31 dgx-1.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: litellm-db
+spec:
+  podSelector:
+    matchLabels: {cnpg.io/cluster: litellm-db}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: litellm}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: litellm}
+        - podSelector:
+            matchLabels: {cnpg.io/cluster: litellm-db}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: cnpg-system}
+        - ipBlock: {cidr: 10.42.0.0/31}
+        - ipBlock: {cidr: 10.42.1.0/31}
+      ports:
+        - {port: 5432, protocol: TCP}
+        - {port: 8000, protocol: TCP}

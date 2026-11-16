@@ -1,6 +1,7 @@
 # The *.nghodki.ai front door in k3s (decision 0007, runbooks/edge.md). Backends are reached directly; since
 # 2026-11-15 there's no relay through dgx-1's edge-caddy/nginx-gateway (both stopped, decision 0007 "Relay retired").
-#   - LiteLLM and DGXMM on dgx-1 by its direct-cable address 10.100.136.1 (reachable from both Sparks, where these
+#   - LiteLLM in k3s by its fixed ClusterIP 10.43.0.150 (the stopped Docker copy on 10.100.136.1:4000 as the fallback).
+#   - DGXMM (and the old LiteLLM) on dgx-1 by its direct-cable address 10.100.136.1 (reachable from both Sparks, where these
 #     pods run, but not on the LAN or the tailnet). DGXMM publishes :8090 only there and trusts X-Forwarded-For from
 #     the two source addresses these pods arrive with: 10.100.136.2 (pod on dgx-2) and 172.23.0.1 (pod on dgx-1,
 #     masqueraded onto the Docker network `gateway`); DGXMM_TRUSTED_PROXIES in its .env.
@@ -69,10 +70,20 @@
 	# DGXMM has no login of its own, so it's only on dgxmanager.nghodki.ai, behind sign-in; old links go there.
 	redir /dgxmm* https://dgxmanager.nghodki.ai{uri} 308
 	# LiteLLM. On-demand models: a cold start or queued request can wait several minutes; stream without buffering.
+	# In k3s (litellm/litellm, fixed ClusterIP, two pods) first; the stopped Docker copy on dgx-1 (:4000 on the cable
+	# address) is the fallback until 2026-11-23 (runbooks/litellm.md). With both down (the move, a total outage) a
+	# request waits up to 90 s for one to come back instead of failing at once: LLM clients wait minutes anyway.
 	@litellm path /v1/* /health*
 	handle @litellm {
-		reverse_proxy 10.100.136.1:4000 {
+		reverse_proxy 10.43.0.150:4000 10.100.136.1:4000 {
 			import strip_session_cookie
+			lb_policy first
+			lb_try_duration 90s
+			lb_try_interval 250ms
+			health_uri /health/liveliness
+			health_interval 5s
+			health_timeout 3s
+			fail_duration 10s
 			header_up X-Real-IP {remote_host}
 			flush_interval -1
 			transport http {
@@ -273,8 +284,15 @@
 		# Front door sign-in first (admins), then LiteLLM's own UI login.
 		route {
 			import session_check admins
-			reverse_proxy 100.65.137.82:4000 {
+			# LiteLLM in k3s first, the stopped Docker copy as the fallback (as for /v1 on model.nghodki.ai)
+			reverse_proxy 10.43.0.150:4000 10.100.136.1:4000 {
 				import strip_session_cookie
+				lb_policy first
+				lb_try_duration 10s
+				health_uri /health/liveliness
+				health_interval 5s
+				health_timeout 3s
+				fail_duration 10s
 				header_up Host {upstream_hostport}
 				header_up X-Real-IP {remote_host}
 				header_up X-Forwarded-For {remote_host}

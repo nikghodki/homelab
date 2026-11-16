@@ -33,7 +33,10 @@
         compose_stack_private_templates:
           litellm-proxy: 0   # litellm.env: root 0600, read by docker compose
         compose_stack_extra_files:
-          - {src: "{{ playbook_dir }}/../files/litellm/defenseclaw_guardrail.py", dest: litellm-proxy/defenseclaw_guardrail.py}
+          # One copy of the proxy's files, shared with the k3s app (cluster/apps/litellm/proxy)
+          - {src: "{{ playbook_dir }}/../../cluster/apps/litellm/proxy/config.yaml", dest: litellm-proxy/config.yaml}
+          - {src: "{{ playbook_dir }}/../../cluster/apps/litellm/proxy/qwen_system_merge.py", dest: litellm-proxy/qwen_system_merge.py}
+          - {src: "{{ playbook_dir }}/../../cluster/apps/litellm/proxy/defenseclaw_guardrail.py", dest: litellm-proxy/defenseclaw_guardrail.py}
         compose_stack_env:
           POSTGRES_PASSWORD: "{{ litellm_postgres_password }}"
   tasks:

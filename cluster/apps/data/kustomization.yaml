@@ -1,0 +1,9 @@
+# Shared databases (CloudNativePG clusters, plan P3.7). Today: litellm-db (runbooks/litellm.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: data
+resources:
+  - namespace.yaml
+  - litellm-db.yaml
+generators:
+  - secret-generator.yaml

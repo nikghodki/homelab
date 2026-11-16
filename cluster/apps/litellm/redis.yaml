@@ -1,0 +1,76 @@
+# Redis 7.4 for LiteLLM (rate limits, router state, the admin UI's PKCE verifier between pods). No response cache, no
+# persistence: losing it costs nothing but in-flight rate-limit counts. Redis 7 is kept (RSALv2/SSPL, free for
+# private use; Valkey declined, decision 0012), pinned to the digest the Docker copy ran (AWS's mirror of the Docker
+# official image, the allowed registry). One replica; after its node fails it is rescheduled within ~30 s.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: litellm-redis
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm-redis
+  labels: {app.kubernetes.io/name: litellm-redis}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: litellm-redis}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: litellm-redis}
+    spec:
+      serviceAccountName: litellm-redis
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      tolerations:
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 10}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 10}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: redis
+          image: public.ecr.aws/docker/library/redis:7-alpine@sha256:7b1753b4c5ad8458906c272a8132b8c15f5557b000379eb115fb239706a384b7
+          # requirepass is in the mounted file, not on the command line
+          args: ["/etc/redis/redis.conf"]
+          ports:
+            - {name: redis, containerPort: 6379}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            tcpSocket: {port: redis}
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: {port: redis}
+            periodSeconds: 20
+          volumeMounts:
+            - {name: conf, mountPath: /etc/redis, readOnly: true}
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: conf
+          secret: {secretName: litellm-redis, defaultMode: 256}  # 0400
+        - name: data
+          emptyDir: {sizeLimit: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm-redis
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.152
+  selector: {app.kubernetes.io/name: litellm-redis}
+  ports:
+    - {name: redis, port: 6379, targetPort: redis, protocol: TCP}

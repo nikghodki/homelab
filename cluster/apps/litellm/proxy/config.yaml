@@ -1,11 +1,12 @@
-# LiteLLM proxy on dgx-1 (hosts/stacks/litellm, runbooks/litellm.md). No response cache; traces go to Phoenix.
+# LiteLLM proxy (cluster/apps/litellm, runbooks/litellm.md); the stopped Docker copy on dgx-1 (hosts/stacks/litellm) reads
+# the same file. No response cache; traces go to Phoenix.
 
 # Every route lives in the DB: DGXMM registers its on-demand models there (runbooks/litellm.md). The two static
 # routes (qwen3.6-35b on vllm-qwen, whisper-large-v3-turbo on vllm-whisper) were removed on 2026-11-15 (P0.7).
 model_list: []
 
 # DefenseClaw checks every chat prompt (fails open) and every MCP tool call (fails closed) through dgx-1's
-# DefenseClaw gateway, agent-gateway route (P2.4; hosts/files/litellm/defenseclaw_guardrail.py). Global on purpose:
+# DefenseClaw gateway, agent-gateway route (P2.4; proxy/defenseclaw_guardrail.py). Global on purpose:
 # per-key guardrails are a LiteLLM enterprise feature. The judge and scanner keys are skipped (their prompts quote
 # what they judge).
 guardrails:

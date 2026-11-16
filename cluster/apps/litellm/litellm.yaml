@@ -1,0 +1,173 @@
+# LiteLLM proxy (runbooks/litellm.md "In k3s"): two replicas, one per Spark, so either Spark can go down. The front
+# door (model.nghodki.ai /v1, litellm-admin) and in-cluster callers reach it on the fixed ClusterIP 10.43.0.150:4000.
+# State is in Postgres (data/litellm-db: keys, routes, spend) and Redis (rate limits, router state, the admin UI's
+# PKCE verifier between pods); nothing on local disk.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: litellm
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  labels: {app.kubernetes.io/name: litellm}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  # one pod per Spark (required anti-affinity): a surge pod could never schedule, so replace one at a time
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  selector:
+    matchLabels: {app.kubernetes.io/name: litellm}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: litellm}
+    spec:
+      serviceAccountName: litellm
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: {app.kubernetes.io/name: litellm}
+              topologyKey: kubernetes.io/hostname
+      # The admin UI's SSO: Pocket ID at the front door's LAN VIP (no cluster DNS on the path)
+      hostAliases:
+        - ip: 192.168.86.11
+          hostnames: [id.nghodki.ai]
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+      # streamed replies get time to finish when a pod is replaced
+      terminationGracePeriodSeconds: 120
+      initContainers:
+        # Never start on an empty database: LiteLLM would create a fresh schema with no keys or routes, and every
+        # caller would get 401s. The data is restored by hand (runbooks/litellm.md "Restore the database").
+        - name: data-present
+          image: ghcr.io/cloudnative-pg/postgresql:17.12-standard-trixie@sha256:b6d31545fc2c500cc56af2cff91bbc37408deff6815b84446da0a2c9a54b3d1c
+          command:
+            - sh
+            - -c
+            - >-
+              until [ "$(psql "$DATABASE_URL" -Atqc 'select 1 from "LiteLLM_VerificationToken" limit 1' 2>/dev/null)" = 1 ];
+              do echo "no LiteLLM data in the database yet: restore it first (runbooks/litellm.md)"; sleep 3; done
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: litellm, key: DATABASE_URL}}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: [ALL]}
+        # The system CAs plus the homelab web CA (Pocket ID's certificate), as one bundle for SSL_CERT_FILE
+        - name: ca-bundle
+          image: ghcr.io/berriai/litellm:v1.109.1@sha256:11175975a3093e05e92faee2fe2fe3412a3ae2fcaa849eb0fe25d5f0d8bcb2e9
+          command: ["sh", "-c", "cat /etc/ssl/certs/ca-certificates.crt /proxy/web-ca.crt > /ca/ca-certificates.crt"]
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 100m, memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: proxy, mountPath: /proxy, readOnly: true}
+            - {name: ca, mountPath: /ca}
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:v1.109.1@sha256:11175975a3093e05e92faee2fe2fe3412a3ae2fcaa849eb0fe25d5f0d8bcb2e9
+          # 2 workers per pod, 2 pods: the 4 workers the Docker copy ran
+          args: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "2"]
+          envFrom:
+            # LITELLM_MASTER_KEY, LITELLM_SALT_KEY, DATABASE_URL, UI_USERNAME, UI_PASSWORD, DEFENSECLAW_TOKEN,
+            # PHOENIX_API_KEY, GENERIC_CLIENT_SECRET, REDIS_PASSWORD
+            - secretRef: {name: litellm}
+          env:
+            - {name: REDIS_HOST, value: "10.43.0.152"}
+            - {name: REDIS_PORT, value: "6379"}
+            - {name: STORE_MODEL_IN_DB, value: "True"}
+            - {name: LITELLM_LOG, value: INFO}
+            - {name: PYTHONPATH, value: /app}
+            # DefenseClaw guardrail (P2.4): dgx-1's gateway through litellm-defenseclaw-cable (hosts/stacks/litellm-bridges)
+            - {name: DEFENSECLAW_URL, value: "http://10.100.136.1:18970"}
+            # Traces to Phoenix on dgx-2 over the LAN (P2.6)
+            - {name: PHOENIX_COLLECTOR_HTTP_ENDPOINT, value: "http://192.168.86.36:6006/v1/traces"}
+            - {name: PHOENIX_PROJECT_NAME, value: litellm}
+            # LiteLLM sets more than the OTel default of 128 attributes on a span; past it the SDK drops the oldest
+            # ones (the key alias among them)
+            - {name: OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT, value: "1024"}
+            - {name: OTEL_ATTRIBUTE_COUNT_LIMIT, value: "1024"}
+            # Admin UI sign-in (P1.13): generic OIDC SSO with Pocket ID, client `litellm` (identity/pocket-id.yaml).
+            # Free while LiteLLM_UserTable has fewer than 5 users. UI_USERNAME/UI_PASSWORD: break-glass (/fallback/login).
+            - {name: PROXY_BASE_URL, value: "https://litellm-admin.nghodki.ai"}
+            - {name: GENERIC_CLIENT_ID, value: litellm}
+            - {name: GENERIC_AUTHORIZATION_ENDPOINT, value: "https://id.nghodki.ai/authorize"}
+            - {name: GENERIC_TOKEN_ENDPOINT, value: "https://id.nghodki.ai/api/oidc/token"}
+            - {name: GENERIC_USERINFO_ENDPOINT, value: "https://id.nghodki.ai/api/oidc/userinfo"}
+            - {name: GENERIC_SCOPE, value: "openid email profile groups"}
+            - {name: GENERIC_CLIENT_USE_PKCE, value: "true"}
+            - {name: GENERIC_USER_ID_ATTRIBUTE, value: preferred_username}
+            - {name: GENERIC_USER_EMAIL_ATTRIBUTE, value: email}
+            - {name: GENERIC_ROLE_MAPPINGS_GROUP_CLAIM, value: groups}
+            - {name: GENERIC_ROLE_MAPPINGS_ROLES, value: "{'proxy_admin': ['admins']}"}
+            - {name: GENERIC_ROLE_MAPPINGS_DEFAULT_ROLE, value: internal_user_viewer}
+            - {name: SSL_CERT_FILE, value: /ca/ca-certificates.crt}
+          ports:
+            - {name: http, containerPort: 4000}
+          resources:
+            requests: {cpu: 250m, memory: 1536Mi}
+            limits: {cpu: "4", memory: 3Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          startupProbe:
+            httpGet: {path: /health/liveliness, port: http}
+            periodSeconds: 3
+            failureThreshold: 100   # 5 min (database migrations on a version change)
+          readinessProbe:
+            httpGet: {path: /health/readiness, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health/liveliness, port: http}
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - {name: proxy, mountPath: /app/config.yaml, subPath: config.yaml, readOnly: true}
+            - {name: proxy, mountPath: /app/qwen_system_merge.py, subPath: qwen_system_merge.py, readOnly: true}
+            - {name: proxy, mountPath: /app/defenseclaw_guardrail.py, subPath: defenseclaw_guardrail.py, readOnly: true}
+            - {name: ca, mountPath: /ca, readOnly: true}
+      volumes:
+        - name: proxy
+          configMap: {name: litellm-proxy}
+        - name: ca
+          emptyDir: {sizeLimit: 2Mi}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: litellm
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: litellm}
+---
+# Fixed ClusterIP (static band, cluster/README.md): the front door's Caddy, Open WebUI, DGXMM's route sync (Docker on
+# dgx-1, through kube-proxy) and the ops agent.
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.150
+  selector: {app.kubernetes.io/name: litellm}
+  ports:
+    - {name: http, port: 4000, targetPort: http, protocol: TCP}

@@ -10,7 +10,7 @@ manifests=$(find cluster -type f \( -name '*.yaml' -o -name '*.yml' \) -print -q
 if [ -z "$manifests" ]; then echo "no manifests under cluster/ yet"; exit 0; fi
 docker run --rm -v "$PWD:/repo:ro" -w /repo "$KUBECONFORM_IMAGE" -strict -summary -ignore-missing-schemas \
   -ignore-filename-pattern '(^|/)values\.ya?ml$' -ignore-filename-pattern '\.enc\.ya?ml$' \
-  -ignore-filename-pattern '\.ssa-patch\.ya?ml$' cluster/
+  -ignore-filename-pattern '\.ssa-patch\.ya?ml$' -ignore-filename-pattern '(^|/)cluster/apps/litellm/proxy/' cluster/
 if [ -z "$(find policies/kyverno -type f \( -name '*.yaml' -o -name '*.yml' \) -print -quit 2>/dev/null)" ]; then
   echo "no Kyverno policies under policies/kyverno/ yet"; exit 0
 fi
@@ -75,3 +75,6 @@ if lists[0] != lists[1]:
     sys.exit(1)
 PYCHK
 kyverno apply policies/kyverno --resource cluster/ --policy-report
+# LiteLLM's copy of the web CA (a ConfigMap source must sit next to its kustomization) must be the CA
+cmp -s hosts/files/pki/web-ca.crt cluster/apps/litellm/proxy/web-ca.crt \
+  || { echo "::error::cluster/apps/litellm/proxy/web-ca.crt differs from hosts/files/pki/web-ca.crt"; exit 1; }
