@@ -1,0 +1,3 @@
+# Managed by homelab Ansible (roles/hardening). apport --start sets fs.suid_dumpable=2; keep it 0.
+[Service]
+ExecStartPost=/usr/sbin/sysctl -q -w fs.suid_dumpable=0

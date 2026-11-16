@@ -21,4 +21,5 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [alerting.md](alerting.md) (how alerts reach the phone: Gatus and ntfy on the Dell, Alertmanager on dgx-2),
 [argocd.md](argocd.md) (GitOps: bootstrap, add an app, break-glass, the deploy key and the age key in the cluster),
 [kyverno.md](kyverno.md) (admission policies, Audit → Enforce),
-[mcp-admission.md](mcp-admission.md) (approved MCP servers, DefenseClaw admission, nightly tool drift check).
+[mcp-admission.md](mcp-admission.md) (approved MCP servers, DefenseClaw admission, nightly tool drift check),
+[hardening.md](hardening.md) (Lynis remediation: host hardening, documented exceptions, roll back).

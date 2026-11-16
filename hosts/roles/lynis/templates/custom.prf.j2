@@ -1,0 +1,9 @@
+# Managed by homelab Ansible (roles/lynis). Documented exceptions: runbooks/hardening.md.
+{% for t in lynis_skip_tests %}
+# {{ t.reason }}
+skip-test={{ t.id }}
+{% endfor %}
+{% for i in lynis_promisc_interfaces %}
+# {{ i.reason }}
+if_promisc:{{ i.name }}:{{ i.reason | replace(':', ' ') }}:
+{% endfor %}

@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (roles/hardening). See runbooks/hardening.md.
+# Forwarding, rp_filter and net.bridge.* are deliberately not set here.
+{% for key, value in hardening_sysctl | dictsort %}
+{{ key }} = {{ value }}
+{% endfor %}
+{% if hardening_yama_present %}
+kernel.yama.ptrace_scope = {{ hardening_ptrace_scope }}
+{% endif %}
+{% if not hardening_router | bool %}
+# Not a router: never send ICMP redirects
+{% for key, value in hardening_non_router_sysctl | dictsort %}
+{{ key }} = {{ value }}
+{% endfor %}
+{% endif %}

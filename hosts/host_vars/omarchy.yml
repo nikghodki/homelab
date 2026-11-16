@@ -15,3 +15,8 @@ k3s_node_labels: [nghodki.ai/role=agent-node, nghodki.ai/hw=x86]
 k3s_kubelet_args:
   - system-reserved=cpu=1,memory=2Gi
   - kube-reserved=cpu=250m,memory=512Mi
+# UFW limits 22/tcp to 6 new connections per 30 s per source; the agents on dgx-1 exceed that
+# (runbooks/hardening.md). Allow dgx-1 (LAN and Tailscale) ahead of the limit rule; it stays for everyone else.
+hardening_ufw_ssh_allow:
+  - {src: 192.168.86.44, comment: dgx-1 automation}
+  - {src: 100.65.137.82, comment: dgx-1 automation}

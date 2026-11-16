@@ -54,3 +54,12 @@ k3s_kubelet_args:
   - kube-reserved=cpu=500m,memory=768Mi
   - eviction-hard=memory.available<300Mi,nodefs.available<5%,imagefs.available<5%
   - max-pods=40
+# Lynis exceptions (runbooks/hardening.md)
+lynis_skip_tests:
+  - id: PKGS-7388
+    reason: >-
+      False positive: noble-security is in deb822 ubuntu.sources (ports.ubuntu.com), which
+      Lynis 3.0.9 does not parse; roles/hardening asserts a -security suite
+lynis_promisc_interfaces:
+  - name: usb0
+    reason: "L4T USB device-mode gadget, a member of bridge l4tbr0 (bridge ports are promiscuous)"

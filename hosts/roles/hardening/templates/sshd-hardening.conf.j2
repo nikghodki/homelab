@@ -1,0 +1,5 @@
+# Managed by homelab Ansible (roles/hardening). Adds to 50-homelab.conf (roles/base).
+# LogLevel VERBOSE records the key fingerprint of each login.
+LogLevel {{ hardening_ssh_log_level }}
+# Agents open many parallel short sessions from dgx-1; don't throttle them pre-auth.
+MaxStartups {{ hardening_ssh_max_startups }}

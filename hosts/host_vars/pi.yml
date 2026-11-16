@@ -20,3 +20,11 @@ cisco_aibom_dirs:
 # Safety governor metrics (127.0.0.1 only) for the status-stale alert (runbooks/robot-safety.md)
 otel_host_collector_extra_scrapes:
   - {job: safety-governor, target: "127.0.0.1:9113", interval: 15s}
+# Hardening (runbooks/hardening.md): the Pi never forwards, so it stops sending ICMP redirects too.
+hardening_router: false
+# Lynis exceptions (runbooks/hardening.md)
+lynis_skip_tests:
+  - id: PKGS-7388
+    reason: >-
+      False positive: trixie-security is in deb822 debian.sources (deb.debian.org/debian-security), which
+      Lynis 3.1.4 does not parse; roles/hardening asserts a -security suite

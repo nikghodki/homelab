@@ -1,0 +1,202 @@
+# Lynis-driven hardening (runbooks/hardening.md). Always --check --diff first, then dgx-2 alone.
+- name: Check the OS is one we support
+  ansible.builtin.assert:
+    that: ansible_facts['os_family'] in ['Debian', 'Archlinux']
+    fail_msg: "Unsupported OS family {{ ansible_facts['os_family'] }}"
+
+- name: Never manage forwarding, rp_filter or bridge sysctls here
+  ansible.builtin.assert:
+    that: (hardening_sysctl.keys() | list + hardening_non_router_sysctl.keys() | list)
+          | select('search', 'forwarding|rp_filter|ip_forward|^net\.bridge\.') | list | length == 0
+    fail_msg: hardening_sysctl must not touch forwarding, rp_filter or net.bridge.* (k3s/flannel/Docker own them)
+
+- name: Read ip_forward
+  ansible.builtin.slurp:
+    src: /proc/sys/net/ipv4/ip_forward
+  register: hardening_ip_forward
+
+- name: Non-router hosts really don't forward
+  ansible.builtin.assert:
+    that: hardening_router | bool or (hardening_ip_forward.content | b64decode | trim) == '0'
+    fail_msg: hardening_router is false but ip_forward=1; this host routes, so keep sending redirects
+
+- name: Is the Yama LSM present
+  ansible.builtin.stat:
+    path: /proc/sys/kernel/yama/ptrace_scope
+  register: hardening_yama
+
+- name: Kernel and network sysctls
+  ansible.builtin.template:
+    src: sysctl-hardening.conf.j2
+    dest: /etc/sysctl.d/60-homelab-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    hardening_yama_present: "{{ hardening_yama.stat.exists }}"
+
+# Not a handler: if a run fails after the template changed, the next run still loads the values.
+- name: Running values match the sysctl file (sets only the ones that differ)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    grep -E '^[a-z]' /etc/sysctl.d/60-homelab-hardening.conf | while IFS='=' read -r key value; do
+      key=$(echo "$key" | tr -d ' '); value=$(echo "$value" | tr -d ' ')
+      if [ "$(sysctl -n "$key")" != "$value" ]; then sysctl -q -w "$key=$value"; echo "set $key=$value"; fi
+    done
+  args:
+    executable: /bin/bash
+  register: hardening_sysctl_apply
+  changed_when: hardening_sysctl_apply.stdout != ''
+
+- name: Does apport run (Ubuntu)
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/apport.service
+  register: hardening_apport
+
+- name: Keep fs.suid_dumpable at 0 after apport starts
+  when: hardening_apport.stat.exists
+  block:
+    - name: Drop-in folder for apport
+      ansible.builtin.file:
+        path: /etc/systemd/system/apport.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+    - name: Apport drop-in
+      ansible.builtin.template:
+        src: apport-suid-dumpable.conf.j2
+        dest: /etc/systemd/system/apport.service.d/50-homelab-suid-dumpable.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload systemd
+
+- name: Unused network protocol modules can't be loaded
+  ansible.builtin.template:
+    src: modprobe-hardening.conf.j2
+    dest: /etc/modprobe.d/60-homelab-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: SSH logging drop-in (after roles/base 50-homelab.conf)
+  ansible.builtin.template:
+    src: sshd-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/55-homelab-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Which cron and sshd paths exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: [/etc/crontab, /etc/cron.d, /etc/cron.hourly, /etc/cron.daily, /etc/cron.weekly, /etc/cron.monthly, /etc/ssh/sshd_config]
+  register: hardening_paths
+
+- name: Root-only cron and sshd configuration
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+    owner: root
+    group: root
+  loop:
+    - {path: /etc/crontab, mode: "0600"}
+    - {path: /etc/cron.d, mode: "0700"}
+    - {path: /etc/cron.hourly, mode: "0700"}
+    - {path: /etc/cron.daily, mode: "0700"}
+    - {path: /etc/cron.weekly, mode: "0700"}
+    - {path: /etc/cron.monthly, mode: "0700"}
+    - {path: /etc/ssh/sshd_config, mode: "0600"}
+  when: item.path in hardening_existing_paths
+  vars:
+    hardening_existing_paths: "{{ hardening_paths.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+
+- name: Is CUPS configured
+  ansible.builtin.stat:
+    path: /etc/cups/cupsd.conf
+  register: hardening_cupsd
+
+- name: CUPS configuration readable by root and lp only
+  ansible.builtin.file:
+    path: /etc/cups/cupsd.conf
+    mode: "0640"
+  when: hardening_cupsd.stat.exists
+
+- name: Password hashing rounds for passwords set with chpasswd/newusers
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^#?\s*{{ item.key }}\s'
+    line: "{{ item.key }} {{ item.value }}"
+  loop: "{{ hardening_login_defs | dict2items }}"
+
+- name: Read accounts
+  ansible.builtin.getent:
+    database: "{{ item }}"
+  loop: [passwd, shadow]
+
+- name: Lock system accounts (UID < 1000 or no login shell) that have an empty password field
+  ansible.builtin.user:
+    name: "{{ item.key }}"
+    password_lock: true
+  loop: "{{ ansible_facts['getent_shadow'] | dict2items | selectattr('value.0', 'equalto', '') | list }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: >-
+    item.key in ansible_facts['getent_passwd'] and
+    ((ansible_facts['getent_passwd'][item.key][1] | int) < 1000 or
+     ansible_facts['getent_passwd'][item.key][5] is search('(nologin|false)$'))
+
+- name: Legal banner for console and telnet-style logins
+  ansible.builtin.template:
+    src: issue.j2
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ ['/etc/issue', '/etc/issue.net'] if ansible_facts['os_family'] == 'Debian' else ['/etc/issue'] }}"
+
+- name: Debian family packages and security updates
+  when: ansible_facts['os_family'] == 'Debian'
+  block:
+    - name: A -security suite is configured (Lynis PKGS-7388 can't parse deb822 sources)
+      # Ubuntu: a=noble-security,n=noble; Debian: a=stable-security,n=trixie-security
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        apt-cache policy | awk '/,(a|n)=[a-z]+-security,/ {found = 1} END {exit !found}'
+      args:
+        executable: /bin/bash
+      changed_when: false
+      check_mode: false
+
+    - name: Package integrity and patch-audit tools
+      ansible.builtin.apt:
+        name: "{{ hardening_debian_packages }}"
+        state: present
+      environment:
+        NEEDRESTART_SUSPEND: "1"
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Apply pending security updates now (opt-in, --tags security_updates; never restarts services)
+      ansible.builtin.command: unattended-upgrade -v
+      environment:
+        NEEDRESTART_SUSPEND: "1"
+        DEBIAN_FRONTEND: noninteractive
+      register: hardening_uu
+      changed_when: "'Packages that will be upgraded' in hardening_uu.stdout"
+      tags: [never, security_updates]
+
+- name: Allow SSH from the automation hosts ahead of the UFW limit rule
+  community.general.ufw:
+    rule: allow
+    src: "{{ item.src }}"
+    port: "22"
+    proto: tcp
+    comment: "{{ item.comment }}"
+    insert: 0
+    insert_relative_to: first-ipv4
+  loop: "{{ hardening_ufw_ssh_allow }}"
+  loop_control:
+    label: "{{ item.src }}"
