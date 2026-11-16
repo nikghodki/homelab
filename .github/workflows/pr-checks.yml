@@ -1,9 +1,9 @@
 name: pr-checks
 
 # Two jobs, each a sequence of steps, because GitHub bills every job rounded up to a whole minute (8 parallel jobs of
-# 12-146 s billed 12-14 min a run). Runs on PRs; once a day on main, the full suite (it catches merge skew and saves the
-# pip and Trivy caches where every PR can restore them: a cache saved on a PR ref is visible to that PR only); and
-# manually. No push to main: a squash merge pushes the tree the PR run passed (infra-optimization review 2026-11 §4).
+# 12-146 s billed 12-14 min a run). Runs on PRs; once a day on main, the full suite (it catches merge skew and saves
+# the tool venv, Trivy and Ansible caches where every PR can restore them: a cache saved on a PR ref is visible to that
+# PR only); and manually. No push to main: a squash merge pushes the tree the PR run passed (infra-optimization review 2026-11 §4).
 # A PR that changes only docs runs the docs build, secret scanning, SOPS, the edge-zone check (and yamllint if it
 # touches YAML); everything else is skipped (.github/scripts/ci-scope.sh). Later steps run after a failed one
 # (`!cancelled()`), so one run reports every failure; any failed step fails the job.
@@ -88,10 +88,6 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           python-version: "3.12"
-          cache: pip  # downloads, for a venv cache miss; --require-hashes still checks every file
-          cache-dependency-path: |
-            .github/requirements-ci.txt
-            docs-site/requirements-docs.txt
       - name: Tool venvs cache (built from the hash-locked files; key = Python version + lock hashes)
         if: ${{ !cancelled() }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -263,11 +259,6 @@ jobs:
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         with:
           python-version: "3.12"
-          cache: pip  # downloads, for a venv cache miss; --require-hashes still checks every file
-          cache-dependency-path: |
-            .github/requirements-ci.txt
-            .github/requirements-aibom.txt
-            .github/requirements-radar.txt
       - name: Tool venvs cache (built from the hash-locked files; key = Python version + lock hashes)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
