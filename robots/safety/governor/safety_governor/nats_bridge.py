@@ -60,9 +60,6 @@ class NatsBridge:
 
     async def _main(self) -> None:
         cfg = self._cfg
-        with open(cfg["credentials_file"], encoding="utf-8") as fh:
-            creds = json.load(fh)
-        tls = ssl.create_default_context(cafile=cfg["ca_file"])
 
         async def error_cb(exc):
             self._log("warning", f"NATS error: {exc}")
@@ -75,6 +72,11 @@ class NatsBridge:
 
         while not self._stop:
             try:
+                # Read on every attempt: a missing or unreadable credentials/CA file is logged and retried like a
+                # failed connect, instead of ending this task with nothing in the governor's log.
+                with open(cfg["credentials_file"], encoding="utf-8") as fh:
+                    creds = json.load(fh)
+                tls = ssl.create_default_context(cafile=cfg["ca_file"])
                 self._nc = await nats.connect(
                     servers=[cfg["url"]],
                     user=creds["user"],
