@@ -22,6 +22,7 @@ env:
   TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
   KUBECONFORM_IMAGE: ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e
   KYVERNO_IMAGE: ghcr.io/kyverno/kyverno-cli:v1.20.0@sha256:bd2b8b7c9d550ecf04e0bacaf351adce2f82ce67fd3f291075edcee7f8ab4ab4
+  SHELLCHECK_IMAGE: koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
 
 jobs:
   lint:
@@ -37,8 +38,16 @@ jobs:
           python-version: "3.12"
       - name: Install Python tools
         run: pip install --require-hashes -r .github/requirements-ci.txt
+      - name: Every scanner image is pinned by digest
+        # tags can be moved (the March 2026 Trivy release and trivy-action tags were): docker run only by digest
+        run: |
+          if grep -nE '^\s+[A-Z_]+_IMAGE:' .github/workflows/*.yml | grep -vE '@sha256:[a-f0-9]{64}$'; then
+            echo "::error::image not pinned by digest (above)"; exit 1
+          fi
       - name: actionlint
         run: docker run --rm -v "$PWD:/repo:ro" -w /repo "$ACTIONLINT_IMAGE" -color
+      - name: shellcheck (*.sh and shell templates)
+        run: .github/scripts/shellcheck.sh "$SHELLCHECK_IMAGE"
       - name: yamllint
         run: yamllint -c .yamllint.yaml .
       - name: ansible-lint
@@ -104,10 +113,13 @@ jobs:
           # 128 = no package manifests found yet
           if [ "$rc" -eq 128 ]; then echo "no dependency manifests yet"; exit 0; fi
           exit "$rc"
-      - name: Trivy (vulnerabilities, misconfigurations, secrets)
+      - name: Trivy ignore file (reasons, 30-day expiry)
+        run: python3 .github/scripts/check-trivy-ignores.py --no-expiry
+      - name: Trivy (vulnerabilities, misconfigurations)
+        # No `secret` scanner: gitleaks (full history) and TruffleHog (verified) in the secrets job cover it
         run: >
           docker run --rm -v "$PWD:/src:ro" "$TRIVY_IMAGE" fs
-          --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress
+          --scanners vuln,misconfig --severity HIGH,CRITICAL --exit-code 1 --no-progress
           --ignorefile /src/.trivyignore.yaml /src
 
   kubernetes:
