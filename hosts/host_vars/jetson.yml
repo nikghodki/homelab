@@ -69,3 +69,9 @@ lynis_skip_tests:
 lynis_promisc_interfaces:
   - name: usb0
     reason: "L4T USB device-mode gadget, a member of bridge l4tbr0 (bridge ports are promiscuous)"
+# ops-ro `certs` and `defenseclaw` (roles/ops_agent_access; k3s certs are added by group).
+# Two DefenseClaw gateways on loopback (runbooks/hermes-profiles.md).
+ops_agent_access_certs:
+  - /usr/local/share/ca-certificates/homelab-ca.crt
+  - /usr/local/share/ca-certificates/nghodki-web-ca.crt
+ops_agent_access_defenseclaw_ports: [18970, 18980]

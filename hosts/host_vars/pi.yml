@@ -39,3 +39,7 @@ lynis_skip_tests:
 # tag:robot -> Jetson:22 grant; restart counter 232, SYN-SENT), nothing listens on 18970. roles/retired_units
 retired_units_user:
   - {user: nikghodki-raspberry-1, unit: dclaw-tunnel.service, reason: "retired by P1.12; it never connected"}
+# ops-ro `certs` (roles/ops_agent_access)
+ops_agent_access_certs:
+  - /usr/local/share/ca-certificates/homelab-ca.crt
+  - /usr/local/share/ca-certificates/nghodki-web-ca.crt

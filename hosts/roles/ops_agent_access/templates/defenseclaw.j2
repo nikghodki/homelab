@@ -1,0 +1,4 @@
+# Managed by homelab Ansible (roles/ops_agent_access). Loopback ports of DefenseClaw gateways (GET /health only).
+{% for port in ops_agent_access_defenseclaw_ports %}
+{{ port }}
+{% endfor %}

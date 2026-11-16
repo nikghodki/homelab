@@ -1,0 +1,7 @@
+# Read-only SSH access for the ambient ops agent on every host (decision 0013, runbooks/ops-agent.md).
+# Always --check --diff first.
+- name: Ops agent read-only access (opsro, ops-ro)
+  hosts: all
+  become: true
+  roles:
+    - role: ops_agent_access

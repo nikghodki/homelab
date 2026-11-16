@@ -20,3 +20,8 @@ k3s_kubelet_args:
 hardening_ufw_ssh_allow:
   - {src: 192.168.86.44, comment: dgx-1 automation}
   - {src: 100.65.137.82, comment: dgx-1 automation}
+  - {src: 192.168.86.36, comment: dgx-2 ops agent}  # opsro; pod egress is SNATed to the node IP
+# ops-ro `certs` (roles/ops_agent_access; k3s certs are added by group)
+ops_agent_access_certs:
+  - /etc/ca-certificates/trust-source/anchors/homelab-ca.crt
+  - /etc/ca-certificates/trust-source/anchors/nghodki-web-ca.crt

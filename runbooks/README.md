@@ -37,4 +37,5 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [robot-ros.md](robot-ros.md) (ROS 2 with rmw_zenoh, the Zenoh router on the Jetson, the Pi's LiDAR),
 [sign-in.md](sign-in.md) (Pocket ID and the edge-auth proxy: adding an app, clients, groups),
 [temporal.md](temporal.md) (Temporal on dgx-2: the jobs stack, namespace, UI),
+[ops-agent.md](ops-agent.md) (the ambient ops agent; host access through the read-only `opsro` user and `ops-ro`),
 [web-https.md](web-https.md) (the homelab web CA for `*.nghodki.ai`: install on a device, renew).

@@ -1,0 +1,4 @@
+# Managed by homelab Ansible (roles/ops_agent_access). The read-only ops user may run only the root helper,
+# which re-validates its own arguments (containers, container-logs <name>, certs).
+Defaults:{{ ops_agent_access_user }} !requiretty, env_reset
+{{ ops_agent_access_user }} ALL=(root) NOPASSWD: /usr/local/libexec/ops-ro-root
