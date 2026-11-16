@@ -28,6 +28,13 @@ def test_gpu_jetson_sysfs(tmp_path):
     g = collect.read_gpu(sysfs_path=str(load))
     assert g == {"gpu_pct": 41.0, "gpu_name": "Jetson GPU"}
 
+def test_gpu_jetson_sysfs_low_load_is_per_mille_too(tmp_path):
+    # a light load (<= 10 %) used to be reported as if the raw value were already a percentage
+    load = tmp_path / "load"; load.write_text("50\n")
+    assert collect.read_gpu(sysfs_path=str(load))["gpu_pct"] == 5.0
+    load.write_text("100\n")
+    assert collect.read_gpu(sysfs_path=str(load))["gpu_pct"] == 10.0
+
 def test_gpu_nvidia_smi(tmp_path):
     def fake_run(cmd, **kw):
         class R: returncode = 0; stdout = "67, NVIDIA GH200\n"

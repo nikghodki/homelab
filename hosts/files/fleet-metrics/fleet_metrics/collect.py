@@ -60,12 +60,11 @@ def read_cpu(proc_root: str = "/proc", interval: float = 0.1) -> float | None:
 
 
 def read_gpu(sysfs_path: str = "/sys/devices/platform/gpu.0/load", run=subprocess.run) -> dict:
-    # 1. Jetson integrated GPU load
+    # 1. Jetson integrated GPU load: always per-mille (0-1000), so 50 is 5.0 %, not 50 %
     try:
         with open(sysfs_path) as f:
             raw = float(f.read().strip())
-        pct = raw / 10.0 if raw > 100 else raw
-        return {"gpu_pct": round(pct, 1), "gpu_name": "Jetson GPU"}
+        return {"gpu_pct": round(raw / 10.0, 1), "gpu_name": "Jetson GPU"}
     except (OSError, ValueError):
         pass
     # 2. nvidia-smi - try to get utilization, memory, and temperature
