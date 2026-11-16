@@ -1,7 +1,8 @@
 # Fixed ClusterIPs in the static band (10.43.0.0-10.43.0.255, see cluster/README.md) so Docker services on the
 # nodes can reach them without a NodePort on the LAN: kube-proxy on every node routes ClusterIPs for host traffic.
 #   edge-caddy on dgx-1  -> 10.43.0.100:80   (argocd.nghodki.ai)
-#   VictoriaMetrics dgx-2 -> 10.43.0.100:8083 (server), 10.43.0.101:8082 (application controller)
+#   VictoriaMetrics dgx-2 -> 10.43.0.100:8083 (server), 10.43.0.101:8082 (application controller),
+#                            10.43.0.102:8084 (repo-server)
 apiVersion: v1
 kind: Service
 metadata:
@@ -30,3 +31,17 @@ spec:
     app.kubernetes.io/name: argocd-application-controller
   ports:
     - {name: metrics, port: 8082, targetPort: 8082, protocol: TCP}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-repo-server-host
+  namespace: argocd
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.102
+  selector:
+    app.kubernetes.io/instance: argocd
+    app.kubernetes.io/name: argocd-repo-server
+  ports:
+    - {name: metrics, port: 8084, targetPort: 8084, protocol: TCP}
