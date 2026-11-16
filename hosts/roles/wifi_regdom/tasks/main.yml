@@ -1,0 +1,36 @@
+- name: Is this a Raspberry Pi boot command line
+  ansible.builtin.stat:
+    path: "{{ wifi_regdom_cmdline }}"
+  register: wifi_regdom_cmdline_file
+
+- name: Current command line
+  ansible.builtin.slurp:
+    src: "{{ wifi_regdom_cmdline }}"
+  register: wifi_regdom_cmdline_now
+  when: wifi_regdom_cmdline_file.stat.exists
+
+- name: Regulatory domain on the kernel command line (replace the existing value; one line, no newline added)
+  ansible.builtin.replace:
+    path: "{{ wifi_regdom_cmdline }}"
+    regexp: '(^|\s)cfg80211\.ieee80211_regdom=\S*'
+    replace: '\1cfg80211.ieee80211_regdom={{ wifi_regdom_country }}'
+    backup: true
+  when:
+    - wifi_regdom_cmdline_file.stat.exists
+    - "'cfg80211.ieee80211_regdom=' in (wifi_regdom_cmdline_now.content | b64decode)"
+
+- name: Regulatory domain on the kernel command line (add it)
+  ansible.builtin.replace:
+    path: "{{ wifi_regdom_cmdline }}"
+    regexp: '^(.*\S)\s*$'
+    replace: '\1 cfg80211.ieee80211_regdom={{ wifi_regdom_country }}'
+    backup: true
+  when:
+    - wifi_regdom_cmdline_file.stat.exists
+    - "'cfg80211.ieee80211_regdom=' not in (wifi_regdom_cmdline_now.content | b64decode)"
+
+- name: Regulatory domain now (opt-in, wifi_regdom_apply_now)
+  ansible.builtin.command:
+    cmd: /usr/sbin/iw reg set {{ wifi_regdom_country }}
+  changed_when: true
+  when: wifi_regdom_apply_now | bool
