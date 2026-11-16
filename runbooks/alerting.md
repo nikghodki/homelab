@@ -67,6 +67,9 @@ Test an alert end to end: add one in Alertmanager on dgx-2
 (`docker exec observe-alertmanager-1 amtool --alertmanager.url=http://127.0.0.1:9093 alert add Test severity=warning`),
 wait 30 s, look for it on the phone, then resolve it (POST it to `/api/v2/alerts` with `endsAt` = now).
 
+The Watchdog is always firing, so it shows in `ALERTS`. Fleet home filters it out; the DefenseClaw overview is vendored
+from upstream (CI checks it's unchanged), so its firing-alerts count is one higher than the real alerts.
+
 ## Change things
 
 - Checks: edit `hosts/stacks/alerting/gatus/config.yaml.j2`, then from `hosts/`: `ansible-playbook playbooks/alerting.yml --check --diff`,

@@ -7,7 +7,7 @@
           "uid": "defenseclaw-prometheus"
         },
         "enable": true,
-        "expr": "ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}",
+        "expr": "ALERTS{alertstate=\"firing\"}",
         "iconColor": "red",
         "name": "Firing alerts",
         "tagKeys": "alertname,severity",
@@ -211,7 +211,7 @@
       },
       "targets": [
         {
-          "expr": "count(ALERTS{alertstate=\"firing\", alertname!=\"Watchdog\"}) or vector(0)",
+          "expr": "count(ALERTS{alertstate=\"firing\"}) or vector(0)",
           "refId": "A"
         }
       ],
