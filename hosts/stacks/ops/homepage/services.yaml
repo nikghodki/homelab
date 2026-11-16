@@ -39,6 +39,15 @@
         icon: mdi-chip
         siteMonitor: https://dgxmanager.nghodki.ai/dgxmm/
 
+- ML:
+    - MLflow:
+        href: https://mlflow.nghodki.ai
+        description: Sim and training runs (Isaac Lab, MuJoCo)
+        icon: mdi-flask-outline
+        # The browser URL is behind Pocket ID (302 when signed out), so the check uses the job API's open /health
+        # on dgx-2's LAN address instead; it needs no extra_hosts entry and no credentials.
+        siteMonitor: http://192.168.86.36:5000/health
+
 - Home:
     - Home Assistant:
         href: https://ha.nghodki.ai

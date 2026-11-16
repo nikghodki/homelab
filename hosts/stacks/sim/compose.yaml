@@ -24,15 +24,24 @@ x-job: &job
         devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
 
 services:
-  # Isaac Lab 3.0.0 kit-less image (Newton/MuJoCo-Warp physics, no Isaac Sim, no EULA), multi-arch from NGC.
+  # Isaac Lab 3.0.0 kit-less image (Newton/MuJoCo-Warp physics, no Isaac Sim, no EULA), multi-arch from NGC, plus
+  # only the MLflow client (robots/sim/isaaclab/Dockerfile). Arguments are those of the `isaaclab` command;
+  # train_mlflow.py (mounted, so it changes without a rebuild) runs it and logs RSL-RL runs to MLflow.
   isaaclab:
     <<: *job
-    image: nvcr.io/nvidia/isaac-lab:3.0.0-kitless@sha256:d47169952b55effb46dba8f79761d381532b521561ecba38a3019adc7648884b
+    image: homelab/isaaclab:3.0.0-kitless-mlflow3.18.0   # built from robots/sim/isaaclab; bump the tag when it changes
+    build:
+      context: ../../../robots/sim/isaaclab
+    # MLflow job API settings, as for mujoco below; without the file or with `-e MLFLOW_TRACKING_URI=`, TensorBoard only.
+    env_file:
+      - path: /etc/homelab/mlflow-client.env
+        required: false
     environment:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
       - isaaclab-logs:/workspace/isaaclab/logs
-    entrypoint: ["isaaclab"]
+      - ../../../robots/sim/isaaclab/train_mlflow.py:/opt/homelab/train_mlflow.py:ro
+    entrypoint: ["python", "/opt/homelab/train_mlflow.py"]
     command: ["train", "--rl_library", "rsl_rl", "--task", "Isaac-Cartpole-Direct", "--max_iterations", "300", "physics=newton_mjwarp"]
 
   # MuJoCo 3.6 + MJX + Playground 0.2.0 on JAX 0.9.2 (CUDA 13), built locally from robots/sim/mujoco.
