@@ -1,0 +1,10 @@
+# Open WebUI, the chat UI for people (family included), backed by LiteLLM (plan P3.7, runbooks/open-webui.md).
+# Moved from a hand-run Docker container on dgx-1 (~/open-webui) on 2026-11-16.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: open-webui
+resources:
+  - namespace.yaml
+  - open-webui.yaml
+generators:
+  - secret-generator.yaml

@@ -297,9 +297,17 @@
 		}
 	}
 
+	# Open WebUI in k3s (open-webui/open-webui, fixed ClusterIP; runbooks/open-webui.md). Until the move is finished the
+	# old Docker copy on dgx-1 (:3100) is the fallback: `first` takes the pod whenever its health check passes.
 	@webui host webui.nghodki.ai
 	handle @webui {
-		reverse_proxy 100.65.137.82:3100 {
+		reverse_proxy 10.43.0.130:8080 100.65.137.82:3100 {
+			lb_policy first
+			lb_try_duration 5s
+			health_uri /health
+			health_interval 5s
+			health_timeout 3s
+			fail_duration 10s
 			header_up Host {upstream_hostport}
 			header_up X-Real-IP {remote_host}
 			header_up X-Forwarded-For {remote_host}

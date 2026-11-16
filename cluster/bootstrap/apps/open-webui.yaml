@@ -1,0 +1,21 @@
+# Open WebUI (cluster/apps/open-webui, runbooks/open-webui.md).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: open-webui
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: apps
+  source:
+    repoURL: git@github.com:nikghodki/homelab.git
+    targetRevision: main
+    path: cluster/apps/open-webui
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: open-webui
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}
