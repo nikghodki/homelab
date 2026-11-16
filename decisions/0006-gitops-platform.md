@@ -77,8 +77,8 @@ objects); it was OOM-killed once at 512 Mi during the first sync, so it has 768 
 
 ## Consequences
 
-- A merge to `cluster/` (or `policies/kyverno`) deploys within about 2 minutes, no manual step (P3.4 acceptance;
-  measured 89 s for a label change).
+- A merge to `cluster/` (or `policies/kyverno`) deploys within about 3 minutes, no manual step (P3.4 acceptance;
+  measured 178 s from the merge of PR #58 to the label being applied, 89 s for a push during the bootstrap).
 - Two things in the cluster are not from Git: `argocd/sops-age` and `argocd/repo-homelab` (runbooks/argocd.md).
 - The OIDC client secret exists twice (`secrets/console.enc.yaml` and `cluster/platform/argocd/extras/oidc.enc.yaml`);
   rotate both together.

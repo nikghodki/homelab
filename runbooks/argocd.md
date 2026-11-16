@@ -12,7 +12,7 @@ read-only deploy key, and decrypts SOPS files with KSOPS. Nothing pushes into th
 | UI | `https://argocd.nghodki.ai`: edge-caddy on dgx-1 → fixed ClusterIP `10.43.0.100:80` (server in insecure mode; TLS ends at Caddy) |
 | Sign-in | Pocket ID, client `argocd` (PKCE S256, `identity/pocket-id.yaml`); group `admins` → `role:admin`, everyone else nothing. Built-in `admin` is **off** |
 | CLI | on dgx-1: `argocd --core --kube-context argocd app list` (talks to the Kubernetes API with the admin kubeconfig; no Argo CD login) |
-| Polling | every 2 min (`timeout.reconciliation: 120s`); GitHub can't call in |
+| Polling | every 2 min plus up to 1 min jitter (`timeout.reconciliation: 120s`); GitHub can't call in |
 | Metrics | controller `10.43.0.101:8082`, server `10.43.0.100:8083`, repo-server `10.43.0.102:8084`, scraped by VictoriaMetrics on dgx-2. Dashboard: Grafana → Cluster → Argo CD |
 | Alerts | `ArgoCDAppOutOfSync`, `ArgoCDAppNotHealthy` (15 min), `ArgoCDMetricsDown` (10 min): `hosts/stacks/observe/vmalert/rules/gitops.yml` |
 
@@ -40,12 +40,13 @@ cluster disappears with it).
 ## Add an app
 
 See [cluster/apps/README.md](../cluster/apps/README.md): a folder in `cluster/apps/<name>/` and an Application in
-`cluster/bootstrap/apps/<name>.yaml`. Merge; `root` creates it within about 2 minutes. A platform component (cluster
+`cluster/bootstrap/apps/<name>.yaml`. Merge; `root` creates it within about 3 minutes. A platform component (cluster
 scope, a Helm chart) goes in `cluster/platform/<name>/` with project `platform` instead. Remove an app by deleting
 both; `root` prunes the Application.
 
-**Measured (2026-11-15):** a label change pushed to Git was applied in **89 s** with no manual step (poll interval
-120 s, so expect up to about 2.5 min).
+**Measured (2026-11-15):** a label change was applied with no manual step **89 s** after a push (to the PR
+branch, while bootstrapping) and **178 s** after the merge of PR #58 to `main`. Argo CD polls every 120 s plus up to
+60 s of jitter, so expect up to about 3 minutes.
 
 Roll back a bad deploy: revert the commit on `main`. Don't fix things by hand in the cluster: selfHeal puts Git's
 version back within seconds.
