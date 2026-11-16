@@ -60,4 +60,6 @@ The `misconfigurations:` entries (kube-vip, the tailnet externalIPs) are design 
 | CVE-2026-85394 | python-jose 3.5.0 | Home Assistant 2026.11.1 | no fix anywhere yet; HA is LAN/tailnet only |
 
 All of these were the newest release or digest on 2026-11-15. Fixed by a bump instead: dcgm-exporter 4.4.2-4.7.1 →
-4.9.0 (gRPC CVE-2026-33186). Phoenix's findings were secret-scanner false positives (above).
+4.8.4 (gRPC CVE-2026-33186). Not 4.9.0: it renames the metrics and changes units (`DCGM_FI_DEV_GPU_TEMP` →
+`DCGM_FI_DEV_GPU_TEMP_CELSIUS`, utilisation as a 0–1 ratio, ...), which the vmalert rules (`FleetGpuHot`,
+`FleetGpuMetricsMissing`) and the Fleet Home dashboard read; Renovate holds it below 4.9 until they move. Phoenix's findings were secret-scanner false positives (above).
