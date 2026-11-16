@@ -1,5 +1,12 @@
 restic_backup_paths:
   - /opt/homelab
+  # Pocket ID's volume in k3s (local-path PV on dgx-2, runbooks/sign-in.md "Pocket ID in k3s"); the PVC's UID is in the
+  # name. The database itself goes in as a SQLite snapshot (below). Not backed up at all while it ran in Docker.
+  - /var/lib/rancher/k3s/storage/pvc-7a351907-71e3-4534-97d8-300a06317ac5_console_pocket-id-data
+restic_backup_excludes:
+  - /var/lib/rancher/k3s/storage/pvc-7a351907-71e3-4534-97d8-300a06317ac5_console_pocket-id-data/pocket-id.db
+restic_backup_sqlite:
+  - {name: pocket-id, path: /var/lib/rancher/k3s/storage/pvc-7a351907-71e3-4534-97d8-300a06317ac5_console_pocket-id-data/pocket-id.db}
 # Cisco AIBOM (runbooks/aibom.md)
 cisco_aibom_enabled: true
 cisco_aibom_containers: [observe-phoenix-1]

@@ -3,6 +3,15 @@
   hosts: observe
   become: true
   pre_tasks:
+    # Pocket ID runs in k3s since 2026-11-16 (cluster/apps/pocket-id). This stack is the stopped fallback until
+    # 2026-11-23: starting it next to the pod would give two copies of the users, passkeys and sessions.
+    - name: Only for a rollback to the Docker copy (runbooks/sign-in.md "Rollback")
+      ansible.builtin.assert:
+        that: pocketid_docker_rollback | default(false) | bool
+        fail_msg: >-
+          Pocket ID runs in k3s; this playbook would start the stopped Docker copy. For a rollback follow
+          runbooks/sign-in.md and pass -e pocketid_docker_rollback=true.
+        quiet: true
     - name: Load console secrets from SOPS
       community.sops.load_vars:
         file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
