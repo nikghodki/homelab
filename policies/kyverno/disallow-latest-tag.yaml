@@ -1,4 +1,4 @@
-# Images carry an explicit tag other than `latest`, or a digest. Audit (runbooks/kyverno.md).
+# Images carry an explicit tag other than `latest`, or a digest. Enforce (runbooks/kyverno.md).
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -7,7 +7,8 @@ metadata:
     policies.kyverno.io/title: Disallow latest and untagged images
     policies.kyverno.io/description: Every image needs a tag that isn't latest, or a digest (design, "no latest").
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
+  failurePolicy: Fail
   evaluation:
     background: {enabled: true}
   matchConstraints:

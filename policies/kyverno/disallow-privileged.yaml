@@ -1,4 +1,5 @@
-# No privileged containers and no host network/PID/IPC, except in the allowlisted namespaces below. Audit.
+# No privileged containers and no host network/PID/IPC, except in the allowlisted namespaces below. Enforce
+# (runbooks/kyverno.md). kube-vip (P3.3: hostNetwork, NET_ADMIN/NET_RAW) runs in kube-system, so it is covered here.
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -9,7 +10,8 @@ metadata:
       No privileged containers, hostNetwork, hostPID or hostIPC outside the allowlist (kube-system, kyverno,
       cnpg-system). Later: the Fleet API proxy (hostNetwork, security) and Tetragon (P3.6) get added here.
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
+  failurePolicy: Fail
   evaluation:
     background: {enabled: true}
   matchConstraints:
@@ -34,7 +36,7 @@ spec:
         !(has(object.spec.hostNetwork) && object.spec.hostNetwork)
         && !(has(object.spec.hostPID) && object.spec.hostPID)
         && !(has(object.spec.hostIPC) && object.spec.hostIPC)
-      message: hostNetwork, hostPID and hostIPC are not allowed outside the allowlisted namespaces
+      message: hostNetwork, hostPID and hostIPC are not allowed outside the allowlisted namespaces (runbooks/kyverno.md)
     - expression: >-
         variables.containers.all(c, !has(c.securityContext) || !has(c.securityContext.privileged)
           || !c.securityContext.privileged)

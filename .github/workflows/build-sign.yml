@@ -119,14 +119,18 @@ jobs:
           TAGS: ${{ steps.spec.outputs.tags }}
           IMAGE: ${{ matrix.image }}
         run: |
-          cosign verify "$REF" --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null
+          cosign verify "$REF" --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > verify.json
+          # What was checked, from the verified certificate (not from our own inputs).
+          jq -r '.[0].optional | "Subject: \(.Subject)\nIssuer: \(.Issuer)\nWorkflow ref: \(.githubWorkflowRef)\nWorkflow SHA: \(.githubWorkflowSha)"' verify.json \
+            | tee identity.txt
           cosign verify-attestation "$REF" --type spdxjson \
             --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null
           {
             echo "### $IMAGE"
             echo "- \`$REF\` ($PLATFORMS)"
             echo "- tags: \`$TAGS\`"
-            echo "- signed and SBOM-attested by \`$CERT_IDENTITY\`"
+            echo "- signed and SBOM-attested; \`cosign verify\` says:"
+            echo '```'; cat identity.txt; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Log out
         if: always()

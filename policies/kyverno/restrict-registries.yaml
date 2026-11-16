@@ -1,4 +1,4 @@
-# Images come only from the registries and repositories the fleet uses. Audit (runbooks/kyverno.md).
+# Images come only from the registries and repositories the fleet uses. Enforce (runbooks/kyverno.md).
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -9,7 +9,8 @@ metadata:
       Images must start with an allowed prefix. Names without a registry are docker.io (and docker.io/library/
       without a namespace). Add a prefix here when a new upstream is reviewed.
 spec:
-  validationActions: [Audit]
+  validationActions: [Deny]
+  failurePolicy: Fail
   evaluation:
     background: {enabled: true}
   matchConstraints:
@@ -30,7 +31,10 @@ spec:
           'quay.io/viaductoss/ksops:',
           'reg.kyverno.io/kyverno/',
           'ghcr.io/kyverno/',
-          'ghcr.io/cloudnative-pg/'
+          'ghcr.io/cloudnative-pg/',
+          'ghcr.io/kube-vip/kube-vip:',
+          'docker.io/library/caddy:',
+          'registry.k8s.io/kube-state-metrics/kube-state-metrics:'
         ]
     - name: images
       expression: >-

@@ -1,7 +1,7 @@
 # 0006: GitOps platform: Argo CD (Helm, self-managed), KSOPS, Kyverno in Audit, CNPG operator, single replicas
 
 - Date: 2026-11-15
-- Status: decided (nikghodki)
+- Status: decided (nikghodki); the Kyverno parts (Audit, one replica, failurePolicy Ignore) replaced by [0008](0008-image-signing.md)
 
 ## Context
 

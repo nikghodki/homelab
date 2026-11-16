@@ -1,6 +1,6 @@
 # Kyverno: chart kyverno 3.10.0 (Kyverno v1.20.0), namespace kyverno. Used by cluster/bootstrap/apps/kyverno.yaml.
-# Policies live in policies/kyverno (Audit mode, runbooks/kyverno.md). Admission + reports controllers only, one
-# replica each on the Sparks, small limits (decision 0006).
+# Policies live in policies/kyverno (Enforce, runbooks/kyverno.md). Admission controller: 2 replicas, one per Spark;
+# reports controller: 1. Small limits (decisions 0006, 0008).
 crds:
   install: true
   # Storage-version migration Job (post-upgrade hook = Argo CD PostSync, runs when this app syncs).
@@ -8,11 +8,20 @@ crds:
     nodeSelector:
       nghodki.ai/role: gpu
 
+# Webhooks never see kube-system, kyverno or argocd (Kyverno adds its own namespace too): a dead Kyverno can't block
+# the cluster's own add-ons, Kyverno itself or Argo CD, even though the policies fail closed (failurePolicy Fail)
+# everywhere else. Background scans still report on them. `edge` (P3.3: kube-vip, CoreDNS, Caddy) is out too until
+# its manifests are checked against the policies (TODO in runbooks/kyverno.md). Break glass: runbooks/kyverno.md.
+config:
+  webhooks:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: [kube-system, kyverno, argocd, edge]
+
 features:
-  # Audit only for now, and one replica that a GPU OOM can take down: never block the API on Kyverno.
-  # Remove when moving policies to Enforce (runbooks/kyverno.md).
-  forceFailurePolicyIgnore:
-    enabled: true
+  # Policies set their own failurePolicy (Fail for the Enforce ones); forceFailurePolicyIgnore is off since P3.5.
   backgroundScan:
     enabled: true
     backgroundScanWorkers: 1
@@ -32,10 +41,24 @@ webhooksCleanup:
   enabled: false
 
 admissionController:
-  replicas: 1
+  # Two replicas, one per Spark (hard spread), so a GPU OOM on one Spark doesn't stop admission. The PDB keeps one.
+  replicas: 2
   revisionHistoryLimit: 3
   nodeSelector:
     nghodki.ai/role: gpu
+  antiAffinity:
+    enabled: false
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: admission-controller
+          app.kubernetes.io/instance: kyverno
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
   initContainer:
     resources:
       requests: {cpu: 10m, memory: 32Mi}

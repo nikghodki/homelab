@@ -67,6 +67,27 @@ hence QEMU on `ubuntu-24.04`. A cold build of both images measured on the first 
 rebuilds of an unchanged image are a couple of minutes. Builds only run when an image's files change, so normal use
 is far below the quota. GHCR storage and transfer for container images are currently not billed.
 
+Measured 2026-11-15 (each job: tools, QEMU, build of both platforms, push, sign, SBOM attestation, verify):
+
 | Run | mlflow | ros-zenoh |
 |---|---|---|
-| first (cold cache) | see PR | see PR |
+| first (cold cache) | 1 min 54 s | 1 min 44 s (failed at the SBOM attestation, fixed by #64) |
+| warm cache | 1 min 42 s | 1 min 49 s |
+
+So a build of both images costs about 4 billed minutes (jobs round up to the minute).
+
+## Built images (2026-11-15)
+
+| Image | Digest (index: linux/amd64 + linux/arm64) | Tags |
+|---|---|---|
+| `ghcr.io/nikghodki/mlflow` | `sha256:ac9c9ca6befcb06384381b87619d6f71d886d610f2ec94690e7d6e5501fae8a0` | `3.18.0-psycopg2.9.13`, `sha-f5c4656542d7` |
+| `ghcr.io/nikghodki/ros-zenoh` | `sha256:77e2acdc5628b45d35029a1ee243ab0bd3e4a9e7ad1e98461ec792cbfdd45e8d` | `kilted-1`, `sha-f5c4656542d7` |
+
+Later builds move the tags; the run summary lists each build's digest and the verified certificate identity.
+
+## Visibility
+
+Packages pushed from this private repo start **private**: nodes and Kyverno can't read them without a credential
+(runbooks/kyverno.md, "Private images"). For `mlflow` and `ros-zenoh` (nothing private inside) set them public:
+github.com/nikghodki → Packages → `<name>` → Package settings → Danger zone → Change visibility → Public. The API
+has no endpoint for this; it's a one-time click per package.
