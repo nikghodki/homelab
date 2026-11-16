@@ -12,3 +12,11 @@
   environment:
     XDG_RUNTIME_DIR: "/run/user/{{ safety_governor_uid }}"
   when: not ansible_check_mode
+
+- name: Restart robot-motion-bridge
+  become: true
+  ansible.builtin.systemd_service:
+    name: robot-motion-bridge
+    state: restarted
+    daemon_reload: true
+  when: not ansible_check_mode

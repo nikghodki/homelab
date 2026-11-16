@@ -20,7 +20,7 @@ secrets. Decision: decisions/0003-cisco-ai-defense-tools.md.
 | dgx-1 | DGXMM `~/workspace/dgx-model-manager`, LiteLLM config `~/litellm-setup` | `litellm-proxy`, `open-webui` |
 | dgx-2 | — | `observe-phoenix-1` |
 | jetson | Hermes `~nikjetson/.hermes/hermes-agent`, Hermes `~hermes-nikhil/.hermes/hermes-agent`, `~/workspace/roboclaw` | — |
-| pi | PicoClaw `~/.picoclaw` (config, workspace, skills), `~/workspace/roboclaw` | — |
+| pi | PicoClaw `/var/lib/picoclaw/.picoclaw` (config, workspace, skills) and its MCP server `/var/lib/picoclaw/roboclaw` (own user since 2026-11-15, runbooks/robot-safety.md), `~/workspace/roboclaw` | — |
 
 Pocket ID and the rest of the observe stack are not AI components and are not scanned. To add a target, extend
 `cisco_aibom_dirs` / `cisco_aibom_containers` in the host's `host_vars` and run the playbook.

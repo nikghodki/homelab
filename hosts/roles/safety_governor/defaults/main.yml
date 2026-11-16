@@ -43,3 +43,21 @@ safety_governor_cli_nats:
 safety_governor_metrics_port: 9113   # 127.0.0.1 only; scraped by the host collector
 safety_governor_control_rate_hz: 10
 safety_governor_status_rate_hz: 2
+
+# Motion bridge (runbooks/robot-safety.md): the only way picoclaw's MCP motion tools reach the robot. A
+# system unit as the governor's user, socket in /run/robot-motion (group robot-motion: picoclaw), publishing
+# /cmd_vel_in + /safety/heartbeat while a move runs. Speed 255 maps to full_speed_*, which must stay above
+# the caps (the governor clamps) and below the ceiling (the governor would reject).
+safety_governor_motion_group: robot-motion
+safety_governor_motion_socket: /run/robot-motion/motion.sock
+safety_governor_motion_bridge:
+  full_speed_linear: 0.4
+  full_speed_angular: 2.0
+  turn_rate: 0.8
+  default_duration_ms: 1000
+  max_duration_ms: 10000
+  estop_on_stop: true
+# The motion integration test runs picoclaw's real MCP server (role picoclaw) as picoclaw against a test bridge.
+safety_governor_mcp_user: picoclaw
+safety_governor_mcp_node: /var/lib/picoclaw/bin/node
+safety_governor_mcp_server: /var/lib/picoclaw/roboclaw/mcp-server/picoclaw-hardware-mcp.js

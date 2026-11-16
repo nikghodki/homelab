@@ -53,6 +53,12 @@
         mode: "0600"
       no_log: true
 
+- name: Motion socket group (picoclaw joins it in role picoclaw)
+  become: true
+  ansible.builtin.group:
+    name: "{{ safety_governor_motion_group }}"
+    system: true
+
 - name: Env, code, config and unit
   become: true
   become_user: "{{ safety_governor_user }}"
@@ -94,6 +100,7 @@
       loop:
         - {path: "{{ safety_governor_code_dir }}/safety_governor", mode: "0755"}
         - {path: "{{ safety_governor_code_dir }}/integration", mode: "0755"}
+        - {path: "{{ safety_governor_code_dir }}/motion_bridge", mode: "0755"}
         - {path: "{{ safety_governor_config_dir }}", mode: "0700"}
         - {path: "{{ safety_governor_home }}/.config/systemd/user"}
       loop_control: {label: "{{ item.path }}"}
@@ -106,11 +113,34 @@
       loop: [__init__.py, core.py, sinks.py, metrics.py, nats_bridge.py, node.py, estop_cli.py]
       notify: Restart safety-governor
 
-    - name: Integration test (mock sink only)
+    - name: Motion bridge code
       ansible.builtin.copy:
-        src: "{{ safety_governor_src }}/governor/integration/pi_integration.py"
-        dest: "{{ safety_governor_code_dir }}/integration/pi_integration.py"
+        src: "{{ safety_governor_src }}/motion_bridge/motion_bridge/{{ item }}"
+        dest: "{{ safety_governor_code_dir }}/motion_bridge/{{ item }}"
         mode: "0644"
+      loop: [__init__.py, core.py, node.py]
+      notify: Restart robot-motion-bridge
+
+    - name: Integration tests (mock sink only)
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ safety_governor_code_dir }}/integration/{{ item.src | basename }}"
+        mode: "0644"
+      loop:
+        - {src: "{{ safety_governor_src }}/governor/integration/pi_integration.py"}
+        - {src: "{{ safety_governor_src }}/motion_bridge/integration/motion_integration.py"}
+      loop_control: {label: "{{ item.src | basename }}"}
+
+    - name: Motion bridge config and its integration test wrapper
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - {src: motion-bridge.json.j2, dest: "{{ safety_governor_config_dir }}/motion-bridge.json", mode: "0600"}
+        - {src: run-motion-integration-test.j2, dest: "{{ safety_governor_code_dir }}/run-motion-integration-test", mode: "0755"}
+      loop_control: {label: "{{ item.dest | basename }}"}
+      notify: Restart robot-motion-bridge
 
     - name: NATS credentials (picoclaw user)
       ansible.builtin.copy:
@@ -155,3 +185,22 @@
       environment:
         XDG_RUNTIME_DIR: "/run/user/{{ safety_governor_uid }}"
       when: not ansible_check_mode
+
+- name: Motion bridge unit (system, as the governor's user)
+  become: true
+  ansible.builtin.template:
+    src: robot-motion-bridge.service.j2
+    dest: /etc/systemd/system/robot-motion-bridge.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart robot-motion-bridge
+
+- name: Motion bridge is enabled and running
+  become: true
+  ansible.builtin.systemd_service:
+    name: robot-motion-bridge
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode

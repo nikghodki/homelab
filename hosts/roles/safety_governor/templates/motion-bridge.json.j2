@@ -1,0 +1,12 @@
+{{ (safety_governor_motion_bridge | combine({
+  'socket': safety_governor_motion_socket,
+  'cmd_topic': '/cmd_vel_in',
+  'heartbeat_topic': '/safety/heartbeat',
+  'status_topic': '/safety/status',
+  'estop_topic': '/safety/estop',
+  'cmd_rate_hz': safety_governor_control_rate_hz,
+  'heartbeat_rate_hz': 5,
+  'status_max_age_s': 2.0,
+  'ceiling_linear': (safety_governor_limits | combine(safety_governor_limit_overrides)).ceiling_linear,
+  'ceiling_angular': (safety_governor_limits | combine(safety_governor_limit_overrides)).ceiling_angular
+})) | to_nice_json(indent=2) }}

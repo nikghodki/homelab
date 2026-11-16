@@ -1,0 +1,29 @@
+---
+# picoclaw (the robot's agent) on the Pi, as its own unprivileged system user (runbooks/robot-safety.md).
+# No sudo, no login, own home; a hardened system unit. Its motion tools reach the robot only through the
+# safety governor's motion bridge (role safety_governor), via group robot-motion.
+picoclaw_user: picoclaw
+picoclaw_home: /var/lib/picoclaw
+picoclaw_groups: [robot-motion]   # no dialout: serial/i2c/spi tools are off; the hook doesn't use dclaw-ipc
+picoclaw_unit: picoclaw
+picoclaw_env_file: /etc/picoclaw/picoclaw.env   # OPENAI_API_KEY (the LiteLLM key); root 0600, read by systemd
+picoclaw_mcp_dir: "{{ picoclaw_home }}/roboclaw/mcp-server"
+picoclaw_motion_socket: /run/robot-motion/motion.sock
+picoclaw_memory_max: 1G
+
+# Where picoclaw ran before (2026-11-15): the login user's home and user unit. Copied from once (marker
+# file); the old copy and the old user unit stay, the unit disabled, for rollback.
+picoclaw_old_user: nikghodki-raspberry-1
+picoclaw_old_home: "/home/{{ picoclaw_old_user }}"
+picoclaw_old_unit: picoclaw-gateway
+picoclaw_migrated_marker: "{{ picoclaw_home }}/.migrated-from-{{ picoclaw_old_user }}"
+# The login home is 0750 so picoclaw can't read anything in it (the governor's unit, code and config live there).
+picoclaw_old_home_mode: "0750"
+
+# Must stay unreadable for picoclaw (checked on every run): the operator's NATS credentials and the governor's files.
+picoclaw_forbidden_paths:
+  - /etc/safety-operator/nats-operator.json
+  - "{{ picoclaw_old_home }}/.config/safety-governor/nats-credentials.json"
+  - "{{ picoclaw_old_home }}/.config/safety-governor/governor.json"
+  - "{{ picoclaw_old_home }}/.config/systemd/user/safety-governor.service"
+  - "{{ picoclaw_old_home }}/.local/lib/safety-governor/safety_governor/core.py"

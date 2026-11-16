@@ -1,0 +1,7 @@
+---
+- name: Restart picoclaw
+  ansible.builtin.systemd_service:
+    name: "{{ picoclaw_unit }}"
+    state: restarted
+    daemon_reload: true
+  when: not ansible_check_mode

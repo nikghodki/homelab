@@ -58,7 +58,7 @@ If the push returns `HTTP 500 compile/sign failed: trusted policy compiler Pytho
 - The C engine has a fixed tool table. picoclaw's `message`, `i2c`, `serial`, `spawn`, `cron` (and other non-file, non-shell, non-web tools) fail closed with `INVALID_INPUT`.
 - The shipped `picoclaw_hook.py` loads the engine in-process (FFI). It never uses the daemon, so picoclaw's calls never reach Fleet through it.
 
-Because of these limits, picoclaw keeps its in-process hook (`~/.defenseclaw/bin/picoclaw_hook.py`). The daemon and Fleet are live for registration, signed heartbeats, signed policy, emergency commands and audit. The `dclaw-ipc` group is ready for a daemon-backed hook when upstream gains an allow path and picoclaw tool mappings.
+Because of these limits, picoclaw keeps its in-process hook (`/var/lib/picoclaw/.defenseclaw/bin/picoclaw_hook.py`; picoclaw runs as its own user `picoclaw` since 2026-11-15, runbooks/robot-safety.md, and is not in `dclaw-ipc`). The daemon and Fleet are live for registration, signed heartbeats, signed policy, emergency commands and audit. The `dclaw-ipc` group is ready for a daemon-backed hook when upstream gains an allow path and picoclaw tool mappings.
 
 ## Metrics and alerts
 

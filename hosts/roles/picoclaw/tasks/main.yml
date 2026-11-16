@@ -1,0 +1,230 @@
+---
+# picoclaw as its own unprivileged user (runbooks/robot-safety.md). Runs after role safety_governor
+# (playbooks/robot.yml), which creates the robot-motion group and the motion bridge.
+- name: Groups
+  ansible.builtin.group:
+    name: "{{ item }}"
+    system: true
+  loop: "{{ [picoclaw_user] + picoclaw_groups }}"
+
+- name: Service account (no sudo, no login)
+  ansible.builtin.user:
+    name: "{{ picoclaw_user }}"
+    group: "{{ picoclaw_user }}"
+    groups: "{{ picoclaw_groups }}"
+    append: false
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ picoclaw_home }}"
+    create_home: false
+  notify: Restart picoclaw
+
+- name: Old login user's account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ picoclaw_old_user }}"
+
+- name: Migrated already?
+  ansible.builtin.stat:
+    path: "{{ picoclaw_migrated_marker }}"
+  register: picoclaw_migrated
+
+- name: One-time move from the login user (old copy and unit kept for rollback)
+  when: not picoclaw_migrated.stat.exists
+  block:
+    - name: Stop the old user unit before copying its state
+      become: true
+      become_user: "{{ picoclaw_old_user }}"
+      ansible.builtin.systemd_service:
+        name: "{{ picoclaw_old_unit }}"
+        scope: user
+        state: stopped
+        enabled: false
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[picoclaw_old_user][1] }}"
+      when: not ansible_check_mode
+
+    - name: Copy install, config, state, workspace, hook and MCP server
+      ansible.builtin.shell: |
+        set -eu
+        old="{{ picoclaw_old_home }}"; new="{{ picoclaw_home }}"; u="{{ picoclaw_user }}"
+        install -d -o root -g "$u" -m 0750 "$new"
+        # agent config, state, workspace, logs: the agent's own
+        cp -a "$old/.picoclaw" "$new/.picoclaw"
+        rm -f "$new/.picoclaw/.picoclaw.pid"
+        chown -R "$u:$u" "$new/.picoclaw"
+        chmod -R u+rwX,go-rwx "$new/.picoclaw"
+        # DefenseClaw Lite hook: read-only for the agent, except its logs
+        cp -a "$old/.defenseclaw" "$new/.defenseclaw"
+        chown -R "root:$u" "$new/.defenseclaw"
+        chmod -R u+rwX,g+rX,g-w,o-rwx "$new/.defenseclaw"
+        chown -R "$u:$u" "$new/.defenseclaw/logs"
+        chmod -R u+rwX,go-rwx "$new/.defenseclaw/logs"
+        # MCP server (the user's roboclaw code): read-only for the agent
+        install -d -o root -g "$u" -m 0750 "$new/roboclaw"
+        cp -a "$old/workspace/roboclaw/mcp-server" "$new/roboclaw/mcp-server"
+        cp -a "$new/roboclaw/mcp-server/picoclaw-hardware-mcp.js" "$new/roboclaw/mcp-server/picoclaw-hardware-mcp.js.pre-governor"
+        chown -R "root:$u" "$new/roboclaw"
+        chmod -R u+rwX,g+rX,g-w,o-rwx "$new/roboclaw"
+        # binaries (picoclaw, node), root-owned
+        install -d -o root -g root -m 0755 "$new/bin"
+        install -o root -g root -m 0755 "$old/.local/bin/picoclaw" "$old/.local/bin/node" "$new/bin/"
+        # the LiteLLM key, read by systemd only
+        install -d -o root -g root -m 0700 "{{ picoclaw_env_file | dirname }}"
+        install -o root -g root -m 0600 "$old/.config/picoclaw/env" "{{ picoclaw_env_file }}"
+        date -u +%FT%TZ > "{{ picoclaw_migrated_marker }}"
+      args:
+        creates: "{{ picoclaw_migrated_marker }}"
+      notify: Restart picoclaw
+
+- name: Folders
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ picoclaw_home }}", owner: root, group: "{{ picoclaw_user }}", mode: "0750"}
+    - {path: "{{ picoclaw_home }}/.picoclaw", owner: "{{ picoclaw_user }}", group: "{{ picoclaw_user }}", mode: "0700"}
+    - {path: "{{ picoclaw_home }}/.defenseclaw", owner: root, group: "{{ picoclaw_user }}", mode: "0750"}
+    - {path: "{{ picoclaw_home }}/.defenseclaw/logs", owner: "{{ picoclaw_user }}", group: "{{ picoclaw_user }}", mode: "0700"}
+    - {path: "{{ picoclaw_home }}/roboclaw", owner: root, group: "{{ picoclaw_user }}", mode: "0750"}
+    - {path: "{{ picoclaw_mcp_dir }}", owner: root, group: "{{ picoclaw_user }}", mode: "0750"}
+    - {path: "{{ picoclaw_home }}/bin", owner: root, group: root, mode: "0755"}
+    - {path: "{{ picoclaw_env_file | dirname }}", owner: root, group: root, mode: "0700"}
+  loop_control: {label: "{{ item.path }}"}
+  when: not ansible_check_mode or picoclaw_migrated.stat.exists
+
+- name: MCP server motion goes through the governor (homelab client + patch to the user's code)
+  when: not ansible_check_mode or picoclaw_migrated.stat.exists
+  block:
+    - name: Motion bridge client
+      ansible.builtin.copy:
+        src: governor-motion.js
+        dest: "{{ picoclaw_mcp_dir }}/governor-motion.js"
+        owner: root
+        group: "{{ picoclaw_user }}"
+        mode: "0640"
+      notify: Restart picoclaw
+
+    - name: Motion tools call the bridge, not the car (patch; the original is picoclaw-hardware-mcp.js.pre-governor)
+      ansible.posix.patch:
+        src: picoclaw-hardware-mcp.governed.patch
+        dest: "{{ picoclaw_mcp_dir }}/picoclaw-hardware-mcp.js"
+      notify: Restart picoclaw
+
+    - name: MCP server permissions
+      ansible.builtin.file:
+        path: "{{ picoclaw_mcp_dir }}/picoclaw-hardware-mcp.js"
+        owner: root
+        group: "{{ picoclaw_user }}"
+        mode: "0640"
+
+    - name: No direct motion calls to the car are left
+      ansible.builtin.command:
+        argv: [grep, -nE, 'post\("/(drive|turn|velocity)"', "{{ picoclaw_mcp_dir }}/picoclaw-hardware-mcp.js"]
+      register: picoclaw_direct_motion
+      changed_when: false
+      failed_when: picoclaw_direct_motion.rc != 1
+      when: not ansible_check_mode
+
+- name: Config points at the new home (paths only; secrets untouched)
+  when: not ansible_check_mode or picoclaw_migrated.stat.exists
+  block:
+    - name: Helper folder
+      ansible.builtin.file:
+        path: /usr/local/lib/picoclaw
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Helper
+      ansible.builtin.copy:
+        src: picoclaw_paths.py
+        dest: /usr/local/lib/picoclaw/picoclaw_paths.py
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Paths in config.json
+      ansible.builtin.command:
+        argv: "{{ ['python3', '/usr/local/lib/picoclaw/picoclaw_paths.py'] + (['--check'] if ansible_check_mode else []) }}"
+        stdin: "{{ picoclaw_paths | to_json }}"
+      vars:
+        picoclaw_paths:
+          config: "{{ picoclaw_home }}/.picoclaw/config.json"
+          home: "{{ picoclaw_home }}"
+          old_home: "{{ picoclaw_old_home }}"
+          node: "{{ picoclaw_home }}/bin/node"
+          mcp_server: "{{ picoclaw_mcp_dir }}/picoclaw-hardware-mcp.js"
+          motion_socket: "{{ picoclaw_motion_socket }}"
+          hook: "{{ picoclaw_home }}/.defenseclaw/bin/picoclaw_hook.py"
+          hook_lib: "{{ picoclaw_home }}/.defenseclaw/lib/libdclaw_core.so"
+          hook_log: "{{ picoclaw_home }}/.defenseclaw/logs/dclaw_hook.log"
+      register: picoclaw_config_paths
+      changed_when: "'changed' in picoclaw_config_paths.stdout"
+      check_mode: false
+      notify: Restart picoclaw
+
+- name: Env file (LiteLLM key) is root-only
+  ansible.builtin.file:
+    path: "{{ picoclaw_env_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: not ansible_check_mode or picoclaw_migrated.stat.exists
+
+- name: Unit
+  ansible.builtin.template:
+    src: picoclaw.service.j2
+    dest: "/etc/systemd/system/{{ picoclaw_unit }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart picoclaw
+
+- name: Old user unit stays stopped and disabled (kept for rollback)
+  become: true
+  become_user: "{{ picoclaw_old_user }}"
+  ansible.builtin.systemd_service:
+    name: "{{ picoclaw_old_unit }}"
+    scope: user
+    state: stopped
+    enabled: false
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[picoclaw_old_user][1] }}"
+
+- name: Service is enabled and running
+  ansible.builtin.systemd_service:
+    name: "{{ picoclaw_unit }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Login home is closed to other users (the governor's files live there)
+  ansible.builtin.file:
+    path: "{{ picoclaw_old_home }}"
+    state: directory
+    mode: "{{ picoclaw_old_home_mode }}"
+
+- name: The picoclaw account has no sudo
+  ansible.builtin.command:
+    argv: [sudo, -n, -l, -U, "{{ picoclaw_user }}"]
+  register: picoclaw_sudo
+  changed_when: false
+  failed_when: "'is not allowed to run sudo' not in picoclaw_sudo.stdout"
+  check_mode: false
+  when: not ansible_check_mode or picoclaw_migrated.stat.exists
+
+- name: The picoclaw account can't read the operator's credentials or the governor's files
+  ansible.builtin.command:
+    argv: [runuser, -u, "{{ picoclaw_user }}", --, test, -r, "{{ item }}"]
+  loop: "{{ picoclaw_forbidden_paths }}"
+  register: picoclaw_forbidden
+  changed_when: false
+  failed_when: picoclaw_forbidden.rc == 0
+  check_mode: false
+  when: not ansible_check_mode or picoclaw_migrated.stat.exists

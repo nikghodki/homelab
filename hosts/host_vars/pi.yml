@@ -1,4 +1,7 @@
 restic_backup_paths:
+  # picoclaw as its own user (role picoclaw, runbooks/robot-safety.md); the login-home copies below are its rollback copy
+  - /var/lib/picoclaw
+  - /etc/picoclaw
   - /home/nikghodki-raspberry-1/.picoclaw
   - /home/nikghodki-raspberry-1/.defenseclaw
   - /home/nikghodki-raspberry-1/maps
@@ -8,6 +11,9 @@ restic_backup_paths:
   - /home/nikghodki-raspberry-1/.config/picoclaw
   - /home/nikghodki-raspberry-1/.config/defenseclaw-edge
 restic_backup_excludes:
+  - /var/lib/picoclaw/.picoclaw/logs
+  - /var/lib/picoclaw/bin
+  - /var/lib/picoclaw/roboclaw/mcp-server/node_modules
   - /home/nikghodki-raspberry-1/.picoclaw/logs
 edge_connector_device_id: 1
 edge_connector_ipc_user: nikghodki-raspberry-1
@@ -15,7 +21,8 @@ edge_connector_ipc_user: nikghodki-raspberry-1
 cisco_aibom_enabled: true
 cisco_aibom_memory_max: 1500M
 cisco_aibom_dirs:
-  - {name: picoclaw, path: /home/nikghodki-raspberry-1/.picoclaw}
+  - {name: picoclaw, path: /var/lib/picoclaw/.picoclaw}
+  - {name: picoclaw-mcp, path: /var/lib/picoclaw/roboclaw}
   - {name: roboclaw, path: /home/nikghodki-raspberry-1/workspace/roboclaw}
 # Safety governor metrics (127.0.0.1 only) for the status-stale alert (runbooks/robot-safety.md)
 otel_host_collector_extra_scrapes:
