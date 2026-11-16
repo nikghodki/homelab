@@ -31,7 +31,8 @@ def _cache() -> Path:
 
 
 def _fetch(dest: Path) -> None:
-    with urllib.request.urlopen(TARBALL, timeout=60) as r:  # noqa: S310 (fixed https URL)
+    # TARBALL is a constant https URL built from the pinned VERSION, never user input; the body is integrity-checked.
+    with urllib.request.urlopen(TARBALL, timeout=60) as r:  # noqa: S310  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         data = r.read()
     digest = "sha512-" + base64.b64encode(hashlib.sha512(data).digest()).decode()
     if digest != INTEGRITY:
