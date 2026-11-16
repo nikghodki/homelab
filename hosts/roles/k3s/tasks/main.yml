@@ -101,6 +101,9 @@
     INSTALL_K3S_EXEC: "{{ k3s_role }}"
   notify: Restart k3s
 
+- name: Iptables-restore shim for k3s (kernels without NFLOG or physdev)
+  ansible.builtin.include_tasks: nflog_shim.yml
+
 - name: Apply config, token or binary changes now
   ansible.builtin.meta: flush_handlers
 

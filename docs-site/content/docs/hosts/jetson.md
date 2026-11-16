@@ -75,3 +75,7 @@ ros2-kilted topic hz /scan                       # ROS CLI inside the router con
 - Hermes' main profile `api_server` listens on all interfaces (0.0.0.0:8642), so it is reachable on the LAN.
 - The Jetson is on Wi-Fi and is an etcd member. A Wi-Fi drop takes it out of quorum until it reconnects (decision 0005).
 - `ros2-kilted` only works while the router container runs.
+- The tegra kernel has no iptables `NFLOG` target and no `physdev` match (not even as modules). k3s's network policy
+  controller needs both, so k3s here runs `iptables-restore` through a wrapper that drops those rules
+  (`k3s_netpol_iptables_shim`, [k3s runbook](https://github.com/nikghodki/homelab/blob/main/runbooks/k3s.md#known-issues)). Without it, NetworkPolicies are not
+  enforced on this node.
