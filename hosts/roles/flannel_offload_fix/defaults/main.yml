@@ -1,0 +1,4 @@
+---
+# Turn off tx checksum offload on the flannel VXLAN device (runbooks/k3s.md, known issues).
+flannel_offload_fix_iface: flannel.1
+flannel_offload_fix_script: /usr/local/sbin/flannel-offload-fix

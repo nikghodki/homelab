@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (role flannel_offload_fix). Covers a device that already exists;
+# the udev rule covers one that k3s creates later.
+[Unit]
+Description=Software tx checksums on {{ flannel_offload_fix_iface }} (flannel VXLAN)
+After=k3s.service k3s-agent.service
+ConditionPathExists=/sys/class/net/{{ flannel_offload_fix_iface }}
+
+[Service]
+Type=oneshot
+ExecStart={{ flannel_offload_fix_script }} {{ flannel_offload_fix_iface }}
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

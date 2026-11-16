@@ -1,0 +1,57 @@
+---
+# Bad outer VXLAN checksums on flannel.1 for UDP from Docker containers to k3s Services (runbooks/k3s.md).
+# Persisted with a udev rule (k3s recreates flannel.1 on restart) and a boot-time oneshot.
+- name: Ethtool
+  ansible.builtin.package:
+    name: ethtool
+    state: present
+
+- name: Fix script
+  ansible.builtin.template:
+    src: flannel-offload-fix.sh.j2
+    dest: "{{ flannel_offload_fix_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Udev rule (runs the script when flannel.1 is created)
+  ansible.builtin.template:
+    src: 90-flannel-offload-fix.rules.j2
+    dest: /etc/udev/rules.d/90-flannel-offload-fix.rules
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload udev rules
+
+- name: Boot-time unit (applies it when flannel.1 already exists)
+  ansible.builtin.template:
+    src: flannel-offload-fix.service.j2
+    dest: /etc/systemd/system/flannel-offload-fix.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: flannel_offload_fix_unit
+  notify: Reload systemd
+
+- name: Flush handlers (udev and systemd see the new files)
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the boot-time unit
+  ansible.builtin.systemd_service:
+    name: flannel-offload-fix.service
+    enabled: true
+  when: not (ansible_check_mode and flannel_offload_fix_unit is changed)
+
+- name: Current tx checksum offload
+  ansible.builtin.command: ethtool -k {{ flannel_offload_fix_iface }}
+  register: flannel_offload_fix_state
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Turn it off now
+  ansible.builtin.command: "{{ flannel_offload_fix_script }} {{ flannel_offload_fix_iface }}"
+  when:
+    - flannel_offload_fix_state.rc == 0
+    - "'tx-checksum-ip-generic: on' in flannel_offload_fix_state.stdout"
+  changed_when: true
