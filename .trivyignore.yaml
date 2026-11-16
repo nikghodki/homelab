@@ -1,0 +1,24 @@
+# Trivy findings accepted on purpose (pr-checks.yml passes this with --ignorefile). Each entry is scoped to the files
+# that need it and says why; anything new still fails CI. Review when the component changes.
+misconfigurations:
+  # kube-vip (decision 0007, cluster/README.md "Host namespaces"): it adds the VIPs to the host's Wi-Fi interface and
+  # answers/sends ARP for them, which needs the host network namespace, NET_ADMIN and NET_RAW (raw ARP frames).
+  # Kubernetes grants added capabilities only to uid 0. Not privileged; read-only root; seccomp RuntimeDefault.
+  - id: KSV-0009
+    paths: ["cluster/platform/kube-vip/daemonset.yaml"]
+    statement: kube-vip ARP mode binds the VIPs on the host interface (hostNetwork is the point of it)
+  - id: KSV-0119
+    paths: ["cluster/platform/kube-vip/daemonset.yaml"]
+    statement: kube-vip sends gratuitous ARP over a raw socket (NET_RAW)
+  - id: KSV-0118
+    paths: ["cluster/platform/kube-vip/daemonset.yaml"]
+    statement: kube-vip runs as root because added capabilities only take effect for uid 0
+  # kube-vip writes the LoadBalancer IP and its annotations to Services (read-only on endpoints/EndpointSlices).
+  - id: KSV-0056
+    paths: ["cluster/platform/kube-vip/rbac.yaml"]
+    statement: kube-vip must update Services to publish their LoadBalancer IP
+  # The tailnet front door is the Sparks' Tailscale IPs as externalIPs (decision 0007). The CVE-2020-8554 risk (anyone
+  # who can create a Service can claim an IP) is limited by who can create Services: Argo CD from Git, and admins.
+  - id: KSV-0108
+    paths: ["cluster/platform/edge/coredns.yaml", "cluster/platform/edge/caddy.yaml"]
+    statement: edge-dns-tailnet / edge-caddy-tailnet answer on the Sparks' Tailscale IPs by design

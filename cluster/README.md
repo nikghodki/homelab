@@ -11,12 +11,16 @@ cluster/
 │   ├── projects.yaml      AppProjects `platform` (cluster-wide tooling) and `apps` (namespaced workloads)
 │   ├── argocd.yaml        Argo CD manages itself (chart + platform/argocd)
 │   ├── kyverno.yaml, kyverno-policies.yaml, cnpg-operator.yaml, cluster-dns.yaml
+│   ├── kube-vip.yaml, edge.yaml, kube-state-metrics.yaml   the front door (P3.3, runbooks/edge.md)
 │   └── smoke.yaml         SOPS canary (apps/_smoke)
 ├── platform/<component>/  values.yaml for the Helm chart and extras/ (kustomize: Services, NetworkPolicies, SOPS secrets)
 │   ├── argocd/            Argo CD 3.6 + KSOPS in the repo-server
 │   ├── kyverno/           Kyverno 1.20, admission (2 replicas) + reports controllers
 │   ├── cnpg-operator/     CloudNativePG 1.30 operator, no clusters yet
-│   └── cluster-dns/       CoreDNS zone for *.nghodki.ai (forwards to edge-dnsmasq on dgx-1)
+│   ├── cluster-dns/       CoreDNS zone for *.nghodki.ai (forwards to edge-dnsmasq on dgx-1)
+│   ├── kube-vip/          kube-vip DaemonSet (kube-system, hostNetwork): API VIP .10, edge VIP .11
+│   ├── edge/              namespace edge: CoreDNS (names.txt → zones) and Caddy (the *.nghodki.ai front door)
+│   └── kube-state-metrics/  readiness metrics for vmalert (kube-system)
 └── apps/                  workloads, one folder per app (README.md); `_smoke` is the SOPS canary
 ```
 
@@ -46,11 +50,35 @@ on every node routes ClusterIPs for host and Docker traffic too, so nothing is p
 | IP:port | Service | Used by |
 |---|---|---|
 | 10.43.0.10:53 | kube-dns (k3s) | pods |
+| 10.43.0.53:53 | `edge/edge-dns-lan` (also on the VIP 192.168.86.11) | kube-system's CoreDNS for `nghodki.ai` (after the P3.3 cutover) |
 | 10.43.0.100:80, :8083 | `argocd/argocd-server-host` | edge-caddy (`argocd.nghodki.ai`), VictoriaMetrics |
 | 10.43.0.101:8082 | `argocd/argocd-controller-host` | VictoriaMetrics |
 | 10.43.0.102:8084 | `argocd/argocd-repo-server-host` | VictoriaMetrics |
 | 10.43.0.110:8000 | `kyverno/kyverno-admission-host` | VictoriaMetrics |
 | 10.43.0.111:8000 | `kyverno/kyverno-reports-host` | VictoriaMetrics |
+| 10.43.0.120:8080 | `kube-system/kube-state-metrics-host` | VictoriaMetrics |
 
 Pick the next free address here and add a row. If the pods behind one have a NetworkPolicy, allow the hosts
-(`argocd/extras/host-scrape-netpol.yaml`). P3.3 (kube-vip, Caddy in the cluster) replaces the edge-caddy path.
+(`argocd/extras/host-scrape-netpol.yaml`). After the P3.3 cutover the in-cluster Caddy reaches Argo CD by Service name.
+
+## Addresses outside the cluster
+
+| Address | What | Set by |
+|---|---|---|
+| 192.168.86.10 | k3s API VIP (`k8s.nghodki.ai` on the LAN) | kube-vip, lease `kube-system/plndr-cp-lock` |
+| 192.168.86.11 | edge VIP: `edge-dns-lan` :53, `edge-caddy-lan` :80/:443 | kube-vip (`kube-vip.io/loadbalancerIPs`), lease `plndr-svcs-lock` |
+| 100.124.175.23 (+ 100.65.137.82 after the cutover) | the Sparks' Tailscale IPs: `edge-dns-tailnet` :53, `edge-caddy-tailnet` :80/:443 | `externalIPs` (kube-proxy) |
+
+Both VIPs are below the Nest's DHCP pool (`.20`–`.250`). LoadBalancer Services here set
+`allocateLoadBalancerNodePorts: false` (no NodePorts on every node address).
+
+## Host namespaces and capabilities (Kyverno allowlist)
+
+| Pod | Namespace | Needs | Why |
+|---|---|---|---|
+| kube-vip (DaemonSet, Sparks) | kube-system (allowlisted) | **hostNetwork**, `NET_ADMIN`, `NET_RAW` (not privileged) | adds the VIPs to `wlP9s9` and sends gratuitous ARP |
+| edge-dns | edge | `NET_BIND_SERVICE` (all else dropped) | the image's `/coredns` carries that file capability; without it exec fails |
+| edge-caddy | edge | sysctl `net.ipv4.ip_unprivileged_port_start=0` (namespaced, "safe"), no capabilities | :80/:443 as a non-root user |
+
+`edge` is excluded from Kyverno's webhooks (like kube-system and argocd) so the front door can restart while Kyverno
+is down; background scans still report on it (decision 0007).

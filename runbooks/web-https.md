@@ -19,7 +19,10 @@ hosts). That CA has no name constraint, so it must never be installed on phones 
   store. On Omarchy, browsers pick it up through p11-kit.
 - Phones, Macs and Windows PCs: install it once from `http://ca.nghodki.ai`. Never install the internal homelab CA on them.
 
-## Front door (dgx-1 `~/edge-gateway`, not in this repo yet)
+## Front door (dgx-1 `~/edge-gateway`, not in this repo)
+
+The in-cluster replacement (Caddy and CoreDNS in `edge`, same routes, same cert as the Secret `edge/web-tls`) runs in
+parallel until the cutover: [edge.md](edge.md).
 
 - `conf/Caddyfile`: every route lives in the `(nghodki_routes)` snippet, imported by `:80` and by `:443`
   (`tls /etc/caddy/certs/web.crt /etc/caddy/certs/web.key`). `voice-agent.nghodki.ai` uses the same cert.
@@ -38,7 +41,8 @@ hosts). That CA has no name constraint, so it must never be installed on phones 
 
 Re-issue `web.crt` with the same extensions (SAN `nghodki.ai`, `*.nghodki.ai`; EKU serverAuth; keyUsage
 digitalSignature; AKI/SKI) from `pki_web_ca_key`, commit the cert, and copy the cert and key into `conf/certs/`.
-Then restart edge-caddy. Devices don't need anything: they trust the CA, not the certificate.
+Then restart edge-caddy, and refresh `cluster/platform/edge/web-tls.enc.yaml` for the in-cluster Caddy
+([edge.md](edge.md) "Renew"). Devices don't need anything: they trust the CA, not the certificate.
 
 ## Later
 

@@ -22,4 +22,5 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [argocd.md](argocd.md) (GitOps: bootstrap, add an app, break-glass, the deploy key and the age key in the cluster),
 [kyverno.md](kyverno.md) (admission policies, Audit → Enforce),
 [mcp-admission.md](mcp-admission.md) (approved MCP servers, DefenseClaw admission, nightly tool drift check),
-[hardening.md](hardening.md) (Lynis remediation: host hardening, documented exceptions, roll back).
+[hardening.md](hardening.md) (Lynis remediation: host hardening, documented exceptions, roll back),
+[edge.md](edge.md) (the `*.nghodki.ai` front door in k3s: kube-vip, CoreDNS, Caddy; adding routes; the cutover).

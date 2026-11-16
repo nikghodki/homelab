@@ -10,8 +10,8 @@ crds:
 
 # Webhooks never see kube-system, kyverno or argocd (Kyverno adds its own namespace too): a dead Kyverno can't block
 # the cluster's own add-ons, Kyverno itself or Argo CD, even though the policies fail closed (failurePolicy Fail)
-# everywhere else. Background scans still report on them. `edge` (P3.3: kube-vip, CoreDNS, Caddy) is out too until
-# its manifests are checked against the policies (TODO in runbooks/kyverno.md). Break glass: runbooks/kyverno.md.
+# everywhere else. Background scans still report on them. `edge` (the front door: CoreDNS, Caddy) is out too, for the
+# same reason: it must be able to restart while Kyverno is down (decision 0007). Break glass: runbooks/kyverno.md.
 config:
   webhooks:
     namespaceSelector:

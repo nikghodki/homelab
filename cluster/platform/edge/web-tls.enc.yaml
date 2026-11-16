@@ -1,0 +1,26 @@
+# The *.nghodki.ai wildcard (hosts/files/pki/web.crt) and its key (pki_web_key, secrets/pki.enc.yaml) for Caddy.
+# Renew: runbooks/edge.md. SOPS encrypts stringData only.
+apiVersion: v1
+kind: Secret
+metadata:
+    name: web-tls
+    namespace: edge
+type: kubernetes.io/tls
+stringData:
+    tls.crt: ENC[AES256_GCM,data:3fjbcAxLdmVzeCX1esJloDl5NqMR3FpRuU3muhlD7nMZNLQ24km28Rz7TC4GptHgDqUUyX45N1eUsiv1qXncu6y2AVw0hXmNliwO0mV+Gs465J0ZOYRG6+jrpM6wnYbgcS5sduE9CnViFXDOyyV9GhpfWkIW4hY940BHwjQjlyXKpDojXdnrv5hrkpgiFilnIDBAgElYuWCKW8gCF8wzronjxBFpi6wn1iVuPq4Z+N6rGOM5uDByt5DX1j//QtliBjV9fH+t2DnW2UEu55EuE4yjDXPX2Wa9ejCUfb1nGIJPodafHp+XJ9gZY/Fs3u0YePbfQwKlx9nASZ+PVkZAefjY739nuJgKSdV4aBvkDaOF5h02qxBvEmoRu6T7RHHuSIOM0c07DRh3B6t2v5YyrWH2T8T0ZzUwMqQ2XNnQs1Yqa5c5/PvdIiNTcL50JwhnXyPxTiX1SHbVYH1DOK6hX75a85vq7H51WlPvCEqq1s+Pu5bbiz8tXup3C9vsfvm1qosAKLHI2iL7LMWkw9tVzFSPWLXpZclnZ6uooYrIblw/S0wtMf5WKCCd3zcWTW6PqjJmBSWE55m08a+hDX9NkbNf6v9VI/l6SeGwAKNMyj7KmJfY/kb+oTk92rTHhPLUTcOO2rJ2WSGc0bABGWJ3CFMz1y7vl6S5+h9AwSOIfxvsr8kkUxyqY9/VTeCdE6p8Te+tLwfW4wefK0zarvglanzdNi/x9G1KyFS/DlRkLgY5cDb5tvvjJtIDmqay9555k1FWd/Uz+wtrTqwK8p90PSMI0kpkLn/gaGGpz+8QG8x2sbNf9lHrfgYHEeqBl7i9sFMiUrZoi333eo/7iYDazRHuaOCw8cWasoDam1fOxW8vfJ5CwXwnBm+9HnHSgvWaRdy2R7IxuHwvczVog7ozW6I+Fbq88DkPeaxOKZQhG9m+IUoKAMGW+eNZZrwkhZuYqt50aauGN6AhRL0HSC59bKg=,iv:wrgkPU6ISQ36FoYhSkyJhiQp8rvkM6SWe0d9eZeML+M=,tag:VAj7Sml53tE+umLQiFD+qg==,type:str]
+    tls.key: ENC[AES256_GCM,data:P0eDOT34sYUgJN6ASGRqmpilYhJu5KH7U8PE5s6Fvo24NeEQFokgFMCIUPIYUT0NntBjnsjmkrWS1xkkL0Y1XGB3cPSUEaFTixwT3Wx8B/KN3aicNGUd+VsmXVEeXCb+eTBRS07hOu7Vu7UzHINalLh/111duR1e3ywDq4W2xXewJMI8VBmrZGkwb8aeWEZdMUrM09y57sJ2MU15bEv4iwla/oH4GVXNglFOg709rftQo4bywfM2tOLnrXFR+JLpEUv3EivYR4pr+KQcaVjKBqIHwTpRE1u9E7AHtz7GMGxDAD0=,iv:0jL8YlkSeRmgp2tSSs0JDw/xHPm09Dx3OvlwKqo1P0A=,tag:CgqbNCmy982VwkBuPtPvLw==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAwVEx1Smt4K3FRcmcxNWtV
+            Y3Z6aU1Vd0RBbzRnMDlMVVZuUER2aC9xMG1VClhDVk5NUDBoeThUSWd0TEhNL290
+            ZDdOQ20xRC9ONHFaYnNHTXV6UW81cWcKLS0tIFR0N0dvVlhsQnhRT3laOFVJRm8z
+            L3VsOW14RTRzMGRiWFpsNmcvZEptQ2sKpM/XLIehJmke45hpBVnTSNpd+MdYwn3G
+            Zq25LlYmlqZ2IrTqu637A9bpCDBDKeUeQJwbZnOpb9oZPToiuC3V3A==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-16T01:14:37Z"
+    mac: ENC[AES256_GCM,data:FpiWMYp2FxTjSFf08OUIE7H8tMrIf1tmu9wPnrvq3cisRD++a8qqHxnoujYgtzUw8JRbPzmzWApqZDOU6K5krygR2prerOmWM/jh3hawT+KWPjRYS1naRR+rID4mmLc72cj5qq6SxI9VBjaPwFSQ2tikZFoPwvQ70/50dTQtZX8=,iv:YWNvgVfBB1kXGAkF4/adr6wbN0aVyTaC+/20GpEQ43g=,tag:DRBlw5ORPf8BALK5o1g5Lg==,type:str]
+    version: 3.13.3

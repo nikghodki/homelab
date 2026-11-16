@@ -1,0 +1,51 @@
+# kube-vip's permissions (upstream https://kube-vip.io/manifests/rbac.yaml, v1.3), narrowed: it writes Services and
+# their status (the LoadBalancer IP, its own annotations), reads endpoints and EndpointSlices (upstream also grants
+# update; ARP mode doesn't need it), and uses leases for leader election.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-vip
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:kube-vip-role
+rules:
+  - apiGroups: [""]
+    resources: ["services/status"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["list", "get", "watch", "update"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list", "get", "watch", "update", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["list", "get", "watch", "update", "create"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["list", "get", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: ["", "events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:kube-vip-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-vip-role
+subjects:
+  - kind: ServiceAccount
+    name: kube-vip
+    namespace: kube-system

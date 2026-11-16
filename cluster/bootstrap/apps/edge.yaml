@@ -1,0 +1,20 @@
+# The front door: CoreDNS for *.nghodki.ai and Caddy (cluster/platform/edge, decision 0007).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: edge
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: git@github.com:nikghodki/homelab.git
+    targetRevision: main
+    path: cluster/platform/edge
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: edge
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}

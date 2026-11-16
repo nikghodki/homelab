@@ -1,0 +1,113 @@
+# CoreDNS for *.nghodki.ai (decision 0007, runbooks/edge.md). Separate from k3s's kube-system CoreDNS (cluster DNS).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: edge-dns
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-dns
+  labels: {app.kubernetes.io/name: edge-dns, app.kubernetes.io/part-of: edge}
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: edge-dns}
+  strategy:
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: edge-dns, app.kubernetes.io/part-of: edge}
+    spec:
+      serviceAccountName: edge-dns
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: {app.kubernetes.io/name: edge-dns}
+              topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: coredns
+          image: docker.io/rancher/mirrored-coredns-coredns:1.14.7@sha256:7efd3c635b03efd68c4e8398fc45f0d993d0e9ab016f72c1cefb0fd6d01aa286
+          args: ["-conf", "/etc/coredns/Corefile"]
+          env:
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          ports:
+            - {name: dns-lan, containerPort: 1053, protocol: UDP}
+            - {name: dns-lan-tcp, containerPort: 1053, protocol: TCP}
+            - {name: dns-ts, containerPort: 1054, protocol: UDP}
+            - {name: dns-ts-tcp, containerPort: 1054, protocol: TCP}
+            - {name: metrics, containerPort: 9153, protocol: TCP}
+          resources:
+            requests: {cpu: 20m, memory: 24Mi}
+            limits: {cpu: 250m, memory: 96Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            # The image sets cap_net_bind_service on /coredns; without it in the bounding set exec fails (EPERM).
+            capabilities: {drop: [ALL], add: [NET_BIND_SERVICE]}
+          livenessProbe:
+            httpGet: {path: /health, port: 8080}
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: /ready, port: 8181}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: config, mountPath: /etc/coredns, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: edge-dns}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: edge-dns
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: edge-dns}
+---
+# LAN: the edge VIP (kube-vip ARP), port 53. Fixed ClusterIP so kube-system's CoreDNS can forward nghodki.ai here
+# (cluster/README.md). No NodePorts: they'd listen on every node address.
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-dns-lan
+  annotations:
+    kube-vip.io/loadbalancerIPs: 192.168.86.11
+spec:
+  type: LoadBalancer
+  clusterIP: 10.43.0.53
+  allocateLoadBalancerNodePorts: false
+  externalTrafficPolicy: Cluster
+  selector: {app.kubernetes.io/name: edge-dns}
+  ports:
+    - {name: dns, port: 53, targetPort: dns-lan, protocol: UDP}
+    - {name: dns-tcp, port: 53, targetPort: dns-lan-tcp, protocol: TCP}
+---
+# Tailnet: the Sparks' Tailscale IPs, port 53 (kube-proxy DNATs them on the node the packet arrives at). Until the
+# cutover only dgx-2's: dgx-1's 100.65.137.82:53 belongs to edge-dnsmasq, which the tailnet uses today, and a
+# kube-proxy DNAT would take it over (decision 0007).
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-dns-tailnet
+spec:
+  type: ClusterIP
+  externalIPs: [100.124.175.23]
+  selector: {app.kubernetes.io/name: edge-dns}
+  ports:
+    - {name: dns, port: 53, targetPort: dns-ts, protocol: UDP}
+    - {name: dns-tcp, port: 53, targetPort: dns-ts-tcp, protocol: TCP}

@@ -85,7 +85,8 @@ jobs:
       - name: Trivy (vulnerabilities, misconfigurations, secrets)
         run: >
           docker run --rm -v "$PWD:/src:ro" "$TRIVY_IMAGE" fs
-          --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress /src
+          --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --no-progress
+          --ignorefile /src/.trivyignore.yaml /src
 
   kubernetes:
     name: Kubernetes manifests
@@ -97,6 +98,8 @@ jobs:
           persist-credentials: false
       - name: kubeconform + Kyverno CLI
         run: .github/scripts/check-kubernetes.sh "$KUBECONFORM_IMAGE" "$KYVERNO_IMAGE"
+      - name: edge zone and CA page match cluster/platform/edge/names.txt and hosts/files/web-ca
+        run: python3 .github/scripts/edge-zone.py check
 
   ai-scanners:
     name: AI scanners (MCP tools, skills, agent cards, agent code)

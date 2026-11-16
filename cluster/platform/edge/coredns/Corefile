@@ -1,0 +1,29 @@
+# *.nghodki.ai for the LAN (:1053, behind the edge VIP 192.168.86.11:53) and the tailnet (:1054, behind the Sparks'
+# Tailscale IPs :53). The zones are generated from names.txt (runbooks/edge.md). The tailnet zone is per node
+# (NODE_NAME from the downward API): a replica answers with its own Spark's Tailscale IP, so a tailnet answer always
+# names a Spark that is up (decision 0007). The `file` plugin is authoritative,
+# so AAAA for a name that exists is NOERROR with no answer (not NXDOMAIN, which edge-dnsmasq returns and which Go
+# resolvers treat as "no such host"), and an unknown name is NXDOMAIN.
+nghodki.ai:1053 {
+    errors
+    file /etc/coredns/lan.db nghodki.ai
+    prometheus :9153
+}
+nghodki.ai:1054 {
+    errors
+    file /etc/coredns/tailnet-{$NODE_NAME}.db nghodki.ai
+    prometheus :9153
+}
+# Everything else, for LAN clients only (Tailscale split DNS sends only nghodki.ai to :1054, which answers nothing
+# else). The router doesn't resolve nghodki.ai itself, so forwarding to it can't loop; `loop` stops it if that changes.
+.:1053 {
+    errors
+    health :8080 {
+        lameduck 5s
+    }
+    ready :8181
+    prometheus :9153
+    cache 300
+    loop
+    forward . 192.168.86.1
+}

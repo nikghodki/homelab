@@ -1,0 +1,6 @@
+# kube-state-metrics for the cluster alerts (hosts/stacks/observe/vmalert/rules/front-door.yml).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - rbac.yaml
+  - deployment.yaml

@@ -55,6 +55,17 @@ endpoints:
   - {name: etcd dgx-1, group: k3s, url: "tcp://10.100.136.1:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: etcd dgx-2, group: k3s, url: "tcp://10.100.136.2:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
   - {name: etcd jetson, group: k3s, url: "tcp://192.168.86.211:2379", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  # The in-cluster front door (plan P3.3, decision 0007, runbooks/edge.md), on its VIPs. The Dell is a k3s node, so its
+  # kube-proxy answers for the VIPs locally: these check CoreDNS, Caddy and the API, not which Spark holds the VIP over ARP
+  # (vmalert KubeVipNotReady watches kube-vip). TLS isn't verified (no web CA in Gatus), only the cert's expiry.
+  # DNS over TCP only: UDP from the Dell's Docker containers to any k3s Service is dropped (the Dell's flannel.1 sends
+  # NAT'd UDP with a bad outer VXLAN checksum; runbooks/edge.md "Known issues"). So these check that CoreDNS answers on
+  # :53; the answers themselves are checked by .github/scripts/compare-front-doors.sh.
+  - {name: edge DNS (VIP), group: edge, url: "tcp://192.168.86.11:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: edge DNS tailnet view, group: edge, url: "tcp://100.124.175.23:53", interval: 1m, conditions: ["[CONNECTED] == true"], alerts: [{type: ntfy}]}
+  - {name: edge Caddy (VIP), group: edge, url: "https://192.168.86.11/", headers: {Host: ca.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[CERTIFICATE_EXPIRATION] > 720h"], alerts: [{type: ntfy}]}
+  - {name: grafana.nghodki.ai (VIP), group: edge, url: "https://192.168.86.11/api/health", headers: {Host: grafana.nghodki.ai}, client: {insecure: true}, <<: *web}
+  - {name: API (VIP), group: edge, url: "https://192.168.86.10:6443/readyz", client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401"], alerts: [{type: ntfy}]}
 external-endpoints:
   # Key observe_alert-pipeline-heartbeat (Alertmanager posts to /api/v1/endpoints/<key>/external?success=true).
   - name: alert pipeline heartbeat
