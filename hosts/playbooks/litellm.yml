@@ -1,9 +1,19 @@
-# LiteLLM on dgx-1 (runbooks/litellm.md): proxy, Postgres and Redis from hosts/stacks/litellm, keys from
+# The stopped Docker copy of LiteLLM on dgx-1 (rollback only until 2026-11-23; runbooks/litellm.md): proxy, Postgres and
+# Redis from hosts/stacks/litellm, keys from
 # secrets/litellm.enc.yaml. Always --check --diff first.
 - name: LiteLLM
   hosts: litellm
   become: true
   pre_tasks:
+    # LiteLLM runs in k3s since 2026-11-16 (cluster/apps/litellm). This stack is the stopped fallback: starting it
+    # while the pods serve would split the keys and spend between two databases.
+    - name: Only for a rollback to the Docker copy (runbooks/litellm.md "Rollback")
+      ansible.builtin.assert:
+        that: litellm_docker_rollback | default(false) | bool
+        fail_msg: >-
+          LiteLLM runs in k3s; this playbook would start the stopped Docker copy. For a rollback follow
+          runbooks/litellm.md and pass -e litellm_docker_rollback=true.
+        quiet: true
     - name: Load LiteLLM secrets from SOPS
       community.sops.load_vars:
         file: "{{ playbook_dir }}/../../secrets/litellm.enc.yaml"

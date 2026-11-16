@@ -1,5 +1,5 @@
 # Open WebUI on dgx-1 (runbooks/open-webui.md). One replica: SQLite (webui.db) and the built-in Chroma DB live on a
-# local-path volume on dgx-1, next to LiteLLM. Caddy reaches it on the fixed ClusterIP 10.43.0.130 (no cluster DNS
+# local-path volume on dgx-1. Caddy reaches it on the fixed ClusterIP 10.43.0.130 (no cluster DNS
 # on the front door's path, cluster/README.md).
 apiVersion: v1
 kind: ServiceAccount
@@ -34,7 +34,7 @@ spec:
     spec:
       serviceAccountName: open-webui
       automountServiceAccountToken: false
-      # The data volume is on dgx-1's disk (local-path), and LiteLLM is on dgx-1.
+      # The data volume is on dgx-1's disk (local-path).
       nodeSelector: {kubernetes.io/hostname: dgx-1}
       securityContext:
         seccompProfile: {type: RuntimeDefault}
@@ -71,8 +71,9 @@ spec:
         - name: open-webui
           image: ghcr.io/open-webui/open-webui:v0.13.3@sha256:46b59158e6558eeb980bc828e0f1b30238ad24d82ed84d5e5eda1dab2a082f14
           env:
-            # LiteLLM on dgx-1 (published on 0.0.0.0:4000; the node's cable address from a pod on dgx-1)
-            - {name: OPENAI_API_BASE_URL, value: "http://10.100.136.1:4000/v1"}
+            # LiteLLM in k3s (fixed ClusterIP). Only read at the first start: Open WebUI keeps the connection in its
+            # database (`openai.api_base_urls`), which wins over this (runbooks/open-webui.md "Model connection").
+            - {name: OPENAI_API_BASE_URL, value: "http://10.43.0.150:4000/v1"}
             - {name: ENABLE_OLLAMA_API, value: "false"}
             - {name: WEBUI_URL, value: "http://webui.nghodki.ai"}
             # On-demand models can take ~6-7 min to cold-start; don't give up on them.
@@ -130,7 +131,7 @@ spec:
     - {name: http, port: 8080, targetPort: http, protocol: TCP}
 ---
 # In: only the front door's Caddy pods (kubelet probes come from the node, allowed by k3s's policy controller).
-# Out: DNS, LiteLLM on dgx-1, and HTTPS/HTTP to the internet (web search and URL loading), nothing else on the LAN,
+# Out: DNS, LiteLLM (k3s), and HTTPS/HTTP to the internet (web search and URL loading), nothing else on the LAN,
 # the tailnet or the cluster.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -157,13 +158,6 @@ spec:
       ports:
         - {port: 53, protocol: UDP}
         - {port: 53, protocol: TCP}
-    # LiteLLM: Docker DNATs dgx-1's :4000 to the container (network `gateway`, 172.23.0.0/16) before the policy sees
-    # the packet, so the rule needs the container side too (the pod is on dgx-1).
-    - to:
-        - ipBlock: {cidr: 10.100.136.1/32}
-        - ipBlock: {cidr: 172.23.0.0/16}
-      ports:
-        - {port: 4000, protocol: TCP}
     # LiteLLM in k3s (litellm/litellm, ClusterIP 10.43.0.150, DNATed to the pods before the policy check)
     - to:
         - namespaceSelector:
