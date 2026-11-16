@@ -34,7 +34,8 @@ cisco_aibom_dirs:
   - {name: dgx-model-manager, path: /home/nikghodki-dgx/workspace/dgx-model-manager}
   - {name: litellm, path: /opt/homelab/litellm}
 cisco_aibom_containers: [litellm-proxy, open-webui]
-cisco_aibom_llm_api_base: http://127.0.0.1:4000/v1
+# The agentic stage's model API: the role's default, http://model.nghodki.ai/v1 (the front door), as on every host;
+# LiteLLM is in k3s since 2026-11-16 and no longer on dgx-1's loopback.
 # k3s (plan P3.2)
 k3s_node_ip: 10.100.136.1
 k3s_node_external_ip: 192.168.86.44
