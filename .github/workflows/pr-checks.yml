@@ -263,7 +263,9 @@ jobs:
             ~/venvs/ci
             ~/venvs/aibom
             ~/venvs/radar
-          key: venvs-scans-${{ steps.py.outputs.python-version }}-${{ hashFiles('.github/requirements-ci.txt', '.github/requirements-aibom.txt', '.github/requirements-radar.txt') }}
+          key: >-
+            venvs-scans-${{ steps.py.outputs.python-version }}-${{ hashFiles('.github/requirements-ci.txt',
+            '.github/requirements-aibom.txt', '.github/requirements-radar.txt') }}
       - name: Install scanners
         id: pyci
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
