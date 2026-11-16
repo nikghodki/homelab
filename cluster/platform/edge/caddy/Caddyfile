@@ -91,10 +91,13 @@
 # without it) and without the session cookie. Signed out, edge-auth's /oauth2/start answers here: a CSRF cookie and a
 # 302 to Pocket ID; after the passkey the browser comes back through https://auth.nghodki.ai/oauth2/callback to the
 # URL it asked for. The cookie is for .nghodki.ai, so one sign-in covers every signed-in route.
+# Upstreams are IPs, never cluster Service names: Caddy must not depend on kube-dns, which can be down (a dead Spark)
+# while the door is up. edge-auth is the fixed ClusterIP of edge/edge-auth-ip (10.43.0.54), Argo CD that of
+# argocd/argocd-server-host (10.43.0.100).
 (session_check) {
 	@plain protocol http
 	redir @plain https://{host}{uri} 308
-	reverse_proxy edge-auth.edge.svc.cluster.local:4180 {
+	reverse_proxy 10.43.0.54:4180 {
 		# forward auth, written out (forward_auth can't pass the refreshed session cookie back to the browser)
 		method GET
 		rewrite /oauth2/auth?allowed_groups={args[0]}
@@ -108,7 +111,7 @@
 		}
 		@signin status 401
 		handle_response @signin {
-			reverse_proxy edge-auth.edge.svc.cluster.local:4180 {
+			reverse_proxy 10.43.0.54:4180 {
 				method GET
 				rewrite /oauth2/start?
 				# oauth2-proxy builds the return URL from X-Forwarded-Host/-Uri only if Host differs from X-Forwarded-Host
@@ -161,7 +164,7 @@
 		redir @plain https://{host}{uri} 308
 		@proxy path /oauth2/* /ping
 		handle @proxy {
-			reverse_proxy edge-auth.edge.svc.cluster.local:4180
+			reverse_proxy 10.43.0.54:4180
 		}
 		handle {
 			redir https://ops.nghodki.ai/ 302
@@ -239,7 +242,7 @@
 	handle @argocd {
 		@plain protocol http
 		redir @plain https://{host}{uri} 308
-		reverse_proxy argocd-server.argocd.svc.cluster.local:80 {
+		reverse_proxy 10.43.0.100:80 {
 			flush_interval -1
 		}
 	}

@@ -2,13 +2,15 @@
 # Validate cluster/ manifests with kubeconform, and test them against policies/kyverno with the Kyverno CLI.
 # Helm values files and SOPS-encrypted Secrets (*.enc.yaml) are skipped by kubeconform: values aren't manifests,
 # and the `sops:` block isn't part of the Secret schema (check-sops.sh covers those files).
+# *.ssa-patch.yaml are partial objects that Argo CD server-side-applies onto resources it does not own.
 set -euo pipefail
 KUBECONFORM_IMAGE="$1"; KYVERNO_IMAGE="$2"
 # -print -quit, not `| head -1` / `| grep -q`: with pipefail, find's SIGPIPE on a big tree fails the pipeline
 manifests=$(find cluster -type f \( -name '*.yaml' -o -name '*.yml' \) -print -quit 2>/dev/null)
 if [ -z "$manifests" ]; then echo "no manifests under cluster/ yet"; exit 0; fi
 docker run --rm -v "$PWD:/repo:ro" -w /repo "$KUBECONFORM_IMAGE" -strict -summary -ignore-missing-schemas \
-  -ignore-filename-pattern '(^|/)values\.ya?ml$' -ignore-filename-pattern '\.enc\.ya?ml$' cluster/
+  -ignore-filename-pattern '(^|/)values\.ya?ml$' -ignore-filename-pattern '\.enc\.ya?ml$' \
+  -ignore-filename-pattern '\.ssa-patch\.ya?ml$' cluster/
 if [ -z "$(find policies/kyverno -type f \( -name '*.yaml' -o -name '*.yml' \) -print -quit 2>/dev/null)" ]; then
   echo "no Kyverno policies under policies/kyverno/ yet"; exit 0
 fi

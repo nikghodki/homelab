@@ -46,6 +46,11 @@ dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and n
   Sparks' LAN IPs `192.168.86.44` and `192.168.86.36` (the pods leave from their node's IP); set in HA's UI by the
   user. Without the entry HA answers 400 to every request through that Spark's pod.
 
+- **No cluster DNS on the door's path.** Every Caddy upstream is an IP: LAN/cable/Tailscale addresses, and for
+  in-cluster backends a fixed ClusterIP (edge-auth `10.43.0.54`, Argo CD `10.43.0.100`). With Service names, a dead
+  kube-dns (one replica until 2026-11-16, on dgx-2) broke sign-in for every new connection (the failover drill).
+  kube-dns has two replicas now, one per Spark (`cluster/platform/cluster-dns/coredns-replicas.ssa-patch.yaml`).
+
 - **Signed-in routes** (apps without their own login: Homepage, docs, Gatus' UI, MLflow) are one line each,
   `import signed_in <backend> <group>`: Caddy asks `edge-auth` (`/oauth2/auth?allowed_groups=<group>`) on every
   request, sends signed-out browsers to Pocket ID (callback `https://auth.nghodki.ai`, one cookie for `.nghodki.ai`),

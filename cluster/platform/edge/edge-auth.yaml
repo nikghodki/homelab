@@ -95,6 +95,20 @@ spec:
   ports:
     - {name: http, port: 4180, targetPort: http, protocol: TCP}
 ---
+# The same pods on a fixed ClusterIP (static band, cluster/README.md): Caddy calls this address, not the Service name,
+# so the front door doesn't need the cluster's DNS (kube-dns) to sign people in (failover drill 2026-11-16,
+# runbooks/edge.md).
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-auth-ip
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.54
+  selector: {app.kubernetes.io/name: edge-auth}
+  ports:
+    - {name: http, port: 4180, targetPort: http, protocol: TCP}
+---
 # Only the Caddy pods reach the proxy (they are its trusted_proxy_ips); kubelet probes come from the node and are
 # allowed by k3s's network-policy controller.
 apiVersion: networking.k8s.io/v1
