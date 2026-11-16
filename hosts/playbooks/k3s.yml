@@ -34,3 +34,6 @@
 
 - name: Flannel VXLAN checksum fix
   ansible.builtin.import_playbook: flannel-offload-fix.yml
+
+- name: Etcd leader stays on a Spark
+  ansible.builtin.import_playbook: etcd-leader-pin.yml

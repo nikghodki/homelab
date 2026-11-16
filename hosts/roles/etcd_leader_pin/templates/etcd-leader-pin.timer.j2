@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (role etcd_leader_pin, runbooks/k3s.md "etcd leader").
+[Unit]
+Description=Keep the etcd leader on a Spark, every {{ etcd_leader_pin_interval }}
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec={{ etcd_leader_pin_interval }}
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

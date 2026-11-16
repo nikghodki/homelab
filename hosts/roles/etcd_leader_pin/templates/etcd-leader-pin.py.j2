@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+# Managed by homelab Ansible (role etcd_leader_pin, runbooks/k3s.md "etcd leader").
+# If the etcd leader is not one of the preferred members (the Sparks, on the cable), move leadership to the first
+# preferred member that is up and caught up. Prints only when it acts or can't decide; exit 0 unless the move fails.
+import json, subprocess, sys
+
+TLS = "/var/lib/rancher/k3s/server/tls/etcd"
+PREFER = {{ etcd_leader_pin_prefer | to_json }}
+MEMBERS = {{ etcd_leader_pin_members | to_json }}
+MAX_LAG = {{ etcd_leader_pin_max_lag | int }}
+
+
+def ctl(endpoint, *args):
+    return subprocess.run(
+        ["/usr/local/bin/etcdctl", "--endpoints", endpoint, "--cacert", f"{TLS}/server-ca.crt",
+         "--cert", f"{TLS}/client.crt", "--key", f"{TLS}/client.key", "--dial-timeout=2s",
+         "--command-timeout=3s", *args], capture_output=True, text=True)
+
+
+status = {}
+for ep in MEMBERS:
+    r = ctl(ep, "endpoint", "status", "-w", "json")
+    if r.returncode == 0:
+        s = json.loads(r.stdout)[0]["Status"]
+        status[ep] = {"id": s["header"]["member_id"], "leader": s["leader"], "index": s["raftIndex"]}
+leaders = {s["leader"] for s in status.values()}
+if len(leaders) != 1 or 0 in leaders:
+    print(f"no single leader seen ({len(status)} members answered); not acting")
+    sys.exit(0)
+leader = leaders.pop()
+leader_ep = next((ep for ep, s in status.items() if s["id"] == leader), None)
+if leader_ep in PREFER:
+    sys.exit(0)
+if leader_ep is None:
+    print("the leader didn't answer; not acting")
+    sys.exit(0)
+top = status[leader_ep]["index"]
+target = next((ep for ep in PREFER if ep in status and top - status[ep]["index"] <= MAX_LAG), None)
+if target is None:
+    print(f"leader {leader_ep} is not a preferred member, but no preferred member is up and caught up")
+    sys.exit(0)
+r = ctl(leader_ep, "move-leader", format(status[target]["id"], "x"))
+print(f"moved the etcd leader from {leader_ep} to {target}: {r.stdout.strip() or r.stderr.strip()}")
+sys.exit(r.returncode)

@@ -1,0 +1,8 @@
+# Managed by homelab Ansible (role etcd_leader_pin, runbooks/k3s.md "etcd leader").
+[Unit]
+Description=Move the etcd leader off the Jetson (Wi-Fi) to a Spark
+After=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart={{ etcd_leader_pin_script }}

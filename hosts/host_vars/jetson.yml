@@ -51,6 +51,9 @@ k3s_link_routes:
 k3s_node_labels: [nghodki.ai/role=edge-robot, nghodki.ai/hw=orin]
 k3s_node_taints: ["nghodki.ai/jetson=true:NoSchedule"]
 k3s_min_mem_available_mb: 2048
+# The member on Wi-Fi waits twice as long as the Sparks (5 s) before it calls an election, so after a Spark dies the
+# other Spark becomes leader, not the Jetson (runbooks/k3s.md "etcd leader"; role etcd_leader_pin covers handovers).
+k3s_etcd_args: [election-timeout=10000]
 # About 2.3 GiB allocatable; pods are evicted before host processes run out of memory.
 k3s_kubelet_args:
   - system-reserved=cpu=1500m,memory=4Gi

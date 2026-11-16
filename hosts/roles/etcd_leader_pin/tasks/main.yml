@@ -1,0 +1,67 @@
+---
+# etcdctl from the etcd release (k3s doesn't ship it, and its etcd has no JSON gateway) plus a timer that moves the
+# etcd leader off the Jetson (runbooks/k3s.md, "etcd leader").
+- name: Release folder
+  ansible.builtin.file:
+    path: /opt/etcd-{{ etcd_leader_pin_version }}
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Etcd release tarball (sha256 checked)
+  ansible.builtin.get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_leader_pin_version }}/{{ etcd_leader_pin_tarball }}.tar.gz"
+    dest: /opt/etcd-{{ etcd_leader_pin_version }}/etcd.tar.gz
+    checksum: "sha256:{{ etcd_leader_pin_sha256[ansible_facts['architecture']] }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: not ansible_check_mode  # the folder doesn't exist yet in check mode
+
+- name: Etcdctl only
+  ansible.builtin.unarchive:
+    src: /opt/etcd-{{ etcd_leader_pin_version }}/etcd.tar.gz
+    dest: /opt/etcd-{{ etcd_leader_pin_version }}
+    remote_src: true
+    include: ["{{ etcd_leader_pin_tarball }}/etcdctl"]
+    extra_opts: [--strip-components=1]
+    creates: /opt/etcd-{{ etcd_leader_pin_version }}/etcdctl
+  when: not ansible_check_mode
+
+- name: Etcdctl on the PATH
+  ansible.builtin.file:
+    src: /opt/etcd-{{ etcd_leader_pin_version }}/etcdctl
+    dest: /usr/local/bin/etcdctl
+    state: link
+    force: true
+  when: not ansible_check_mode
+
+- name: Pin script
+  ansible.builtin.template:
+    src: etcd-leader-pin.py.j2
+    dest: "{{ etcd_leader_pin_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Service and timer
+  ansible.builtin.template:
+    src: "etcd-leader-pin.{{ item }}.j2"
+    dest: /etc/systemd/system/etcd-leader-pin.{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [service, timer]
+  register: etcd_leader_pin_units
+  notify: Reload systemd
+
+- name: Flush handlers (systemd sees the units)
+  ansible.builtin.meta: flush_handlers
+
+- name: Timer enabled and running
+  ansible.builtin.systemd_service:
+    name: etcd-leader-pin.timer
+    enabled: true
+    state: started
+  when: not (ansible_check_mode and etcd_leader_pin_units is changed)

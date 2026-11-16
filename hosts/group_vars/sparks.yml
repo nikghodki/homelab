@@ -12,6 +12,9 @@ k3s_node_labels: [nghodki.ai/role=gpu, nghodki.ai/hw=gb10]
 k3s_kubelet_args:
   - system-reserved=cpu=2,memory=8Gi,ephemeral-storage=20Gi
   - kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=5Gi
+# A dead node's pods leave the Services after 20 s instead of Kubernetes' 50 s (runbooks/edge.md "Failover drill":
+# until then the surviving Spark still sends part of the front door's connections to the dead pods).
+k3s_kube_controller_manager_args: [node-monitor-grace-period=20s]
 # Cisco AIBOM (runbooks/aibom.md). A model can take most of the unified memory: cap the job and skip image scans
 # when little is left (both Sparks crashed from memory exhaustion on 2026-11-15).
 cisco_aibom_memory_max: 6G
