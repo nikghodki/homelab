@@ -1,6 +1,6 @@
 # The *.nghodki.ai front door in k3s (decision 0007, runbooks/edge.md). Same routes as edge-caddy on dgx-1
 # (~/edge-gateway/conf/Caddyfile), with three differences, all because this runs in a pod:
-#   - nginx-gateway (model, dgxmanager, ha, voice-agent, anything else) is only on dgx-1's Docker network `gateway`,
+#   - nginx-gateway (model, dgxmanager, ha, anything else) is only on dgx-1's Docker network `gateway`,
 #     so those routes go through edge-caddy on dgx-1 (192.168.86.44:80), which hands them to nginx-gateway.
 #   - Argo CD by its Service name instead of the fixed ClusterIP 10.43.0.100.
 #   - The wildcard cert is the TLS Secret `web-tls` (KSOPS); the CA page is a ConfigMap of hosts/files/web-ca.
@@ -176,24 +176,6 @@
 :443 {
 	tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
 	import nghodki_routes
-}
-
-voice-agent.nghodki.ai {
-	tls /etc/caddy/certs/tls.crt /etc/caddy/certs/tls.key
-
-	@livekit {
-		path /rtc*
-		path /twirp/*
-	}
-	handle @livekit {
-		reverse_proxy 100.65.137.82:7880
-	}
-
-	handle {
-		reverse_proxy 192.168.86.44:80 {
-			header_up Host voice-agent.nghodki.ai
-		}
-	}
 }
 
 # Probes (pod-internal).

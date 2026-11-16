@@ -23,7 +23,7 @@ Docker on dgx-1, `~/edge-gateway`). The [cutover](#cutover) is a separate, appro
   a dead Spark; Caddy on either Tailscale IP reaches either Caddy pod. Non-`nghodki.ai` queries are REFUSED there.
 - **Not through Caddy**: `nats`, `fleet` (dgx-1), `backup` (dgx-2), the host names (`jetson`, `pi`, ...) and
   `k8s` (the API VIP on the LAN; on the tailnet, the answering Spark's Tailscale IP).
-- **nginx-gateway** (model, dgxmanager, ha, voice-agent, the default route) is reachable only on dgx-1's Docker
+- **nginx-gateway** (model, dgxmanager, ha, the default route) is reachable only on dgx-1's Docker
   network, so Caddy sends those to edge-caddy on `192.168.86.44:80`, which relays to nginx-gateway. edge-caddy stays
   until those services move into the cluster (P3.7).
 
