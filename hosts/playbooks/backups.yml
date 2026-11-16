@@ -1,6 +1,7 @@
-# Backups (plan P1.10): server on dgx-2, nightly restic on every host. Always --check --diff first.
+# Backups (plan P1.10; user decision 2026-11-16, decision 0002): rest-server on the Jetson (500 GB cap, 3 days kept),
+# nightly restic on every host. Always --check --diff first.
 - name: Backup server
-  hosts: observe
+  hosts: backup_server
   become: true
   pre_tasks:
     - name: Load secrets
@@ -9,23 +10,66 @@
         name: "{{ item }}_secrets"
       loop: [backup, pki]
       no_log: true
-    - name: Backup data folder
-      ansible.builtin.file:
-        path: /srv/homelab-backup
-        state: directory
-        owner: root
-        group: root
-        mode: "0700"
   vars:
     restic_hosts: "{{ groups['all'] }}"
     pki_backup_key: "{{ pki_secrets.pki_backup_key }}"
   roles:
+    - role: backup_server
     - role: compose_stack
       vars:
         compose_stack_name: backup
         compose_stack_src: "{{ playbook_dir }}/../stacks/backup"
     - role: restic_install
     - role: restic_prune
+
+# The old server on dgx-2 (2026-11-14 to 2026-11-16), retired: rest-server stopped and not restarted, the weekly prune
+# off. The container and image stay (no deletions without the user); its repositories were deleted by hand once the
+# Jetson's held a verified full backup (docs-site services/backup-server.md).
+- name: Old backup server on dgx-2 is off
+  hosts: observe
+  become: true
+  tasks:
+    - name: Is the old stack still there
+      ansible.builtin.stat:
+        path: /opt/homelab/backup/compose.yaml
+      register: backup_old_stack
+
+    - name: Old rest-server stopped
+      community.docker.docker_compose_v2:
+        project_src: /opt/homelab/backup
+        state: stopped
+      when: backup_old_stack.stat.exists
+
+    - name: Old rest-server doesn't come back on reboot
+      ansible.builtin.command:
+        cmd: docker update --restart=no backup-rest-server-1
+      register: backup_old_restart
+      changed_when: false
+      failed_when: backup_old_restart.rc != 0 and 'No such container' not in backup_old_restart.stderr
+      when: backup_old_stack.stat.exists and not ansible_check_mode
+
+    - name: Old weekly prune off
+      ansible.builtin.systemd_service:
+        name: homelab-backup-prune.timer
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Old prune units and script removed
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/homelab-backup-prune.timer
+        - /etc/systemd/system/homelab-backup-prune.service
+        - /usr/local/sbin/homelab-backup-prune
+        - /etc/restic-prune
+      notify: Reload systemd
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
 
 - name: Nightly backups
   hosts: all

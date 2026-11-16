@@ -1,6 +1,6 @@
 ---
 title: "dgx-2"
-description: "The second DGX Spark: observability, Pocket ID, Temporal, MLflow, simulation jobs, backup server, k3s server that started the cluster."
+description: "The second DGX Spark: observability, Pocket ID, Temporal, MLflow, simulation jobs, k3s server that started the cluster."
 ---
 
 dgx-2 carries the stateful platform services and the batch work. Its memory is shared between those services and GPU
@@ -27,7 +27,7 @@ jobs, so jobs must leave the service reserve alone.
 | `jobs` | temporal, postgresql, admin-tools, ui | 192.168.86.36: 7233 (gRPC), 8233 (UI), 9233 (metrics) | `jobs.yml` |
 | `ml` | mlflow, postgresql, api (Caddy) | 192.168.86.36: 4181 (UI gate for the front door), 5000 (job API) | `ml.yml` |
 | `gpu` | dcgm-exporter 4.8.4 | 127.0.0.1:9400 | `gpu.yml` |
-| `backup` | rest-server (restic) | 0.0.0.0:8000 (TLS) | `backups.yml` |
+| `backup` | rest-server (restic), **retired 2026-11-16**: stopped, not restarted; the server is on the Jetson now | — | `backups.yml` |
 | `sim` (on demand) | isaaclab, mujoco (profile `jobs`, never start by themselves) | none | run by hand |
 
 Also seen: a `dgxmm-node-probe` container (DGXMM session's; not in this repo).
@@ -36,8 +36,7 @@ k3s pods here since 2026-11-16 (P3.7): Pocket ID (`console/pocket-id`, pinned: i
 the primary of LiteLLM's CNPG cluster `data/litellm-db` (preferred placement) and one of the two LiteLLM proxy pods.
 
 systemd: `k3s` (server, `cluster-init`), `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `earlyoom` and
-`gpu-oom-guard` (`roles/memory_guard`, as on dgx-1). Timers: `cisco-aibom`, `lynis-audit`, `homelab-backup`,
-`homelab-backup-prune` (Sunday 05:00).
+`gpu-oom-guard` (`roles/memory_guard`, as on dgx-1). Timers: `cisco-aibom`, `lynis-audit`, `homelab-backup`.
 
 ## Memory
 

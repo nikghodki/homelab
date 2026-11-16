@@ -26,7 +26,7 @@ certificates with `hosts/files/pki/temporal/issue.sh` (`runbooks/temporal.md`).
 | `web.crt` / key | edge-caddy on dgx-1 (`:443`); the in-cluster Caddy (P3.3) | `~/edge-gateway/conf/certs/`; KSOPS Secret `edge/web-tls` (`cluster/platform/edge/web-tls.enc.yaml`) |
 | `nats.crt` | NATS on dgx-1 (4222, 8883) | `/opt/homelab/bus/nats/certs/` |
 | `fleet.crt` | Mosquitto 8884 and fleet-caddy 8971 on dgx-1 | `/opt/homelab/fleet/{mosquitto,caddy}/certs/` |
-| `backup.crt` | restic rest-server on dgx-2 | `/opt/homelab/backup/rest-server/` |
+| `backup.crt` | restic rest-server on the Jetson (re-issued 2026-11-16 for its names and addresses, same key; expires 2028-11-15) | `/opt/homelab/backup/rest-server/` |
 
 Clients that verify the internal CA point at `/usr/local/share/ca-certificates/homelab-ca.crt` (Edge Connector, Fleet
 gateway, safety governor, NATS clients). Containers that talk to Pocket ID mount the host bundle

@@ -49,9 +49,10 @@ when one Spark is down. Its memory is tight; treat every new process here as a b
 | `k3s.service` | etcd-only server + kubelet (`disable-apiserver` etc.) | 192.168.86.211:2379, *:10250, *:6443 (k3s supervisor, not a full API server) |
 | `otelcol-contrib`, `fleet-metrics`, `tailscaled`, `docker` | standard | 9109 |
 | `nvidia-cdi-refresh` drop-in | CSV mode and retry (role `jetson_cdi`) | — |
+| container `backup-rest-server-1` | the fleet's restic rest-server (decision 0002, [Backup server](../services/backup-server.md)): host network, 256m; repositories on the 500 GB `/srv/homelab-backup` (loop image `/var/lib/homelab-backup.img`); `backup-server-guard.service` lets only fleet hosts in | *:8000 (TLS, fleet LAN sources only) |
 
 Timers: `cisco-aibom.timer` at 01:30 (code dirs only, 3 h per target, each Hermes checkout is about 8,000 Python files; this host's images are scanned on dgx-2 by digest), `lynis-audit`,
-`homelab-backup`.
+`homelab-backup`, `homelab-backup-prune` (daily 05:30, 3 days kept, every host's repository).
 
 ## Memory
 

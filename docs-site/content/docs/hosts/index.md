@@ -16,8 +16,8 @@ the summary; each host has its own page.
 | omarchy | `agent_nodes`, `k3s_agents`, `always_on`, `alerting` | Omarchy (Arch), kernel 7.2.15-omarchy | `nikghodki` | agent |
 | pi | `edge` | Debian 13 trixie (Raspberry Pi OS) | `nikghodki-raspberry-1` | none |
 
-Group meaning: `bus` = where NATS and the Fleet stack run; `observe` = where the observe, console, jobs, ml and backup
-stacks run; `alerting` = where Gatus, ntfy and Homepage run; `edge` = robot devices.
+Group meaning: `bus` = where NATS and the Fleet stack run; `observe` = where the observe, console, jobs and ml
+stacks run; `backup_server` = the restic rest-server (the Jetson); `alerting` = where Gatus, ntfy and Homepage run; `edge` = robot devices.
 
 ## Addresses
 
@@ -60,7 +60,7 @@ over SSH inside a heredoc, use `ssh -n`, or ssh eats the rest of the heredoc as 
 | Weekly Lynis (`lynis-audit.timer`, Sunday 03:30 + up to 30 min) | `lynis` | — | yes |
 | Nightly Cisco AIBOM (`cisco-aibom.timer`) | `cisco_aibom` | — | dgx-1, dgx-2, Jetson, Pi |
 | k3s | `k3s` | 6443, 10250, 2379/2380 | not the Pi |
-| restic backup timer (`homelab-backup.timer`) | `restic_backup` | — | installed on dgx-1, dgx-2, Jetson, Pi (see [Backups](../operations/backups.md)) |
+| restic backup timer (`homelab-backup.timer`) | `restic_backup` | — | installed on every host, to the Jetson (see [Backups](../operations/backups.md)) |
 
 ## Memory budget
 

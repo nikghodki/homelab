@@ -1,32 +1,31 @@
 ---
 title: Backups
-description: What decision 0002 says (backups off), what is actually running (backups on), what is and isn't protected, and how to turn backups on or off properly.
+description: Decision 0002 (revised 2026-11-16): every host backs up nightly to the Jetson, 500 GB cap, 3 days kept. What is protected, the single-host risk, and how to restore.
 ---
 
 ## The decision
 
-Decision 0002 (2026-11-15): the restic setup from PR #17 stays merged but **not deployed**; the off-site target is on
-hold. Consequence written there: each host keeps its own data; a disk loss on dgx-1 or the Jetson means rebuilding from
-Git plus whatever is lost; the age key's offline copy is the only off-host secret backup.
+Decision 0002, revised 2026-11-16 by the user: backups are **on**. Every host backs up nightly with restic to one
+append-only rest-server on the **Jetson** (a 500 GB filesystem on its 4 TB NVMe), and the Jetson keeps **3 days**
+(`forget --keep-within 3d --prune`, daily). The old server on dgx-2 is retired and its repositories are deleted.
 
-## What is actually running (checked 2026-11-15)
+**The risk, plainly:** all backups now sit on one host. If the Jetson or its NVMe is lost, every backup is lost with
+it, and there is no off-site copy. The Jetson's own backup lives on its own disk. And with 3 days kept, anything
+noticed later than that can't be restored. This is the user's choice; an off-site copy is still on hold.
 
-| Host | `homelab-backup.timer` | Last run |
+## What runs
+
+| Host | `homelab-backup.timer` | Repository |
 |---|---|---|
-| dgx-1 | enabled, next 02:30 + jitter | 03:24 on 2026-11-15, snapshot saved |
-| dgx-2 | enabled; also `homelab-backup-prune.timer` (Sunday 05:00) | 03:24 on 2026-11-15 (result not checked) |
-| Jetson | enabled | never yet |
-| Pi | enabled | never yet |
-| Dell | not installed | — |
+| dgx-1, dgx-2, Jetson, Pi, Dell | enabled, 02:30 + up to 30 min | `rest:https://192.168.86.211:8000/<host>/` |
+| Jetson | also `homelab-backup-prune.timer`, daily 05:30 | prunes and checks every repository |
 
-And the rest-server (`backup-rest-server-1`) runs on dgx-2. So backups **are on** for four hosts, to dgx-2. This is a
-real conflict between the decision and the live state ([discrepancies](../decisions/discrepancies.md)). Nothing was
-changed while writing these docs.
+Details: [Backup server](../services/backup-server.md).
 
 ## What a backup run protects
 
 The paths in each host's `host_vars` ([Backup server](../services/backup-server.md)), plus database dumps and SQLite
-snapshots in `/var/backups/homelab`. All copies are on **dgx-2's disk** (one copy, same house). No off-site copy.
+snapshots in `/var/backups/homelab`. All copies are on **the Jetson's disk** (one copy, same house). No off-site copy.
 
 | Protected by the running backups | Not protected |
 |---|---|
@@ -35,34 +34,18 @@ snapshots in `/var/backups/homelab`. All copies are on **dgx-2's disk** (one cop
 | Jetson: Hermes state, HA config + DB snapshot, DefenseClaw, LiveKit config, roboclaw | model weights (re-downloadable) |
 | Pi: picoclaw, DefenseClaw, maps, workspace, units | the Dell |
 
-## Turning backups off (to match the decision)
+## Checking it
 
-Your call. One way (from dgx-1, nothing in the repo changes):
-
-```bash
-for h in dgx-1 dgx-2 jetson pi; do
-  ~/.venvs/ansible/bin/ansible $h -b -m systemd_service -a "name=homelab-backup.timer enabled=false state=stopped"
-done
-~/.venvs/ansible/bin/ansible dgx-2 -b -m systemd_service -a "name=homelab-backup-prune.timer enabled=false state=stopped"
-# and stop the server: sudo docker compose --project-directory /opt/homelab/backup down (on dgx-2)
-```
-
-Then record it in decision 0002 (or a new decision).
-
-## Turning backups on (properly)
-
-1. Replace decision 0002 with a new decision (target, retention, off-site or not).
-2. `ansible-playbook playbooks/backups.yml --check --diff`, then for real. Add the Dell if wanted.
-3. Do a restore test (`restic -r ... restore latest --target /tmp/restore-test` on a host, using `/etc/restic/env`).
-4. Add an alert: there is none today for a failed or missing backup (the journal has `SyslogIdentifier=homelab-backup`).
-5. Temporal, MLflow, Grafana and etcd snapshots are in since 2026-11-16 (dumps in `restic_backup_pre_commands`).
+- Last runs: `journalctl -t homelab-backup --since -1d` on a host; prune: `journalctl -t homelab-backup-prune` on the Jetson.
+- Space: `df -h /srv/homelab-backup` on the Jetson (alerts at 80 and 90 %).
+- There is no alert yet for a failed or missing nightly run (the journal has `SyslogIdentifier=homelab-backup`).
 
 ## Restoring a database dump or snapshot
 
 On the host, as root, with `/etc/restic/env` loaded (`set -a; . /etc/restic/env; set +a`):
 
 ```bash
-restic restore latest --host dgx-2 --include /var/backups/homelab/temporal-db.sql.gz --target /tmp/restore
+restic restore latest --include /var/backups/homelab/temporal-db.sql.gz --target /tmp/restore
 # Postgres: into a scratch database first, e.g.
 gunzip -c /tmp/restore/var/backups/homelab/temporal-db.sql.gz | docker exec -i jobs-postgresql-1 psql -U temporal -d scratch
 # SQLite snapshots: /var/backups/homelab/sqlite/<name>.sqlite3, copy over the stopped service's file
@@ -71,6 +54,6 @@ gunzip -c /tmp/restore/var/backups/homelab/temporal-db.sql.gz | docker exec -i j
 ## Other copies that exist
 
 - The age key: password manager + paper.
-- k3s etcd snapshots: local on each server, twice a day, 5 kept.
+- k3s etcd snapshots: local on each server, twice a day, 5 kept (dgx-1's and dgx-2's are also in the backups).
 - The Pi's pre-migration backup: `~/backups/nikraspberry-2026-11-14/pi-full.tar.zst` on dgx-1 (P0.1).
 - Git: everything in the repo.

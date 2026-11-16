@@ -53,6 +53,10 @@ all:
     observe:
       hosts:
         dgx-2:
+    # restic rest-server and the server-side prune (playbooks/backups.yml; user decision 2026-11-16, decision 0002)
+    backup_server:
+      hosts:
+        jetson:
     edge:
       hosts:
         pi:

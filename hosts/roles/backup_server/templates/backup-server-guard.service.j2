@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (role backup_server). Stop (or disable) to remove the rule.
+[Unit]
+Description=Only fleet hosts may reach the restic rest-server on :{{ backup_server_port }}
+After=network-pre.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft -f {{ backup_server_guard_file }}
+ExecStop=/usr/sbin/nft delete table inet backup_server_guard
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

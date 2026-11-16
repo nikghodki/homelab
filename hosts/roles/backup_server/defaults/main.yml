@@ -1,0 +1,19 @@
+# The backup server's storage and firewall (playbooks/backups.yml, docs-site services/backup-server.md).
+# A dedicated 500 GB ext4 filesystem in an image file on the Jetson's NVMe: the hard cap on all repositories (user
+# decision 2026-11-16, decision 0002). FleetDiskWarning/FleetDiskCritical alert at 80/90 % of it.
+backup_server_image: /var/lib/homelab-backup.img
+backup_server_size: 500G
+backup_server_mount: /srv/homelab-backup
+# rest-server listens on the host network; only these sources may reach the port (the fleet's LAN addresses and VIPs).
+backup_server_port: 8000
+backup_server_allowed_sources:
+  - 127.0.0.0/8
+  - 192.168.86.44   # dgx-1
+  - 192.168.86.36   # dgx-2
+  - 192.168.86.211  # the Jetson itself
+  - 192.168.86.49   # the Dell
+  - 192.168.86.39   # the Pi
+  - 192.168.86.10   # VIPs on the Sparks (a Spark may use one as source address)
+  - 192.168.86.11
+  - 192.168.86.12
+backup_server_guard_file: /etc/homelab/backup-server-guard.nft

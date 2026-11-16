@@ -1,0 +1,4 @@
+# Server-side retention (user decision 2026-11-16, decision 0002): 3 days, daily.
+restic_prune_root: /srv/homelab-backup/repos
+restic_prune_keep_within: 3d
+restic_prune_time: "*-*-* 05:30:00"

@@ -1,0 +1,12 @@
+#!/usr/sbin/nft -f
+# Managed by homelab Ansible (role backup_server). Only fleet hosts reach rest-server's port.
+# Its own table: nothing else (k3s, Docker, iptables-nft) touches it. Recreated on every load.
+table inet backup_server_guard
+delete table inet backup_server_guard
+table inet backup_server_guard {
+	chain input {
+		type filter hook input priority filter - 10; policy accept;
+		tcp dport {{ backup_server_port }} ip saddr != { {{ backup_server_allowed_sources | join(', ') }} } counter drop comment "backup port: fleet hosts only"
+		tcp dport {{ backup_server_port }} ip6 saddr != ::1 counter drop comment "backup port: no IPv6 except loopback"
+	}
+}

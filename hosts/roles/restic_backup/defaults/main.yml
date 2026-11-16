@@ -1,4 +1,5 @@
-restic_backup_server: backup.nghodki.ai:8000
+# The Jetson's rest-server by LAN address, so backups don't depend on the front door's DNS (backup.crt names it).
+restic_backup_server: 192.168.86.211:8000
 restic_backup_paths: []
 restic_backup_excludes: []
 restic_backup_sqlite: []          # [{name, path}] snapshotted with SQLite's backup API before each run
