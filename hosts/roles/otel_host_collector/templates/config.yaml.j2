@@ -68,6 +68,12 @@ processors:
     attributes:
       - {key: service.name, value: "{{ p.service }}", action: upsert}
 {% endfor %}
+  # Only the journald fields in otel_host_collector_journald_keep (roles/otel_host_collector/defaults/main.yml).
+  transform/journald:
+    error_mode: ignore
+    log_statements:
+      - statements:
+          - keep_keys(log.body, {{ otel_host_collector_journald_keep | to_json }}) where IsMap(log.body)
   batch: {timeout: 10s}
 exporters:
   otlp:
@@ -93,7 +99,7 @@ service:
       exporters: [otlp]
     logs:
       receivers: [journald]
-      processors: [memory_limiter, resourcedetection, resource, batch]
+      processors: [memory_limiter, transform/journald, resourcedetection, resource, batch]
       exporters: [otlp]
 {% for p in otel_host_collector_pod_logs %}
     logs/{{ p.service }}:

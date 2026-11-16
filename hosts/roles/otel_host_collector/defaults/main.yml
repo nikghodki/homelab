@@ -18,3 +18,8 @@ otel_host_collector_credentials: {}
 # /var/log/pods/<namespace>_<pod_prefix>-*/<container>/*.log. Only for hosts that run those pods (k3s nodes).
 # Gives the otelcol user read access to /var/log/pods with POSIX ACLs (inherited by new pod folders and files).
 otel_host_collector_pod_logs: []
+# journald fields shipped to Loki; the rest of each record (_CMDLINE, _EXE, __CURSOR, _BOOT_ID, _CAP_EFFECTIVE, ...: about
+# 1.1 KB a line, command lines can hold secrets) is dropped at the host. The body stays a JSON map, so LogQL's
+# `| json ident="SYSLOG_IDENTIFIER", msg="MESSAGE"` (dashboards, runbooks, the ops agent) works as before. The host is
+# the host_name/fleet_host labels. Infra review 2026-11 §3.2.
+otel_host_collector_journald_keep: [MESSAGE, PRIORITY, SYSLOG_IDENTIFIER, _SYSTEMD_UNIT, _SYSTEMD_USER_UNIT, _PID, _COMM]
