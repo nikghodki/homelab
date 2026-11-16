@@ -105,11 +105,11 @@ The docs site's Status page (`docs-site/content/docs/decisions/status.md`) mirro
 |---|---|---|
 | P3.1 | ✅ | D2 confirmed, then refined: Jetson = etcd member + tainted worker (#40) |
 | P3.2 | ✅ | k3s over Wi-Fi (#54, decision 0005): servers on both Sparks, Jetson etcd + tainted worker, Omarchy agent |
-| P3.3 | ✅ | Front door in k3s: kube-vip (VIPs .10 API, .11 edge), CoreDNS, Caddy (#72, decision 0007); cut over 2026-11-15 (#78, #79); old door stopped (#92). Failover drill: platform session |
+| P3.3 | ✅ | Front door in k3s: kube-vip (VIPs .10 API, .11 edge), CoreDNS, Caddy (#72, decision 0007); cut over 2026-11-15 (#78, #79); old door stopped (#92). Failover drill done 2026-11-16 (#123): both Sparks, fixes #116, #117, #119; old door can go 2026-11-22 |
 | P3.4 | ✅ | Argo CD + KSOPS; merge-to-deploy 178 s (#57–#59) |
 | P3.5 | ✅ | Kyverno Enforce, 6 policies, 2 admission replicas (#65, #68); `build-sign.yml` with cosign keyless (#62–#64). The signed-image acceptance case waits until the GHCR packages are public (you) |
 | P3.6 | ⬜ | Tetragon |
-| P3.7 | 🔄 | Workloads into k3s: platform session |
+| P3.7 | 🔄 | Open WebUI in k3s 2026-11-16 (#124, #127, #128; Docker copy removed after 2026-11-23). LiteLLM, NATS, CNPG wait on you (plans in the platform report); Gatus/ntfy stay on the Dell (0009); observability: its session |
 | P3.8 | ⬜ | etcd/CNPG backups to SeaweedFS (after P3.7) |
 | P3.9 | ⬜ | Incident runbooks (interim notes in the docs site's Incident playbooks) |
 
