@@ -1,0 +1,95 @@
+# Who may talk to what in namespace ops (design §9.2 "no exfiltration path"). k3s enforces NetworkPolicies
+# (kube-router); kubelet probes come from the node and are allowed by it.
+# Ingress: nothing by default.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# The MCP servers: only the agent's own pods (worker, ingest) and the replay harness on the Sparks' hosts (host
+# traffic arrives from a Docker bridge, the node's flannel address or the direct cable; runbooks/ops-agent.md).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-servers-from-agent
+spec:
+  podSelector:
+    matchLabels: {ops.nghodki.ai/role: mcp}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {ops.nghodki.ai/role: agent}
+        - ipBlock: {cidr: 10.42.0.0/16}
+        - ipBlock: {cidr: 10.100.136.0/24}
+---
+# The database: the agent's pods, CNPG's own instances and operator, and the replay harness on the Sparks' hosts.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ops-db
+spec:
+  podSelector:
+    matchLabels: {cnpg.io/cluster: ops-db}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {ops.nghodki.ai/role: agent}
+        - podSelector:
+            matchLabels: {cnpg.io/cluster: ops-db}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: cnpg-system}
+        - ipBlock: {cidr: 10.42.0.0/16}
+        - ipBlock: {cidr: 10.100.136.0/24}
+      ports:
+        - {port: 5432, protocol: TCP}
+        - {port: 8000, protocol: TCP}
+---
+# Egress of the MCP servers: each to its one backend (and the cluster DNS).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-grafana-egress
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: mcp-grafana}
+  policyTypes: [Egress]
+  egress:
+    - to: [{ipBlock: {cidr: 192.168.86.36/32}}]
+      ports: [{port: 3000, protocol: TCP}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-argocd-egress
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: mcp-argocd}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: argocd}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: argocd-server}
+      ports: [{port: 8080, protocol: TCP}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mcp-kubernetes-egress
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: mcp-kubernetes}
+  policyTypes: [Egress]
+  egress:
+    # the k3s API on the three servers (the kubernetes Service's endpoints)
+    - to:
+        - ipBlock: {cidr: 192.168.86.44/32}
+        - ipBlock: {cidr: 192.168.86.36/32}
+        - ipBlock: {cidr: 192.168.86.211/32}
+      ports: [{port: 6443, protocol: TCP}]

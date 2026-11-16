@@ -1,0 +1,22 @@
+# The ops agent (decision 0013, runbooks/ops-agent.md): namespace ops, its database, the read-only MCP servers and
+# (later) the agent itself.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ops
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: apps
+  source:
+    repoURL: git@github.com:nikghodki/homelab.git
+    targetRevision: main
+    path: cluster/apps/ops
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ops
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    retry:
+      limit: 5
+      backoff: {duration: 30s, factor: 2, maxDuration: 5m}

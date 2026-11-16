@@ -1,0 +1,199 @@
+# The read-only MCP servers the agent investigates with (design §5.1), pinned by digest, one replica each.
+# Only the agent's own pods may call them (networkpolicies.yaml); each holds one read-only credential.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mcp-grafana
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-grafana
+  labels: {app.kubernetes.io/name: mcp-grafana, app.kubernetes.io/part-of: ops-agent}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: mcp-grafana}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mcp-grafana, app.kubernetes.io/part-of: ops-agent, ops.nghodki.ai/role: mcp}
+    spec:
+      serviceAccountName: mcp-grafana
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mcp-grafana
+          # mcp-grafana 2.3.0 (Apache-2.0): metrics (VictoriaMetrics), logs (Loki), traces (Tempo) as a Grafana Viewer.
+          image: docker.io/grafana/mcp-grafana:2.3.0@sha256:c27248b5919d09d64ea273ca1b128b32902c6796f6e2dfcd11849d4f1363f9ed
+          args:
+            - -t
+            - streamable-http
+            - --address
+            - 0.0.0.0:8000
+            - --disable-write
+            - --allowed-hosts
+            - mcp-grafana.ops.svc:8000,mcp-grafana.ops.svc.cluster.local:8000,mcp-grafana:8000
+            - --prometheus-guardrail-max-range
+            - 168h
+            - --loki-guardrail-max-range
+            - 168h
+            - --max-loki-log-limit
+            - "200"
+          env:
+            - {name: GRAFANA_URL, value: "http://192.168.86.36:3000"}
+            - {name: GRAFANA_ORG_ID, value: "1"}
+            - name: GRAFANA_SERVICE_ACCOUNT_TOKEN
+              valueFrom: {secretKeyRef: {name: ops-agent, key: grafana-token}}
+            - name: MCP_SERVER_AUTH_TOKEN
+              valueFrom: {secretKeyRef: {name: ops-agent, key: mcp-grafana-auth}}
+          ports:
+            - {name: mcp, containerPort: 8000}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            tcpSocket: {port: mcp}
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-grafana
+spec:
+  selector: {app.kubernetes.io/name: mcp-grafana}
+  ports:
+    - {name: mcp, port: 8000, targetPort: mcp, protocol: TCP}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-kubernetes
+  labels: {app.kubernetes.io/name: mcp-kubernetes, app.kubernetes.io/part-of: ops-agent}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: mcp-kubernetes}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mcp-kubernetes, app.kubernetes.io/part-of: ops-agent, ops.nghodki.ai/role: mcp}
+    spec:
+      serviceAccountName: ops-agent-read
+      nodeSelector: {nghodki.ai/role: gpu}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mcp-kubernetes
+          # kubernetes-mcp-server v0.1.3 (Apache-2.0), read-only.
+          image: quay.io/containers/kubernetes_mcp_server:v0.1.3@sha256:6347155616c49c78512114500688b50d275ddde7597b6a38cefe6f40a8c42c16
+          args: ["--config", "/etc/kubernetes-mcp/config.toml"]
+          ports:
+            - {name: mcp, containerPort: 8080}
+          resources:
+            requests: {cpu: 10m, memory: 48Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            tcpSocket: {port: mcp}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: config, mountPath: /etc/kubernetes-mcp, readOnly: true}
+      volumes:
+        - name: config
+          configMap:
+            name: mcp-kubernetes
+            items: [{key: mcp-kubernetes.toml, path: config.toml}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-kubernetes
+spec:
+  selector: {app.kubernetes.io/name: mcp-kubernetes}
+  ports:
+    - {name: mcp, port: 8080, targetPort: mcp, protocol: TCP}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mcp-argocd
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-argocd
+  labels: {app.kubernetes.io/name: mcp-argocd, app.kubernetes.io/part-of: ops-agent}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: mcp-argocd}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mcp-argocd, app.kubernetes.io/part-of: ops-agent, ops.nghodki.ai/role: mcp}
+    spec:
+      serviceAccountName: mcp-argocd
+      automountServiceAccountToken: false
+      nodeSelector: {nghodki.ai/role: gpu}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mcp-argocd
+          # mcp-for-argocd 0.9.0 (Apache-2.0), read-only, Argo CD account ops-agent (role:readonly, runbooks/argocd.md).
+          image: ghcr.io/argoproj-labs/mcp-for-argocd:v0.9.0@sha256:dffc6c719d8635be2d5f2c8ad1c0178540325da4b40da0b373307e12b4c48f86
+          args: ["http", "--port", "3000", "--bind-address", "0.0.0.0", "--allowed-host-header", "mcp-argocd.ops.svc", "--allowed-host-header", "mcp-argocd"]
+          env:
+            - {name: ARGOCD_BASE_URL, value: "http://10.43.0.100"}
+            - {name: MCP_READ_ONLY, value: "true"}
+            - name: ARGOCD_API_TOKEN
+              valueFrom: {secretKeyRef: {name: ops-agent, key: argocd-token}}
+            - name: MCP_AUTH_TOKEN
+              valueFrom: {secretKeyRef: {name: ops-agent, key: mcp-argocd-auth}}
+            - {name: NODE_OPTIONS, value: "--max-old-space-size=96"}
+          ports:
+            - {name: mcp, containerPort: 3000}
+          resources:
+            requests: {cpu: 10m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 192Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            tcpSocket: {port: mcp}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 16Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-argocd
+spec:
+  selector: {app.kubernetes.io/name: mcp-argocd}
+  ports:
+    - {name: mcp, port: 3000, targetPort: mcp, protocol: TCP}

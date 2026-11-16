@@ -1,0 +1,7 @@
+# The ops agent (decision 0013, docs/ambient-agent-design.md, runbooks/ops-agent.md). Shadow mode: read-only.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ops
+  labels:
+    app.kubernetes.io/part-of: ops-agent

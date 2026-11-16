@@ -1,0 +1,48 @@
+# The agent's database: CNPG cluster ops-db (Postgres 17, 2 instances, one per Spark). Events, incidents, evidence,
+# RCAs, postmortems (decision 0013 Q11), notifications, the audit chain, the docs index. Backups are off (decision
+# 0002): losing both Sparks' disks loses the incident history; the docs and the replay gold set are in Git.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ops-db
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.12-standard-trixie@sha256:b6d31545fc2c500cc56af2cff91bbc37408deff6815b84446da0a2c9a54b3d1c
+  primaryUpdateStrategy: unsupervised
+  storage:
+    storageClass: local-path
+    size: 5Gi
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+  postgresql:
+    parameters:
+      shared_buffers: 128MB
+      max_connections: "60"
+      work_mem: 8MB
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {cpu: "1", memory: 768Mi}
+  affinity:
+    nodeSelector: {nghodki.ai/role: gpu}
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+  monitoring:
+    enablePodMonitor: false
+---
+# A fixed ClusterIP (static band, cluster/README.md) for the replay harness on dgx-1 (runbooks/ops-agent.md,
+# "Replay"): host processes on the Sparks reach it through kube-proxy. The password is still required.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ops-db-host
+spec:
+  type: ClusterIP
+  clusterIP: 10.43.0.143
+  selector:
+    cnpg.io/cluster: ops-db
+    cnpg.io/instanceRole: primary
+  ports:
+    - {name: postgres, port: 5432, targetPort: 5432, protocol: TCP}
