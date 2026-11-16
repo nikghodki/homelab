@@ -10,8 +10,8 @@
 # name             target
 jetson             192.168.86.211
 dgx                192.168.86.44
-raspberrypi        192.168.86.34
-pi                 192.168.86.34
+raspberrypi        192.168.86.39
+pi                 192.168.86.39
 esp32              192.168.86.50
 
 model              edge
