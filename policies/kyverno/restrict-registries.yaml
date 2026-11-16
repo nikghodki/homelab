@@ -18,8 +18,8 @@ spec:
       - apiGroups: [""]
         apiVersions: [v1]
         operations: [CREATE, UPDATE]
-        # pods/ephemeralcontainers: `kubectl debug` adds containers through this subresource (code review #10)
-        resources: [pods, pods/ephemeralcontainers]
+        # Ephemeral containers (`kubectl debug`, the pods/ephemeralcontainers subresource): restrict-ephemeral-containers.yaml
+        resources: [pods]
   variables:
     - name: allowed
       expression: >-
