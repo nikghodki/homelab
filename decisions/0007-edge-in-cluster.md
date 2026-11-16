@@ -99,7 +99,9 @@ API VIP: `https://192.168.86.10:6443/readyz` answered 401 from the Air; kubectl 
 k8s.nghodki.ai`) works; by bare IP it fails TLS (the VIP isn't in the serving cert's SANs; adding it to `k3s_tls_san`
 needs a rolling k3s restart, not done).
 
-**Not tested yet:** a real Spark loss (its Caddy/CoreDNS endpoints stay in the Services until the node is NotReady,
+**Tested since** (failover drill, 2026-11-16, runbooks/edge.md "Failover drill"): a Spark loss on each Spark, LAN and
+tailnet; it found three bugs (kube-dns on one Spark, the Jetson as etcd leader, 50 s node grace), fixed in #116,
+#117 and #119. **Not tested at the time:** a real Spark loss (its Caddy/CoreDNS endpoints stay in the Services until the node is NotReady,
 ~40 s, so some connections through the *surviving* Spark still pick the dead pods until then), and Tailscale's
 behaviour with two split-DNS nameservers when one is dead (needs the admin-console change; cutover step).
 

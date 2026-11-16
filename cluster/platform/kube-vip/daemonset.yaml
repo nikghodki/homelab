@@ -48,7 +48,9 @@ spec:
             - {name: svc_leasename, value: plndr-svcs-lock}
             - {name: vip_leaderelection, value: "true"}
             - {name: vip_leasename, value: plndr-cp-lock}
-            # Lease timing: a dead leader is replaced within ~10 s; renewals go to the local API server over the cable.
+            # Lease timing: a dead leader is replaced within ~10 s (12-16 s seen by clients, runbooks/edge.md "Failover drill").
+            # Renewals go through the kubernetes Service (10.43.0.1, either API server), so one API server restarting
+            # doesn't drop the VIP.
             - {name: vip_leaseduration, value: "10"}
             - {name: vip_renewdeadline, value: "7"}
             - {name: vip_retryperiod, value: "2"}
