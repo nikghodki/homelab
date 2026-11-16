@@ -204,7 +204,7 @@ first) caused no probe failures.
 
 What a user notices when a Spark dies: for ~20–40 s about one request in five hangs for 5 s, then everything on the
 surviving Spark works. ntfy only fires for checks that fail 3 minutes in a row: the dead Spark's own services
-(`k3s/API <spark>`, and for dgx-2 Argo CD, Pocket ID, Grafana, MLflow; for dgx-1 LiteLLM, Open WebUI, DGXMM).
+(`k3s/API <spark>`, and for dgx-2 Pocket ID, Grafana, MLflow; for dgx-1 LiteLLM, Open WebUI, DGXMM).
 
 Known, not fixed:
 - **Tailscale advertises the VIPs as dgx-1's/dgx-2's endpoints** (the Pi reached dgx-1's Tailscale over
@@ -212,7 +212,9 @@ Known, not fixed:
   another path, so expect a few slow seconds on the tailnet right after a VIP move.
 - **The Sparks' Wi-Fi is the weak link**: dgx-2 at -71 dBm on 6 GHz had two episodes of 100–800 ms RTT to the router
   during the drill. Wired Ethernet (P0.11) fixes it; until then move the VIPs to the better Spark (step 6).
-- Argo CD's server is one replica (decision 0006): `argocd.nghodki.ai` is down while its Spark is.
+- ~~Argo CD's server is one replica~~ Fixed 2026-11-16: server and repo-server run one replica per Spark
+  (runbooks/argocd.md "High availability"); `argocd.nghodki.ai` stays up with either Spark down. The application
+  controller and redis are still single.
 
 ### The old door's rollback copy
 

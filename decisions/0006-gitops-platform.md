@@ -1,7 +1,7 @@
 # 0006: GitOps platform: Argo CD (Helm, self-managed), KSOPS, Kyverno in Audit, CNPG operator, single replicas
 
 - Date: 2026-11-15
-- Status: decided (nikghodki); the Kyverno parts (Audit, one replica, failurePolicy Ignore) replaced by [0008](0008-image-signing.md)
+- Status: decided (nikghodki); the Kyverno parts (Audit, one replica, failurePolicy Ignore) replaced by [0008](0008-image-signing.md); Argo CD server and repo-server 2 replicas since 2026-11-16 (Consequences)
 
 ## Context
 
@@ -82,5 +82,9 @@ objects); it was OOM-killed once at 512 Mi during the first sync, so it has 768 
 - Two things in the cluster are not from Git: `argocd/sops-age` and `argocd/repo-homelab` (runbooks/argocd.md).
 - The OIDC client secret exists twice (`secrets/console.enc.yaml` and `cluster/platform/argocd/extras/oidc.enc.yaml`);
   rotate both together.
+- **2026-11-16: Argo CD server and repo-server went to 2 replicas**, one per Spark (required anti-affinity,
+  PDB minAvailable 1, one-at-a-time rollouts), because `argocd.nghodki.ai` went down with dgx-2 in the P3.3 Spark
+  drill (runbooks/edge.md). The host Services got ClientIP affinity so scrapes stay on one replica. Controller and
+  redis stay single (runbooks/argocd.md "High availability").
 - Next: P3.3 (kube-vip, DNS and Caddy in the cluster; the fixed-ClusterIP Caddy path goes away), P3.5 Enforce
   (build-sign.yml, signed-image policy, 2 Kyverno replicas, failurePolicy Fail), P3.7 (workloads into `cluster/apps`).

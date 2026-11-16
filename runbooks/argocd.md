@@ -8,7 +8,7 @@ read-only deploy key, and decrypts SOPS files with KSOPS. Nothing pushes into th
 |---|---|
 | Version | Argo CD **v3.6.1**, Helm chart `argo-cd` **10.18.0** (`cluster/bootstrap/apps/argocd.yaml`), KSOPS **v4.5.1** (digest-pinned init container) |
 | Values | `cluster/platform/argocd/values.yaml`; extras (OIDC secret, host Services, NetworkPolicies) in `cluster/platform/argocd/extras/` |
-| Runs | namespace `argocd`, Sparks only (`nghodki.ai/role=gpu`), one replica each: application controller, repo-server, server, redis. No Dex, notifications, ApplicationSet controller (0 replicas) or commit server |
+| Runs | namespace `argocd`, Sparks only (`nghodki.ai/role=gpu`), **server and repo-server 2 replicas, one per Spark** (required anti-affinity, PDB minAvailable 1); application controller and redis one replica. No Dex, notifications, ApplicationSet controller (0 replicas) or commit server |
 | UI | `https://argocd.nghodki.ai`: edge-caddy on dgx-1 → fixed ClusterIP `10.43.0.100:80` (server in insecure mode; TLS ends at Caddy) |
 | Sign-in | Pocket ID, client `argocd` (PKCE S256, `identity/pocket-id.yaml`); group `admins` → `role:admin`, everyone else nothing. Built-in `admin` is **off** |
 | CLI | on dgx-1: `argocd --core --kube-context argocd app list` (talks to the Kubernetes API with the admin kubeconfig; no Argo CD login) |
@@ -183,6 +183,31 @@ Bump `targetRevision` (chart version) in `cluster/bootstrap/apps/argocd.yaml` af
 CD's upgrade notes; Argo CD upgrades itself on merge. Same for `kyverno.yaml` and `cnpg-operator.yaml`. Check the
 values against the new chart with `helm template` first.
 
+## High availability (2026-11-16)
+
+What survives one Spark being down, and what doesn't:
+
+| Component | Replicas | One Spark down |
+|---|---|---|
+| server (UI, API, OIDC) | 2, one per Spark | `argocd.nghodki.ai` keeps answering from the other replica; Gatus' `argocd.nghodki.ai` check stays green |
+| repo-server (Git, Helm, KSOPS) | 2, one per Spark | manifests still render, so the controller keeps syncing if it is on the surviving Spark |
+| application controller | 1 (StatefulSet) | if it was on the dead Spark nothing syncs until Kubernetes reschedules it (~5 min, node-unreachable toleration) |
+| redis (cache) | 1 | if it was on the dead Spark the UI loads apps (from the API) but resource trees and live diffs are empty or slow until it is rescheduled; sign-in is unaffected |
+
+- **Anti-affinity is required** (`kubernetes.io/hostname`), so the two replicas can't share a Spark. With one Spark
+  down, the second replica stays `Pending` until it is back. That's intended.
+- **Rollouts replace one pod at a time** (`maxSurge: 0`, `maxUnavailable: 1`): with two Sparks and required
+  anti-affinity a surge pod could never schedule and the rollout would hang.
+- **PDBs** `argocd-server` and `argocd-repo-server` (minAvailable 1): a drain (`kubectl drain`) evicts one replica
+  and keeps the other. With one replica already gone (a Spark down) a drain of the other Spark waits.
+- **Sessions** are JWTs signed with `server.secretkey` from `argocd-secret`, so any replica accepts a token the other
+  issued; the OIDC state lives in a cookie. The revoked-token list and login-attempt counters are in redis, shared.
+- **The host Services use ClientIP affinity** (`argocd-server-host` 10.43.0.100, `argocd-repo-server-host`
+  10.43.0.102): each client (each edge-caddy pod, VictoriaMetrics) sticks to one replica, so a scrape always sees the
+  same pod and counters don't flip between two processes. Metrics therefore cover the replica the scrape landed on
+  (like Kyverno's admission replicas); when it goes, the scrape moves to the other one.
+- Controller HA (sharding) and redis HA (redis-ha: 3 redis + sentinels + HAProxy) are not worth the memory here.
+
 ## Resources (measured 2026-11-15, cgroup `memory.current`; anon = process memory without page cache)
 
 | Pod | Node | Request / limit | anon | incl. cache | peak |
@@ -193,7 +218,8 @@ values against the new chart with `helm template` first.
 | redis | dgx-1 | 16Mi / 96Mi | 12 MiB | 13 MiB | 15 MiB |
 | **Argo CD total** | | 592Mi / 1632Mi | **491 MiB** | **808 MiB** | |
 
-Nodes are where the scheduler put them at the time; any Spark is fine.
+Nodes are where the scheduler put them at the time; any Spark is fine. Since 2026-11-16 server and repo-server have a
+second replica on the other Spark ("High availability").
 
 The application controller caches every object in the cluster; it was OOM-killed once at 512 Mi during the first
 sync, hence 768 Mi and `GOMEMLIMIT=600MiB`. The repo-server's extra memory is page cache (Git and Helm charts),
