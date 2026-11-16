@@ -27,7 +27,7 @@ Many configs use LAN IPs, not names, on purpose:
 - Ansible inventory (`hosts/inventory.yml`).
 - Front door upstreams (`reverse_proxy 192.168.86.36:3000`).
 - Gatus checks (they must work when dgx-1's DNS is down).
-- `extra_hosts: id.nghodki.ai:192.168.86.44` in every container that talks to Pocket ID.
+- `extra_hosts: id.nghodki.ai:192.168.86.11` (the front door VIP) in every container that talks to Pocket ID.
 - Alertmanager → ntfy (`http://192.168.86.49:8085`).
 
 So a changed reservation means a repo-wide search for the old address, plus `~/edge-gateway` on dgx-1.

@@ -21,7 +21,7 @@ services:
       - ./pocket-id:/run/pocket-id:ro
       - pocket-id-data:/app/data
     ports:
-      - "192.168.86.36:1411:1411"   # LAN only: dgx-1's Caddy is the only client
+      - "192.168.86.36:1411:1411"   # LAN only: the front door (k3s Caddy) is the only client
 
 volumes:
   pocket-id-data:

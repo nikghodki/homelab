@@ -42,8 +42,8 @@ Names that do **not** exist: `hermes.nghodki.ai` (the URL in `agents/hermes/card
   Tailscale IP, kube-proxy DNATs :53 to edge-dns ahead of dnsmasq.
 - LAN devices: only if they use the VIP (or 192.168.86.44) as their resolver for this zone (unverified per device).
   Don't point the router's DNS at the VIP: edge-dns forwards to the router (a loop; `loop` stops CoreDNS).
-- Containers that must reach Pocket ID don't depend on DNS: they have `extra_hosts: id.nghodki.ai:192.168.86.44`
-  (edge-caddy on dgx-1, which still serves every route on dgx-1's LAN IP).
+- Containers that must reach Pocket ID don't depend on DNS: they have `extra_hosts: id.nghodki.ai:192.168.86.11`
+  (the front door's LAN VIP; edge-caddy on dgx-1's LAN IP is stopped).
 - k3s pods: through k3s's CoreDNS (below).
 
 ## CoreDNS forward in k3s

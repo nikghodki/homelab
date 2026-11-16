@@ -117,9 +117,9 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door and trust the
+    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door's LAN VIP and trust the
     # homelab web CA from the host's bundle (role homelab_ca).
-    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+    extra_hosts: ["id.nghodki.ai:192.168.86.11"]
     ports:
       - "3000:3000"
     depends_on: [victoriametrics, loki, tempo, alertmanager]
@@ -150,9 +150,9 @@ services:
     volumes:
       - phoenix-data:/data
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door and trust the
+    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door's LAN VIP and trust the
     # homelab web CA from the host's bundle (role homelab_ca).
-    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+    extra_hosts: ["id.nghodki.ai:192.168.86.11"]
     ports:
       - "6006:6006"
 
