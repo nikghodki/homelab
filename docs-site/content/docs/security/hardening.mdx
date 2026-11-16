@@ -21,6 +21,9 @@ Two Ansible roles harden every host, and a weekly Lynis audit measures the resul
 Docker, containerd, k3s or model serving); apply security updates there with the hardening role's opt-in tag (below).
 Omarchy (Arch) gets no unattended upgrades; update it in the monthly window.
 
+`site.yml` runs `base`, `hardening`, `tailscale` (installed, running, login state reported) and `fleet_metrics`, then
+imports `always-on.yml`.
+
 ## Hardening role (`hosts/roles/hardening`, `playbooks/hardening.yml`, also in `site.yml` after `base`)
 
 Low-risk changes from the Lynis suggestions; everything is a drop-in file, so it rolls back by deleting files.
