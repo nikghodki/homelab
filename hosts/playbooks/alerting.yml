@@ -1,0 +1,39 @@
+# Alerting path on the Dell: Gatus + ntfy, ntfy on Tailscale HTTPS (runbooks/alerting.md). Always --check --diff first.
+- name: Alerting
+  hosts: alerting
+  become: true
+  pre_tasks:
+    - name: Load alerting secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/observe.enc.yaml"
+        name: observe_secrets
+      no_log: true
+    - name: Load sign-in client secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
+        name: console_secrets
+      no_log: true
+    # Arch enables only docker.socket, which wouldn't start the stack's containers after a boot.
+    - name: Docker starts at boot
+      ansible.builtin.systemd_service:
+        name: docker
+        enabled: true
+        state: started
+  vars:
+    # Used by the stack's templates (ntfy, gatus, status-proxy)
+    ntfy_alerts_password_hash: "{{ observe_secrets.ntfy_alerts_password_hash }}"
+    ntfy_alerts_token: "{{ observe_secrets.ntfy_alerts_token }}"
+    ntfy_phone_password_hash: "{{ observe_secrets.ntfy_phone_password_hash }}"
+    gatus_heartbeat_token: "{{ observe_secrets.gatus_heartbeat_token }}"
+    oidc_gatus_secret: "{{ console_secrets.oidc_gatus_secret }}"
+    oauth2_proxy_status_cookie_secret: "{{ console_secrets.oauth2_proxy_status_cookie_secret }}"
+  roles:
+    - role: compose_stack
+      vars:
+        compose_stack_name: alerting
+        compose_stack_src: "{{ playbook_dir }}/../stacks/alerting"
+        compose_stack_private_templates:
+          status-proxy: 65532   # oauth2-proxy, distroless nonroot
+    - role: tailscale_serve
+      vars:
+        tailscale_serve_target: http://127.0.0.1:8085

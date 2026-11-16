@@ -1,0 +1,6 @@
+# Hosts that must never sleep (role always_on; the Dell runs the alerting path). Always --check --diff first.
+- name: Never sleep
+  hosts: always_on
+  become: true
+  roles:
+    - role: always_on

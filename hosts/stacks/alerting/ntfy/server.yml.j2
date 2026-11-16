@@ -1,0 +1,21 @@
+# ntfy for fleet alerts (backup channel to WhatsApp), on the Dell (runbooks/alerting.md). Nobody can read or post
+# without an account. Users, access and tokens are declared here (from SOPS); ntfy rebuilds user.db from them.
+# base-url is the address the phone subscribes to (Tailscale HTTPS, works without either Spark). It must match the
+# phone's server URL exactly: the iOS app gets instant delivery through upstream-base-url, which forwards only a
+# poll request (a hash of base-url + topic, no message text) to ntfy.sh; the app then fetches the message from here.
+base-url: https://nikghodki-omarchy-1.tail1cb707.ts.net
+upstream-base-url: https://ntfy.sh
+behind-proxy: true
+cache-file: /var/lib/ntfy/cache.db
+auth-file: /var/lib/ntfy/user.db
+auth-default-access: deny-all
+enable-signup: false
+enable-login: true
+auth-users:
+  - "alerts:{{ ntfy_alerts_password_hash }}:user"
+  - "nikhil:{{ ntfy_phone_password_hash }}:user"
+auth-access:
+  - "alerts:fleet-alerts:rw"
+  - "nikhil:fleet-alerts:ro"
+auth-tokens:
+  - "alerts:{{ ntfy_alerts_token }}:gatus"

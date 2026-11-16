@@ -1,5 +1,6 @@
 # Observability stack on dgx-2 (plan P1.6). Deployed by Ansible (playbooks/observe.yml) to /opt/homelab/observe.
 # Images are pinned by digest; Renovate keeps them current. Secrets come from .env (rendered from SOPS by Ansible).
+# Gatus and ntfy run on the Dell (stacks/alerting, runbooks/alerting.md) so alerts still arrive when dgx-2 is down.
 name: observe
 
 x-restart: &restart
@@ -41,7 +42,6 @@ services:
     volumes:
       - am-data:/alertmanager
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-    depends_on: [ntfy]
 
   loki:
     <<: *restart
@@ -124,30 +124,6 @@ services:
       - "3000:3000"
     depends_on: [victoriametrics, loki, tempo, alertmanager]
 
-  gatus:
-    <<: *restart
-    image: twinproduction/gatus:v5.38.0@sha256:085ed63da963728965d00a3c78aa6167e3bf135218485b893201758e079e8415
-    volumes:
-      - ./gatus/config.yaml:/config/config.yaml:ro
-      - gatus-data:/data
-      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
-    # Sign-in through Pocket ID (P1.13): reach id.nghodki.ai at the front door and trust the
-    # homelab web CA from the host's bundle (role homelab_ca).
-    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
-    ports:
-      - "8081:8080"
-    depends_on: [ntfy]
-
-  ntfy:
-    <<: *restart
-    image: binwiederhier/ntfy:v2.38.0@sha256:771309aecfce18d8fe2bfb8069994ddd6be6ca6ccdd7badace3d791a0045ff0d
-    command: ["serve"]
-    volumes:
-      - ./ntfy/server.yml:/etc/ntfy/server.yml:ro
-      - ntfy-data:/var/lib/ntfy
-    ports:
-      - "8085:80"
-
   # LLM and agent traces (plan P2.6). OTLP over HTTP at :6006/v1/traces; UI at phoenix.nghodki.ai.
   phoenix:
     <<: *restart
@@ -186,6 +162,4 @@ volumes:
   loki-data:
   tempo-data:
   grafana-data:
-  gatus-data:
-  ntfy-data:
   phoenix-data:

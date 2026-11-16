@@ -97,6 +97,8 @@
         remove_orphans: true
       register: compose_stack_result
 
+    # Single-file bind mounts keep the old inode, so a changed config only shows up after a restart. This runs even
+    # when the compose step changed something (e.g. removed orphans): those services weren't necessarily recreated.
     - name: Restart services whose config changed (a sub-folder is named after its service)
       vars:
         compose_stack_changed_dirs: >-
@@ -109,5 +111,4 @@
         state: restarted
       when:
         - compose_stack_changed_dirs | length > 0
-        - not compose_stack_result is changed
         - not ansible_check_mode

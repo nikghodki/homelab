@@ -14,12 +14,9 @@
         name: console_secrets
       no_log: true
   vars:
-    # Used by the stack's templates (alertmanager, ntfy, gatus)
+    # Used by the alertmanager template (ntfy and Gatus run on the Dell: playbooks/alerting.yml)
     ntfy_alerts_password: "{{ observe_secrets.ntfy_alerts_password }}"
-    ntfy_alerts_password_hash: "{{ observe_secrets.ntfy_alerts_password_hash }}"
-    ntfy_alerts_token: "{{ observe_secrets.ntfy_alerts_token }}"
-    ntfy_phone_password_hash: "{{ observe_secrets.ntfy_phone_password_hash }}"
-    oidc_gatus_secret: "{{ console_secrets.oidc_gatus_secret }}"
+    gatus_heartbeat_token: "{{ observe_secrets.gatus_heartbeat_token }}"
   roles:
     - role: compose_stack
       vars:

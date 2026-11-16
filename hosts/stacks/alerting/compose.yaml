@@ -1,0 +1,52 @@
+# Alerting path on the Dell (Omarchy, always on: role always_on). Deployed by Ansible (playbooks/alerting.yml)
+# to /opt/homelab/alerting; runbooks/alerting.md. It runs here, not on a Spark, so alerts still reach the phone when
+# dgx-1 (front door, DNS) or dgx-2 (observe stack) is down. Images are pinned by digest; Renovate keeps them current.
+name: alerting
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  # Uptime checks against LAN addresses (it watches the Sparks from outside). No login of its own (see status-proxy),
+  # so only loopback is published: break-glass UI with `ssh -L 8082:127.0.0.1:8082 nikghodki@192.168.86.49`.
+  gatus:
+    <<: *restart
+    image: twinproduction/gatus:v5.38.0@sha256:085ed63da963728965d00a3c78aa6167e3bf135218485b893201758e079e8415
+    volumes:
+      - ./gatus/config.yaml:/config/config.yaml:ro
+      - gatus-data:/data
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    ports:
+      - "127.0.0.1:8082:8080"
+    depends_on: [ntfy]
+
+  # Sign-in for status.nghodki.ai through Pocket ID (client `gatus`, admins only). LAN clients: dgx-1 Caddy, and without
+  # a session only /health, /metrics (VictoriaMetrics) and the heartbeat endpoint (Alertmanager).
+  status-proxy:
+    <<: *restart
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6@sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
+    command: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+    volumes:
+      - ./status-proxy/oauth2-proxy.cfg:/etc/oauth2-proxy/oauth2-proxy.cfg:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    # Reach id.nghodki.ai at the front door and trust the homelab web CA from the host's bundle (role homelab_ca).
+    extra_hosts: ["id.nghodki.ai:192.168.86.44"]
+    ports:
+      - "192.168.86.49:8081:4180"
+    depends_on: [gatus]
+
+  # The phone subscribes over Tailscale HTTPS (tailscale serve -> 127.0.0.1:8085), which needs neither Spark.
+  ntfy:
+    <<: *restart
+    image: binwiederhier/ntfy:v2.38.0@sha256:771309aecfce18d8fe2bfb8069994ddd6be6ca6ccdd7badace3d791a0045ff0d
+    command: ["serve"]
+    volumes:
+      - ./ntfy/server.yml:/etc/ntfy/server.yml:ro
+      - ntfy-data:/var/lib/ntfy
+    ports:
+      - "127.0.0.1:8085:80"         # tailscale serve
+      - "192.168.86.49:8085:80"     # LAN: Alertmanager on dgx-2, dgx-1 Caddy (ntfy.nghodki.ai)
+
+volumes:
+  gatus-data:
+  ntfy-data:

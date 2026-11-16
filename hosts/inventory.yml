@@ -36,6 +36,13 @@ all:
     k3s_init:
       hosts:
         dgx-2:
+    # The Dell never sleeps and runs the alerting path and the ops launcher (runbooks/alerting.md).
+    always_on:
+      hosts:
+        omarchy:
+    alerting:
+      hosts:
+        omarchy:
     bus:
       hosts:
         dgx-1:

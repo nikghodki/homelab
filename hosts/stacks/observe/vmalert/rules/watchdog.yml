@@ -1,0 +1,11 @@
+# Dead man's switch (runbooks/alerting.md). Always firing; Alertmanager sends it to the Dell's Gatus every 5 min
+# instead of ntfy. When it stops arriving, Gatus alerts: VictoriaMetrics, vmalert or Alertmanager (or dgx-2) is down.
+groups:
+  - name: meta
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: Heartbeat of the alert pipeline (never sent to ntfy)

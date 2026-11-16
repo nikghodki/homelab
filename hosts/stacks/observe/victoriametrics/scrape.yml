@@ -19,8 +19,9 @@ scrape_configs:
     static_configs: [{targets: ["tempo:3200"], labels: {service: tempo}}]
   - job_name: grafana
     static_configs: [{targets: ["grafana:3000"]}]
+  # Gatus on the Dell (stacks/alerting); the k3s rules read its results.
   - job_name: gatus
-    static_configs: [{targets: ["gatus:8080"]}]
+    static_configs: [{targets: ["192.168.86.49:8081"]}]
   # Temporal server in the jobs stack (plan P4.7); its metrics port is published on dgx-2's LAN address.
   - job_name: temporal
     static_configs: [{targets: ["192.168.86.36:9233"], labels: {service: temporal}}]
