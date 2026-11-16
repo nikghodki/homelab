@@ -88,8 +88,20 @@ endpoints:
   - {name: DGXMM UI (direct), group: edge, url: "https://192.168.86.11/dgxmm/healthz", headers: {Host: dgxmanager.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
   # DGXMM has no login of its own: the model host must not serve it (308 to dgxmanager.nghodki.ai, which is signed in).
   - {name: DGXMM not on the model host, group: edge, url: "https://192.168.86.11/dgxmm/", headers: {Host: model.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 5m, conditions: ["[STATUS] == 308"], alerts: [{type: ntfy}]}
+  # The ops agent (decision 0013): portal through the front door (signed out: 302 to Pocket ID; /healthz open) and
+  # ops-ingest's health on its fixed ClusterIP (this host is a k3s agent: kube-proxy routes it).
+  - {name: ops-agent.nghodki.ai, group: ops-agent, url: "https://192.168.86.11/", headers: {Host: ops-agent.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 2m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
+  - {name: ops-agent portal health, group: ops-agent, url: "https://192.168.86.11/healthz", headers: {Host: ops-agent.nghodki.ai}, client: {insecure: true}, interval: 2m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
+  - {name: ops-ingest, group: ops-agent, url: "http://10.43.0.141:8080/healthz", interval: 2m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
   - {name: API (VIP), group: edge, url: "https://192.168.86.10:6443/readyz", client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 401"], alerts: [{type: ntfy}]}
 external-endpoints:
+  # Key ops-agent_ops-agent-heartbeat. ops-worker posts every 5 min while it can reach Temporal and its database
+  # (decision 0013, runbooks/ops-agent.md); success=false with the reason when it can't, nothing at all when it's down.
+  - name: ops-agent heartbeat
+    group: ops-agent
+    token: "{{ gatus_ops_agent_heartbeat_token }}"
+    heartbeat: {interval: 15m}
+    alerts: [{type: ntfy, failure-threshold: 1, description: "the ops agent's worker is silent or unhealthy for 15 min"}]
   # Key observe_alert-pipeline-heartbeat (Alertmanager posts to /api/v1/endpoints/<key>/external?success=true).
   - name: alert pipeline heartbeat
     group: observe

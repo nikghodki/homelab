@@ -25,6 +25,11 @@ scrape_configs:
   # Temporal server in the jobs stack (plan P4.7); its metrics port is published on dgx-2's LAN address.
   - job_name: temporal
     static_configs: [{targets: ["192.168.86.36:9233"], labels: {service: temporal}}]
+  # The ops agent (decision 0013): ingest and worker metrics on fixed ClusterIPs (cluster/README.md).
+  - job_name: ops-ingest
+    static_configs: [{targets: ["10.43.0.141:9100"], labels: {service: ops-agent}}]
+  - job_name: ops-worker
+    static_configs: [{targets: ["10.43.0.142:9100"], labels: {service: ops-agent}}]
   # k3s platform (plan P3.4/P3.5, runbooks/argocd.md, runbooks/kyverno.md): fixed ClusterIPs that dgx-2's kube-proxy
   # routes for host traffic (cluster/README.md). Job names match the Argo CD dashboard.
   - job_name: argocd-application-controller-metrics

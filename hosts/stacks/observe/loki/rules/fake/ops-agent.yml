@@ -1,0 +1,16 @@
+# Error-line rates per (host, unit) for the ops agent's log anomaly baselines (decision 0013, design §4.3). Not every
+# line becomes an event: vmalert compares these series to their own 7-day median (vmalert/rules/ops-agent.yml).
+groups:
+  - name: ops-agent-log-errors
+    interval: 5m
+    rules:
+      # journald (host collectors): unit = SYSLOG_IDENTIFIER
+      - record: ops:log_errors:5m
+        expr: >-
+          sum by (host_name, unit) (count_over_time({service_name="unknown_service"}
+            |~ "(?i)(error|fail|panic|oom|denied)" | json unit="SYSLOG_IDENTIFIER" [5m]))
+      # services with their own stream (edge-caddy, defenseclaw): unit = service_name
+      - record: ops:log_errors:5m
+        expr: >-
+          label_replace(sum by (host_name, service_name) (count_over_time({service_name=~"edge-caddy|defenseclaw"}
+            |~ "(?i)(\\"level\\":\\"error\\"|panic|denied|fail)" [5m])), "unit", "$1", "service_name", "(.*)")
