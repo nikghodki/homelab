@@ -11,15 +11,19 @@ others every 4 h.
 
 | Alert | Group | Means | For | Severity |
 |---|---|---|---|---|
-| `FleetHostSilent` | fleet-hosts | `max by (host_name) (lag(system_memory_usage_bytes{state="used"}[1d])) > 300`: a host's last sample is over 5 min old (its collector or the host is down). `lag()` over a day since #74 (the old instant selector dropped a silent host before 300 s, so it never fired); resolves after a day of silence, when the Gatus ssh checks still cover it | 2m | critical |
+| `FleetHostSilent` | fleet-hosts | `max by (host_name, fleet_host) (lag(system_memory_usage_bytes{state="used"}[1d])) > 300`: a host's last sample is over 5 min old (its collector or the host is down). `lag()` over a day since #74 (the old instant selector dropped a silent host before 300 s, so it never fired); resolves after a day of silence, when the Gatus ssh checks still cover it. Inhibited while `GatusHostDown` fires for the same `fleet_host` (Gatus already pushed) | 2m | critical |
 | `FleetDiskWarning` | fleet-hosts | a filesystem is over 80% used | 10m | warning |
 | `FleetDiskCritical` | fleet-hosts | over 90% used | 5m | critical |
-| `FleetMemoryLow` | fleet-hosts | free + cached memory under 2 GB | 10m | warning |
+| `FleetMemoryLow` | fleet-hosts | not GB10: free + cached memory under 2 GB | 10m | warning |
+| `FleetMemoryLow` (`hardware: gb10`) | fleet-hosts | Sparks: MemAvailable (`system_linux_memory_available_bytes`) under 12 GiB, DGXMM's 8 + 4 GiB margin; warns before earlyoom (8 GiB) and gpu-oom-guard (6 GiB) act | 5m | warning |
+| `GatusHostDown` | fleet-hosts | Gatus' `<host> ssh` check fails. Doesn't push (`paging: "false"`); only inhibits `FleetHostSilent` | 1m | warning |
 | `FleetGpuHot` | fleet-thermal | DCGM GPU temperature over 85 °C | 10m | warning |
-| `FleetHostHot` | fleet-thermal | hottest fleet-metrics sensor over 85 °C | 10m | warning |
+| `FleetHostHot` | fleet-thermal | not GB10: hottest fleet-metrics sensor over 85 °C | 10m | warning |
+| `FleetHostHot` (`hardware: gb10`) | fleet-thermal | Sparks: over 95 °C (median 58.8, max 94.1, critical trip 104.8 °C) | 15m | warning |
+| `FleetGpuThermalThrottling` | fleet-thermal | over 30 s of thermal clock slowdown in 15 min (`DCGM_FI_DEV_THERMAL_VIOLATION`, enabled in `stacks/gpu/dcgm-exporter/counters.csv`) | 5m | warning |
 | `FleetPiHot` | fleet-thermal | Pi over 78 °C (it throttles from 80) | 5m | warning |
 | `FleetGpuMetricsMissing` | fleet-thermal | a Spark reports fleet-metrics GPU but no DCGM (gpu stack down?) | 15m | warning |
-| `ObservabilityComponentDown` | fleet-stack | any scrape target `up == 0` | 5m | warning |
+| `ObservabilityComponentDown` | fleet-stack | any scrape target `up == 0`. For `grafana` and `temporal` it doesn't push (Gatus checks both) | 10m | warning |
 
 ## Alerting host (`alerting-host.yml`)
 
@@ -46,6 +50,9 @@ to the public ntfy.sh.
 | `EdgeOtaRollback` | `defenseclaw_fleet_ota_rollbacks_total` went up | — | warning |
 
 ## k3s (`k3s.yml`), from Gatus results
+
+Gatus pushes these checks itself, so these copies carry `paging: "false"` and go to Alertmanager's `no-push` receiver
+(one push per outage; they stay visible in Alertmanager and Grafana).
 
 | Alert | Means | For | Severity |
 |---|---|---|---|
@@ -78,7 +85,7 @@ critical since the cutover (#79). Gatus group `edge` checks the VIPs themselves.
 | `KubeVipNotReady` | the kube-vip DaemonSet isn't ready on every Spark (the VIPs can't fail over) | 5m | warning |
 | `KubeVipDown` | no kube-vip ready: 192.168.86.10/.11 may be on no node | 1m | critical |
 | `EdgeReplicasDown` | an `edge` Deployment (edge-caddy, edge-dns) has fewer than 2 ready replicas | 10m | warning |
-| `EdgeFrontDoorDown` | an `edge` Deployment has no ready replica: `*.nghodki.ai` DNS or HTTPS is down | 2m | critical |
+| `EdgeFrontDoorDown` | an `edge` Deployment has no ready replica: `*.nghodki.ai` DNS or HTTPS is down. Doesn't push: Gatus' edge VIP checks do | 2m | critical |
 | `KubeStateMetricsDown` | kube-state-metrics doesn't answer (the rules above are blind) | 10m | warning |
 
 ## Robot (`robot.yml`)

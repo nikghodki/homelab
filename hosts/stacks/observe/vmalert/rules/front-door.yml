@@ -24,10 +24,13 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "edge/{{ $labels.deployment }} has {{ $value }} of 2 replicas ready for 10 min (runbooks/edge.md)"
+      # Gatus' edge DNS (VIP) and edge Caddy (VIP) checks fail in the same outage and push themselves (the Dell's
+      # kube-proxy has no endpoint left), so this copy doesn't push (paging=false). KubeVipDown does: Gatus can't see
+      # which node holds a VIP.
       - alert: EdgeFrontDoorDown
         expr: min by (deployment) (kube_deployment_status_replicas_available{namespace="edge"}) == 0
         for: 2m
-        labels: {severity: critical}
+        labels: {severity: critical, paging: "false"}
         annotations:
           summary: "edge/{{ $labels.deployment }} has no ready replica: *.nghodki.ai DNS or HTTPS is down (runbooks/edge.md)"
       - alert: KubeStateMetricsDown

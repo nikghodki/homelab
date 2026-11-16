@@ -1,22 +1,24 @@
 # k3s alerts (plan P3.2, runbooks/k3s.md), from Gatus' k3s checks (gatus_results_endpoint_success).
+# Gatus pushes every one of these checks to ntfy itself (decision 0009: that path survives the Sparks), so these
+# copies don't push (paging=false, alertmanager.yml.j2): one push per outage. They stay in Alertmanager and Grafana.
 groups:
   - name: k3s
     rules:
       - alert: K3sEtcdMemberDown
         expr: sum(gatus_results_endpoint_success{group="k3s", name=~"etcd .*"}) < 3
         for: 5m
-        labels: {severity: warning}
+        labels: {severity: warning, paging: "false"}
         annotations:
           summary: "An etcd member is unreachable: the cluster can't lose another one (runbooks/k3s.md)"
       - alert: K3sEtcdQuorumLost
         expr: sum(gatus_results_endpoint_success{group="k3s", name=~"etcd .*"}) < 2
         for: 2m
-        labels: {severity: critical}
+        labels: {severity: critical, paging: "false"}
         annotations:
           summary: "Fewer than 2 of 3 etcd members answer: the k3s API is read-only or down (runbooks/k3s.md)"
       - alert: K3sApiDown
         expr: max(gatus_results_endpoint_success{group="k3s", name=~"API .*"}) == 0
         for: 3m
-        labels: {severity: critical}
+        labels: {severity: critical, paging: "false"}
         annotations:
           summary: "Neither k3s API server answers on :6443 (runbooks/k3s.md)"
