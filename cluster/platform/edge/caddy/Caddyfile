@@ -1,12 +1,56 @@
-# The *.nghodki.ai front door in k3s (decision 0007, runbooks/edge.md). Same routes as edge-caddy on dgx-1
-# (~/edge-gateway/conf/Caddyfile), with three differences, all because this runs in a pod:
-#   - nginx-gateway (model, dgxmanager, ha, anything else) is only on dgx-1's Docker network `gateway`,
-#     so those routes go through edge-caddy on dgx-1 (192.168.86.44:80), which hands them to nginx-gateway.
-#   - Argo CD by its Service name instead of the fixed ClusterIP 10.43.0.100.
+# The *.nghodki.ai front door in k3s (decision 0007, runbooks/edge.md). Backends are reached directly; since
+# 2026-11-15 there's no relay through dgx-1's edge-caddy/nginx-gateway (both stopped, decision 0007 "Relay retired").
+#   - LiteLLM and DGXMM on dgx-1 by its direct-cable address 10.100.136.1 (reachable from both Sparks, where these
+#     pods run, but not on the LAN or the tailnet). DGXMM publishes :8090 only there and trusts X-Forwarded-For from
+#     the two source addresses these pods arrive with: 10.100.136.2 (pod on dgx-2) and 172.23.0.1 (pod on dgx-1,
+#     masqueraded onto the Docker network `gateway`); DGXMM_TRUSTED_PROXIES in its .env.
+#   - Home Assistant on the Jetson trusts X-Forwarded-For from both Sparks' LAN IPs (the pods leave from their node's IP).
+#   - Argo CD by its Service name.
 #   - The wildcard cert is the TLS Secret `web-tls` (KSOPS); the CA page is a ConfigMap of hosts/files/web-ca.
 # Served on :80 and on :443 with the homelab web CA's wildcard (runbooks/web-https.md).
 {
 	grace_period 10s
+}
+
+# The model plane, as nginx-gateway served it (model.nghodki.ai, also dgxmanager.nghodki.ai and the door by IP,
+# which were nginx's default server): LiteLLM's /v1/ and /health*, DGXMM's UI and API under /dgxmm/.
+(model_plane) {
+	# nginx redirected the bare prefixes to the slashed ones
+	redir /v1 /v1/ 301
+	redir /dgxmm /dgxmm/ 301
+	# DGXMM's on-demand gateway is for LiteLLM on the Docker network only.
+	handle /dgxmm/ondemand/* {
+		respond 404
+	}
+	# DGX Model Manager: SSE, so no buffering; long reads; DGXMM's own 1 MB request limit (deploy/nginx-dgxmm.conf).
+	handle /dgxmm/* {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy 10.100.136.1:8090 {
+			header_up X-Real-IP {remote_host}
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+			}
+		}
+	}
+	# LiteLLM. On-demand models: a cold start or queued request can wait several minutes; stream without buffering.
+	@litellm path /v1/* /health*
+	handle @litellm {
+		reverse_proxy 10.100.136.1:4000 {
+			header_up X-Real-IP {remote_host}
+			flush_interval -1
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+	handle {
+		header Content-Type application/json
+		respond `{"error": "Use /v1/ for LLM requests"}` 404
+	}
 }
 
 (nghodki_routes) {
@@ -48,16 +92,7 @@
 
 	@model host model.nghodki.ai
 	handle @model {
-		reverse_proxy 192.168.86.44:80 {
-			header_up X-Real-IP {remote_host}
-			header_up X-Forwarded-For {remote_host}
-			# on-demand models: a cold start or queued request can wait several minutes; stream without buffering
-			flush_interval -1
-			transport http {
-				read_timeout 30m
-				write_timeout 30m
-			}
-		}
+		import model_plane
 	}
 
 	# Observability on dgx-2
@@ -125,12 +160,18 @@
 		reverse_proxy 192.168.86.211:8200
 	}
 
+	# DGXMM's UI by name. The rest of the model plane (LiteLLM's /v1/) answers here too, as it did on nginx-gateway.
 	@dgxmm host dgxmanager.nghodki.ai
 	handle @dgxmm {
 		redir / /dgxmm/ 302
-		reverse_proxy 192.168.86.44:80 {
+		import model_plane
+	}
+
+	# Home Assistant on the Jetson (websockets; Caddy has no read timeout by default).
+	@ha host ha.nghodki.ai
+	handle @ha {
+		reverse_proxy 192.168.86.211:8123 {
 			header_up X-Real-IP {remote_host}
-			header_up X-Forwarded-For {remote_host}
 			flush_interval -1
 		}
 	}
@@ -150,15 +191,9 @@
 		}
 	}
 
-	# Anything else (ha.nghodki.ai, or the front door by IP) is nginx-gateway's, through edge-caddy on dgx-1.
+	# Anything else (the front door by IP, an unknown name): the model plane, as nginx-gateway's default server did.
 	handle {
-		reverse_proxy 192.168.86.44:80 {
-			flush_interval -1
-			transport http {
-				read_timeout 30m
-				write_timeout 30m
-			}
-		}
+		import model_plane
 	}
 }
 

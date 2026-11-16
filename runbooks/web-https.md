@@ -1,6 +1,6 @@
 # HTTPS for *.nghodki.ai (decision D25)
 
-`nghodki.ai` isn't a registered public domain; only the home DNS (edge-dnsmasq) resolves it. So no public CA
+`nghodki.ai` isn't a registered public domain; only the home DNS (edge-dns in k3s, runbooks/edge.md) resolves it. So no public CA
 can issue for it, and the sites use the **homelab web CA** instead:
 
 | File | What |
@@ -22,7 +22,8 @@ hosts). That CA has no name constraint, so it must never be installed on phones 
 ## Front door (dgx-1 `~/edge-gateway`, not in this repo)
 
 Since P3.3 the clients use the in-cluster door (Caddy and CoreDNS in `edge`, same routes, same cert as the Secret
-`edge/web-tls`; [edge.md](edge.md)); edge-caddy below remains as the relay to nginx-gateway and the rollback.
+`edge/web-tls`; [edge.md](edge.md)). The old door below was **stopped on 2026-11-15** and is kept only for a week as a
+rollback (edge.md "Rollback"); this section describes its files, not the live config.
 
 - `conf/Caddyfile`: every route lives in the `(nghodki_routes)` snippet, imported by `:80` and by `:443`
   (`tls /etc/caddy/certs/web.crt /etc/caddy/certs/web.key`). `voice-agent.nghodki.ai` uses the same cert.

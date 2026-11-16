@@ -17,7 +17,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 cmp=$here/compare-front-doors.sh
 names=$REPO/cluster/platform/edge/names.txt; [ -f "$names" ] || names=$REPO/names.txt
 CA=$REPO/hosts/files/pki/web-ca.crt; [ -f "$CA" ] || CA=$REPO/web-ca.crt
-DGX1_TS=100.65.137.82 DGX2_TS=100.124.175.23 VIP=192.168.86.11 OLD_LAN=192.168.86.44
+DGX1_TS=100.65.137.82 DGX2_TS=100.124.175.23 VIP=192.168.86.11 DGX1_LAN=192.168.86.44
 fail=0
 ok()  { printf 'ok    %s\n' "$*"; }
 bad() { printf 'FAIL  %s\n' "$*"; fail=1; }
@@ -33,13 +33,21 @@ for ts in $DGX1_TS $DGX2_TS; do
   a=$(q $ts A example.com); [ "${a%% *}" = REFUSED ] && ok "@$ts example.com: REFUSED" || bad "@$ts example.com: '$a' (dnsmasq still answering?)"
 done
 
-echo; echo "## Every route on dgx-1's Tailscale IP vs the old door (edge-caddy on dgx-1's LAN IP)"
-if bash "$cmp" -r "$REPO" -n $DGX1_TS -o $OLD_LAN -v tailnet > /tmp/verify-cutover.$$ 2>&1; then
+echo; echo "## Every route on dgx-1's Tailscale IP vs the LAN VIP (the old door on dgx-1 is retired)"
+if bash "$cmp" -r "$REPO" -n $DGX1_TS -o $VIP -v tailnet > /tmp/verify-cutover.$$ 2>&1; then
   ok "compare-front-doors: $(grep -c ' yes$' /tmp/verify-cutover.$$) rows the same"
 else
   grep -E ' NO$|RESULT|NXDOMAIN' /tmp/verify-cutover.$$; bad "compare-front-doors differs (full output above)"
 fi
 rm -f /tmp/verify-cutover.$$
+
+echo; echo "## The old door is stopped (edge-caddy, edge-dnsmasq, nginx-gateway on dgx-1, 2026-11-15)"
+for port in 80 443; do
+  if curl -s -o /dev/null -m 5 "http://$DGX1_LAN:$port/" 2>/dev/null || [ $? -ne 7 ]; then
+    bad "$DGX1_LAN:$port answers (edge-caddy running again?)"; else ok "$DGX1_LAN:$port: connection refused"; fi
+done
+a=$(q $DGX1_LAN A grafana.nghodki.ai); case "$a" in NOERROR*) bad "@$DGX1_LAN DNS answers: '$a' (edge-dnsmasq?)" ;;
+  *) ok "@$DGX1_LAN DNS: no answer ($a)" ;; esac
 
 if [ -n "${REPO##"$(cd "$here/../.." && pwd)"}" ] || ! command -v kubectl >/dev/null; then
   echo; echo "## This client's own resolver (MagicDNS split DNS), end to end"

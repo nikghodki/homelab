@@ -2,17 +2,19 @@
 
 Design and test results: [decision 0007](../decisions/0007-edge-in-cluster.md). Certificates: [web-https.md](web-https.md).
 
-**Status: cut over (P3.3).** The tailnet (every client) uses the in-cluster door on both Sparks' Tailscale IPs; the
-LAN view is on the VIP. edge-caddy on dgx-1 stays as the relay to nginx-gateway and, with edge-dnsmasq (its sockets
-are still open but no longer reached on dgx-1's Tailscale IP), as the [rollback](#cutover).
+**Status: cut over (P3.3); the old door is retired (2026-11-15).** The tailnet (every client) uses the in-cluster door
+on both Sparks' Tailscale IPs; the LAN view is on the VIP. Caddy reaches every backend directly: the relay through
+dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and nginx-gateway are **stopped**
+(containers kept, `restart: no`; backup in `/root/backups/` on dgx-1, see [Rollback](#rollback)).
 
-| | Old door (relay + rollback) | New door (k3s, live) |
-|---|---|---|
-| DNS | edge-dnsmasq: `192.168.86.44:53` (dgx-1's Tailscale IP is the cluster's since the cutover) | `edge/edge-dns` (CoreDNS, 2 replicas): VIP `192.168.86.11:53` (LAN view), both Sparks' Tailscale IPs `:53` (tailnet view) |
-| HTTPS | edge-caddy: dgx-1's LAN IP `:80/443` (the nginx-gateway relay) | `edge/edge-caddy` (Caddy, 2 replicas): VIP `192.168.86.11:80/443`, both Sparks' Tailscale IPs `:80/443` |
-| Floating IPs | none | kube-vip (`kube-system`, DaemonSet on the Sparks): `192.168.86.10` (k3s API), `192.168.86.11` (edge) |
-| Config | `~/edge-gateway/conf/Caddyfile`, `dnsmasq/dnsmasq.conf` (not in Git) | `cluster/platform/edge/`: `names.txt` (every name), `caddy/Caddyfile`, generated `coredns/*.db`, `web-tls.enc.yaml` |
-| Argo CD apps | | `kube-vip`, `edge`, `kube-state-metrics` (project `platform`) |
+| | In-cluster door (live) |
+|---|---|
+| DNS | `edge/edge-dns` (CoreDNS, 2 replicas): VIP `192.168.86.11:53` (LAN view), both Sparks' Tailscale IPs `:53` (tailnet view) |
+| HTTPS | `edge/edge-caddy` (Caddy, 2 replicas): VIP `192.168.86.11:80/443`, both Sparks' Tailscale IPs `:80/443` |
+| Floating IPs | kube-vip (`kube-system`, DaemonSet on the Sparks): `192.168.86.10` (k3s API), `192.168.86.11` (edge) |
+| Config | `cluster/platform/edge/`: `names.txt` (every name), `caddy/Caddyfile`, generated `coredns/*.db`, `web-tls.enc.yaml` |
+| Argo CD apps | `kube-vip`, `edge`, `kube-state-metrics` (project `platform`) |
+| Retired (stopped on dgx-1) | edge-caddy (`~/edge-gateway/conf/Caddyfile`), edge-dnsmasq (`~/edge-gateway/dnsmasq/dnsmasq.conf`), nginx-gateway (`~/voice-assistant/nginx/nginx.conf`) |
 
 ## How it works
 
@@ -24,33 +26,43 @@ are still open but no longer reached on dgx-1's Tailscale IP), as the [rollback]
   a dead Spark; Caddy on either Tailscale IP reaches either Caddy pod. Non-`nghodki.ai` queries are REFUSED there.
 - **Not through Caddy**: `nats`, `fleet` (dgx-1), `backup` (dgx-2), the host names (`jetson`, `pi`, ...) and
   `k8s` (the API VIP on the LAN; on the tailnet, the answering Spark's Tailscale IP).
-- **nginx-gateway** (model, dgxmanager, ha, the default route) is reachable only on dgx-1's Docker
-  network, so Caddy sends those to edge-caddy on `192.168.86.44:80`, which relays to nginx-gateway. edge-caddy stays
-  until those services move into the cluster (P3.7).
+- **The model plane** (what nginx-gateway served until 2026-11-15) is the `(model_plane)` snippet, used by
+  `model.nghodki.ai`, `dgxmanager.nghodki.ai` (plus its `/` → `/dgxmm/` 302) and the door by IP or an unknown name
+  (nginx's default server): `/v1/*` and `/health*` → LiteLLM `10.100.136.1:4000` (no buffering, 30 min timeouts),
+  `/dgxmm/*` → DGXMM `10.100.136.1:8090` (SSE, 1 h read timeout, 1 MB request limit), `/dgxmm/ondemand/*` → 404
+  (LiteLLM-only, on the Docker network), `/v1` and `/dgxmm` → 301 to the slashed path, anything else → a JSON 404.
+  `10.100.136.1` is dgx-1's direct-cable address: only the two Sparks (where Caddy runs) reach it.
+  `dgxmanager.nghodki.ai/v1/` reaching LiteLLM is inherited from nginx (its default server), kept as it was.
+- **DGXMM** publishes `:8090` only on `10.100.136.1` and trusts `X-Forwarded-For` from `10.100.136.2` (the Caddy pod
+  on dgx-2) and `172.23.0.1` (the pod on dgx-1, masqueraded onto the Docker network `gateway`):
+  `DGXMM_BIND` / `DGXMM_TRUSTED_PROXIES` in `~/workspace/dgx-model-manager/.env` (the user's repo, not in Git here).
+  A new Caddy node, or a change of Docker network, needs its source address there (check with
+  `docker logs dgxmm | grep 'GET /dgxmm/'` while probing from the pod).
+- **Home Assistant** (`ha.nghodki.ai` → `192.168.86.211:8123`, websockets) trusts `X-Forwarded-For` from both
+  Sparks' LAN IPs `192.168.86.44` and `192.168.86.36` (the pods leave from their node's IP); set in HA's UI by the
+  user. Without the entry HA answers 400 to every request through that Spark's pod.
 
 ## Add or change a route
 
-**Since the cutover, only the in-cluster door** (steps 1–3 and 5). Step 4 (the old door) is needed only for a route
-behind nginx-gateway, or to keep the rollback complete:
+Only the in-cluster door (the old one on dgx-1 is retired):
 
 1. A new name: add `<name>  edge` (or a host target, see the file's header) to `cluster/platform/edge/names.txt`, then
    `.github/scripts/edge-zone.py generate` (writes the zones; CI runs `check`).
 2. The route: add a `@<name> host <name>.nghodki.ai` / `handle` block to `cluster/platform/edge/caddy/Caddyfile`
-   (inside `(nghodki_routes)`, so it's on :80 and :443). Backends are LAN IPs and ports, a Service name, or, for
-   something only on dgx-1's Docker network, `192.168.86.44:80`.
+   (inside `(nghodki_routes)`, so it's on :80 and :443). Backends are LAN IPs and ports, a Service name, or, for a
+   service on dgx-1, a port it publishes on the LAN, its Tailscale IP or `10.100.136.1` (the direct cable; there's no
+   relay onto dgx-1's Docker networks any more).
 3. PR, gated merge; Argo CD rolls the pods (the ConfigMaps are hashed) within ~3 minutes.
-4. Old door, by hand on dgx-1: the same block in `~/edge-gateway/conf/Caddyfile` (back it up first), the
-   `address=` lines from `.github/scripts/edge-zone.py dnsmasq` into `~/edge-gateway/dnsmasq/dnsmasq.conf`, then
-   `docker restart edge-caddy edge-dnsmasq`. Check with `edge-zone.py diff-dnsmasq ~/edge-gateway/dnsmasq/dnsmasq.conf`.
-5. `.github/scripts/compare-front-doors.sh` on dgx-1 must say `RESULT: same`.
+4. `.github/scripts/compare-front-doors.sh` on dgx-1 must say `RESULT: same`.
 
 
 
 ## Checks
 
 ```bash
-cd ~/homelab && .github/scripts/compare-front-doors.sh                      # LAN: VIP vs dgx-1, every route + DNS
-.github/scripts/compare-front-doors.sh -n 100.124.175.23 -o 100.65.137.82 -v tailnet   # tailnet path
+cd ~/homelab && .github/scripts/compare-front-doors.sh                      # LAN VIP vs dgx-2's Tailscale IP, every route + DNS
+.github/scripts/compare-front-doors.sh -n 100.65.137.82 -o 192.168.86.11 -v tailnet    # tailnet path (dgx-1's Tailscale IP)
+.github/scripts/verify-cutover.sh                                           # also: the old door stays stopped
 export KUBECONFIG=~/.kube/config
 kubectl -n edge get pods -o wide; kubectl -n edge get svc                    # 2+2 pods, one per Spark; VIP in EXTERNAL-IP
 kubectl -n kube-system get lease plndr-cp-lock plndr-svcs-lock              # which Spark holds .10 / .11
@@ -108,13 +120,13 @@ don't roll on their own; Caddy reads the files at start).
   `sudo docker run --rm --network alerting_default --entrypoint nslookup <ntfy image> grafana.nghodki.ai 192.168.86.11`.
 - **The API VIP by IP fails TLS**: `192.168.86.10` isn't in the API server's SANs. Use `k8s.nghodki.ai`, or add the
   VIP to `k3s_tls_san` (k3s restarts: one Spark at a time, etcd healthy in between, runbooks/k3s.md).
-- **X-Forwarded-For for nginx-gateway routes** is the Caddy pod's node, not the client: edge-caddy overwrites it.
 - **Router DNS must not point at the VIP** while CoreDNS forwards to `192.168.86.1` (a loop; `loop` stops CoreDNS).
   If LAN-only devices should resolve `nghodki.ai` one day, switch the upstream to public resolvers first.
 
 ## Cutover
 
-Not done. Needs approval. Everything before step 3 is reversible without touching the cluster.
+Done on 2026-11-15 (PR #79); kept as the record of how. The old door it falls back to was retired the same day,
+so its rollback below no longer applies ([Rollback](#rollback)).
 
 **Preconditions (agent):** this PR merged; `kubectl get applications -n argocd` shows `edge`, `kube-vip`,
 `kube-state-metrics` Synced/Healthy; Gatus group `edge` green; `compare-front-doors.sh` `RESULT: same` from dgx-1 and,
@@ -154,29 +166,44 @@ LAN / DHCP IP range): the pool should start at `.20` or above (the default is `.
 never leased. If it starts lower, move its start to `.20`, or reserve `.10` and `.11` for an unused MAC. Don't set the
 router's DNS to the VIP (see Known issues).
 
-**Rollback:**
-
-- *Normal* (Argo CD and the API up): revert the cutover PR on `main`. Within ~3 minutes the externalIP is gone and
-  dnsmasq and edge-caddy, which never stopped listening, get dgx-1's tailnet traffic again; pods forward to
-  `192.168.86.44` again.
-- *Fast* (seconds): stop Git from undoing it, then drop dgx-1's Tailscale IP from the two Services:
-  ```bash
-  export KUBECONFIG=~/.kube/config
-  kubectl -n argocd patch application root --type json -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]'
-  kubectl -n argocd patch application edge --type json -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]'
-  for s in edge-dns-tailnet edge-caddy-tailnet; do
-    kubectl -n edge patch svc $s --type merge -p '{"spec":{"externalIPs":["100.124.175.23"]}}'; done
-  ```
-  Then revert the PR, and give the apps back to Git: `kubectl apply -f ~/homelab/cluster/bootstrap/apps/root.yaml`.
-- *Cluster API down* (can't patch): on dgx-1, put the old door in front of kube-proxy's rules (kube-proxy doesn't
-  move its jump once it exists), and delete these again when the cluster is back:
-  ```bash
-  sudo iptables -t nat -I PREROUTING 1 -d 100.65.137.82 -p tcp -m multiport --dports 80,443 -j DOCKER
-  sudo iptables -t nat -I PREROUTING 2 -d 100.65.137.82 -p udp --dport 53 -j ACCEPT
-  sudo iptables -t nat -I PREROUTING 3 -d 100.65.137.82 -p tcp --dport 53 -j ACCEPT
-  ```
-- *User*, if dgx-2 or the cluster is broken: remove `100.124.175.23` from the `nghodki.ai` nameservers (step 2). The
-  policy grants can stay.
+**Rollback of the cutover** (as it was until 2026-11-15): there is no fast way back to the old door any more. edge-caddy,
+edge-dnsmasq and nginx-gateway are stopped, and the new door has no relay to fall back on. See [Rollback](#rollback).
 
 **API VIP:** nothing at the cutover. Kubeconfigs can move to `https://k8s.nghodki.ai:6443` any time (LAN: the VIP;
 tailnet: a Spark's Tailscale IP; both in the cert by name).
+
+## Rollback
+
+Since 2026-11-15 the old door is stopped, so the instant rollbacks of the cutover (revert, or drop dgx-1's Tailscale
+IP from the Services, with dnsmasq and edge-caddy still listening) are gone. In order of preference:
+
+1. **A bad route or config: revert in Git.** Revert the PR on `main` (gated merge); Argo CD rolls the Caddy/CoreDNS
+   pods within ~3 minutes. For the relay retirement (model, dgxmanager, ha direct) that brings back the relay routes,
+   so do step 3 as well, or the model plane, dgxmanager and ha fail (502).
+2. **One backend unreachable from the pods** (DGXMM after a Docker change, HA after a trusted-proxy change): fix the
+   backend side (DGXMM's `.env` bind/trusted proxies, HA's trusted proxies; see "How it works"); the Caddyfile stays.
+3. **The old door back on dgx-1** (the cluster's Caddy or CoreDNS broken, or step 1 needs the relay). The containers
+   still exist and their config files are where they were; a root-only copy is in
+   `/root/backups/edge-gateway-2026-11-15.tgz` (kept until 2026-11-22: `~/edge-gateway`, `~/voice-assistant/nginx`,
+   `docker inspect` of the three containers):
+   ```bash
+   # if the files are gone: sudo tar -C / -xzf /root/backups/edge-gateway-2026-11-15.tgz
+   for c in nginx-gateway edge-caddy edge-dnsmasq; do docker update --restart unless-stopped $c; done
+   docker start nginx-gateway edge-caddy edge-dnsmasq
+   ```
+   nginx-gateway reaches DGXMM on the Docker network, which DGXMM still trusts only if `172.23.0.0/16` is back in
+   `DGXMM_TRUSTED_PROXIES` (it was removed after the retirement; the `.env` backup is `/root/backups/dgxmm-env-*`).
+   edge-caddy then serves dgx-1's LAN IP again; the tailnet stays on the cluster (kube-proxy owns dgx-1's Tailscale
+   IP :53/:80/:443) until the cutover is reverted too: revert #79 or drop `100.65.137.82` from the two tailnet
+   Services (`kubectl -n edge patch svc edge-caddy-tailnet --type merge -p '{"spec":{"externalIPs":["100.124.175.23"]}}'`,
+   the same for `edge-dns-tailnet`, after turning off auto-sync as in the cutover rollback in Git history). If the
+   cluster API is down, put the old door ahead of kube-proxy:
+   `sudo iptables -t nat -I PREROUTING 1 -d 100.65.137.82 -p tcp -m multiport --dports 80,443 -j DOCKER`, and
+   `-p udp --dport 53 -j ACCEPT` / `-p tcp --dport 53 -j ACCEPT` at positions 2 and 3.
+   The relay itself (Caddy pods → `192.168.86.44:80` → edge-caddy → nginx-gateway) is the Caddyfile before PR
+   "retire the edge relay" (`git log -- cluster/platform/edge/caddy/Caddyfile`).
+4. **User**, if dgx-2 or the cluster is broken: remove `100.124.175.23` from the `nghodki.ai` nameservers in the
+   Tailscale admin console.
+
+After 2026-11-22 (a week without a rollback) the containers and `~/edge-gateway` can be deleted; the tarball stays in
+`/root/backups` until then and goes with them.

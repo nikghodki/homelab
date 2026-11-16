@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
-# Compare the in-cluster front door with the old one (edge-caddy/edge-dnsmasq on dgx-1), without touching clients:
-# every request pins the address with curl --resolve, every query names the server (runbooks/edge.md).
+# Compare two addresses of the front door, without touching clients: every request pins the address with
+# curl --resolve, every query names the server (runbooks/edge.md). Since the old door on dgx-1 (edge-caddy,
+# edge-dnsmasq, nginx-gateway) was stopped on 2026-11-15, the reference is another address of the in-cluster door
+# (LAN VIP vs a Tailscale IP); with the old door restored from its backup, pass -o 192.168.86.44 to compare with it.
 #
 #   compare-front-doors.sh [-n NEW_IP] [-o OLD_IP] [-v lan|tailnet] [-d DNS_IP] [-c CA_FILE] [-r REPO]
 #
-#   NEW_IP  new front door (default 192.168.86.11, the edge VIP; a Spark's Tailscale IP for the tailnet path)
-#   OLD_IP  old front door (default 192.168.86.44, dgx-1)
+#   NEW_IP  front door under test (default 192.168.86.11, the edge VIP; a Spark's Tailscale IP for the tailnet path)
+#   OLD_IP  reference (default 100.124.175.23, the door on dgx-2's Tailscale IP)
 #   view    which generated zone the DNS answers must match: lan (default) or tailnet (either Spark's tailnet zone:
 #           the replica that answers names its own Spark)
 #   DNS_IP  new DNS server (default NEW_IP)
 #   CA      web CA (default REPO/hosts/files/pki/web-ca.crt); REPO defaults to this checkout
 #
 # Prints a table (HTTP and HTTPS status code plus the redirect target without its query string, old vs new, per
-# *.nghodki.ai route) and the DNS results (A matches the zone, AAAA is NOERROR with no answer, an unknown name is
+# *.nghodki.ai route, plus the model plane's paths: LiteLLM, DGXMM, the door by IP) and the DNS results (A matches the zone, AAAA is NOERROR with no answer, an unknown name is
 # NXDOMAIN). Exit 1 on any difference. Runs with bash 3 (macOS) and needs curl, and dig or python3. On a host
 # without the repo, copy names.txt, the coredns/*.db zones and web-ca.crt into one directory and pass it as -r.
 set -u
-NEW=192.168.86.11 OLD=192.168.86.44 VIEW=lan DNS="" CA="" REPO="" QUERY=0
+NEW=192.168.86.11 OLD=100.124.175.23 VIEW=lan DNS="" CA="" REPO="" QUERY=0
 while getopts "n:o:v:d:c:r:Q" f; do
   case $f in n) NEW=$OPTARG ;; o) OLD=$OPTARG ;; v) VIEW=$OPTARG ;; d) DNS=$OPTARG ;; c) CA=$OPTARG ;; r) REPO=$OPTARG ;;
     Q) QUERY=1 ;; *) sed -n '2,16p' "$0"; exit 2 ;; esac
@@ -32,12 +34,14 @@ case $VIEW in lan) zones=$zdir/lan.db ;; tailnet) zones=$(ls "$zdir"/tailnet-*.d
 [ "$QUERY" = 1 ] || for f in "$names" $zones "$CA"; do [ -f "$f" ] || { echo "missing $f" >&2; exit 2; }; done
 fail=0
 
-# probe SCHEME HOST IP -> "CODE [redirect target without query]" (OAuth state and PKCE values change every time)
+# probe SCHEME HOST IP [PATH] -> "CODE [redirect target without query]" (OAuth state and PKCE values change every time)
 probe() {
   local port=80; [ "$1" = https ] && port=443
-  curl -s -o /dev/null -m 20 --cacert "$CA" --resolve "$2:$port:$3" -w '%{http_code} %{redirect_url}' "$1://$2/" \
+  curl -s -o /dev/null -m 20 --cacert "$CA" --resolve "$2:$port:$3" -w '%{http_code} %{redirect_url}' "$1://$2${4:-/}" \
     2>/dev/null | sed 's/?.*//; s/ $//'
 }
+# The door by IP (no name): HTTP only (the cert has no IP SANs); the redirect target names the address, so drop it.
+probe_ip() { curl -s -o /dev/null -m 20 -w '%{http_code}' "http://$1$2" 2>/dev/null; }
 
 # q SERVER TYPE NAME -> "RCODE ANSWERCOUNT addr ..." (A/AAAA), with dig or, if there's none, python3 (stdlib).
 q() {
@@ -97,6 +101,24 @@ for name in $(awk '!/^#/ && NF == 2 && $2 == "edge" {print $1}' "$names"); do
     same=yes; [ "$o" = "$n" ] || { same=NO; fail=1; }
     printf '%-28s %-6s %-36s %-36s %s\n' "$host" "$scheme" "${o:-error}" "${n:-error}" "$same"
   done
+done
+
+echo; echo "## Model plane paths: old $OLD vs new $NEW"
+printf '%-50s %-6s %-36s %-36s %s\n' url scheme old new same
+for hp in model:/health/liveliness model:/v1/models model:/v1 model:/dgxmm/ model:/dgxmm model:/dgxmm/ondemand/x \
+          model:/tts/v1/x dgxmanager:/dgxmm/ dgxmanager:/v1/models ha:/manifest.json; do
+  host=${hp%%:*}.nghodki.ai path=${hp#*:}
+  for scheme in http https; do
+    o=$(probe $scheme "$host" "$OLD" "$path"); n=$(probe $scheme "$host" "$NEW" "$path")
+    o=${o//$OLD/ADDR} n=${n//$NEW/ADDR}
+    same=yes; [ "$o" = "$n" ] || { same=NO; fail=1; }
+    printf '%-50s %-6s %-36s %-36s %s\n' "$host$path" "$scheme" "${o:-error}" "${n:-error}" "$same"
+  done
+done
+for path in / /v1/models /health/liveliness /dgxmm/; do
+  o=$(probe_ip "$OLD" "$path"); n=$(probe_ip "$NEW" "$path")
+  same=yes; [ "$o" = "$n" ] || { same=NO; fail=1; }
+  printf '%-50s %-6s %-36s %-36s %s\n' "(by IP)$path" http "${o:-error}" "${n:-error}" "$same"
 done
 
 echo; echo "## DNS @$DNS ($VIEW view)"

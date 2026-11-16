@@ -136,3 +136,14 @@ names.
   fine). Gatus's edge DNS checks use TCP because of it. It will also bite pods on the Dell that use UDP to Services
   on other nodes (DNS!). The usual fix is `ethtool -K flannel.1 tx-checksum-ip-generic off` on the Dell, made
   persistent by Ansible. Not applied here; see runbooks/edge.md "Known issues".
+
+## Relay retired (2026-11-15)
+
+The routes nginx-gateway served (model, dgxmanager, ha, and the door by IP) moved into the in-cluster Caddyfile, to the
+real backends: LiteLLM and DGXMM on dgx-1's direct-cable address `10.100.136.1` (DGXMM's published port moved there
+from `127.0.0.1`, with the Caddy pods' source addresses `10.100.136.2` and `172.23.0.1` as trusted proxies), Home
+Assistant on the Jetson (dgx-2's LAN IP `192.168.86.36` added to its trusted proxies by the user). The voice routes
+(`/tts/`, `voice-agent.nghodki.ai`) were dropped (D26). nginx's implicit 1 MB request limit on `/v1/` and Home
+Assistant was not carried over; DGXMM's explicit one was. Then edge-caddy, edge-dnsmasq and nginx-gateway were stopped
+on dgx-1 (config kept, root-only backup for a week). The instant rollback of the cutover went with them; the rollback
+is now a Git revert plus restarting the stopped containers (runbooks/edge.md "Rollback").
