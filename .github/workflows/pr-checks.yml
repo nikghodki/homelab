@@ -223,6 +223,9 @@ jobs:
       - name: DefenseClaw LiteLLM guardrail
         working-directory: hosts/files/litellm
         run: PYTHONPATH=. python -m pytest -q tests
+      - name: LiteLLM request hook (system merge, file attachments as text)
+        working-directory: hosts/stacks/litellm/litellm-proxy
+        run: PYTHONPATH=. python -m pytest -q tests
       - name: DefenseClaw fleet policy
         working-directory: policies/defenseclaw
         run: python -m pytest -q tests
