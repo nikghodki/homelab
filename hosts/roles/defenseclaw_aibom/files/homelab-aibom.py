@@ -7,7 +7,6 @@ import datetime, json, os, pathlib, subprocess, sys
 
 STATE = pathlib.Path(os.environ.get("XDG_STATE_HOME", pathlib.Path.home() / ".local/state")) / "homelab-aibom"
 CATEGORIES = ("skills", "plugins", "mcp", "agents", "tools", "model_providers", "rules", "memory", "ide_plugins")
-KEEP = int(sys.argv[1]) if len(sys.argv) > 1 else 30
 
 
 def names(doc: dict) -> dict:
@@ -20,6 +19,7 @@ def names(doc: dict) -> dict:
 
 
 def main() -> int:
+    keep = int(sys.argv[1]) if len(sys.argv) > 1 else 30
     STATE.mkdir(parents=True, exist_ok=True)
     exe = pathlib.Path.home() / ".local/bin/defenseclaw"
     run = subprocess.run([str(exe), "aibom", "scan", "--json"], capture_output=True, text=True, timeout=900)
@@ -27,12 +27,13 @@ def main() -> int:
         print(f"homelab-aibom: scan failed (exit {run.returncode}): {run.stderr.strip()[-300:]}", file=sys.stderr)
         return 1
     doc = json.loads(run.stdout)
-    previous = sorted(STATE.glob("aibom-*.json"))
     today = STATE / f"aibom-{datetime.date.today().isoformat()}.json"
+    # a second run on the same day compares with the last earlier day, not with this morning's file
+    previous = [p for p in sorted(STATE.glob("aibom-*.json")) if p != today]
     today.write_text(json.dumps(doc, indent=1))
     now = names(doc)
     summary = {"event": "aibom", "connector": doc.get("connector"), "counts": {k: len(v) for k, v in now.items()}}
-    if previous and previous[-1] != today:
+    if previous:
         before = names(json.loads(previous[-1].read_text()))
         added = {k: sorted(set(now[k]) - set(before.get(k, []))) for k in CATEGORIES}
         removed = {k: sorted(set(before.get(k, [])) - set(now[k])) for k in CATEGORIES}
@@ -42,7 +43,7 @@ def main() -> int:
     else:
         summary["changed"] = None  # first run, nothing to compare
     print("homelab-aibom " + json.dumps(summary, sort_keys=True))
-    for old in sorted(STATE.glob("aibom-*.json"))[:-KEEP]:
+    for old in sorted(STATE.glob("aibom-*.json"))[:-keep]:
         old.unlink()
     return 0
 
