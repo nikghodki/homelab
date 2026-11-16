@@ -1,4 +1,0 @@
-{
-  "title": "Network",
-  "pages": ["index", "lan", "tailscale", "dns", "front-door", "cluster-network", "ports"]
-}

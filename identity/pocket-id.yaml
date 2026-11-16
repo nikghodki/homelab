@@ -45,3 +45,8 @@ clients:
     callbackURLs: [https://argocd.nghodki.ai/auth/callback]
     launchURL: https://argocd.nghodki.ai
     groups: [admins]      # Argo CD RBAC also maps admins -> role:admin; PKCE S256 (enablePKCEAuthentication)
+  - id: docs
+    name: Docs
+    callbackURLs: [https://docs.nghodki.ai/oauth2/callback]
+    launchURL: https://docs.nghodki.ai
+    groups: [admins]      # oauth2-proxy (oauth2-proxy-docs on the Dell) also checks allowed_groups = admins; PKCE S256

@@ -1,0 +1,70 @@
+---
+title: picoclaw
+description: "The robot agent on the Pi: its own unprivileged user and hardened unit, MQTT input over NATS, the MCP server whose motion tools go through the safety governor's motion bridge, its DefenseClaw hook, and the remaining gaps."
+---
+
+picoclaw is the small agent on the Pi that does robot skills. Since PR #73 (2026-11-15) it runs as its own
+unprivileged system user and its motion tools reach the car only through the [safety governor](../robotics/safety-governor.md).
+Role `picoclaw` (play "PicoClaw (own user)" in `hosts/playbooks/robot.yml`, after the governor play); runbooks/robot-safety.md.
+
+## User and unit
+
+| | |
+|---|---|
+| User | system user `picoclaw` (uid 995), shell `nologin`, home `/var/lib/picoclaw`, groups `picoclaw` and `robot-motion` only: no `sudo`, no `dialout`, no `dclaw-ipc` |
+| Unit | `/etc/systemd/system/picoclaw.service` (`systemctl status picoclaw`, `journalctl -u picoclaw`): `User=picoclaw`, `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome=yes` (no /home), `PrivateTmp`, `PrivateDevices`, no capabilities, `MemoryMax=1G` |
+| Writable | `~/.picoclaw` and `~/.defenseclaw/logs` only; `config.json` and `.security.yml` are read-only inside the unit, so the agent can't rewrite its hook, MCP server or model settings |
+| Binaries | `/var/lib/picoclaw/bin/{picoclaw,node}` (root, 0755) |
+| Config, secrets | `/var/lib/picoclaw/.picoclaw/` (0700; `.security.yml` holds the MQTT/NATS password and model keys); LiteLLM key `OPENAI_API_KEY` in `/etc/picoclaw/picoclaw.env` (root 0600, read by systemd) |
+| Login home | `/home/nikghodki-raspberry-1` is 0750, so picoclaw can't read it. The role checks on every run that `sudo -l -U picoclaw` says "not allowed" and that picoclaw can't read the operator's NATS file or the governor's credentials, config, unit and code |
+| Old setup | the user unit `picoclaw-gateway` of the login user is disabled (kept with the old files for rollback) |
+
+## Input and tools
+
+| | |
+|---|---|
+| Input | MQTT over TLS to NATS on dgx-1 (`nats.nghodki.ai:8883`) as NATS user `picoclaw`, MQTT client `picoclaw-pi`. Topic `/picoclaw/...` = NATS subject `/.picoclaw...` (fixes F3) |
+| MCP server | `picoclaw-hardware` (stdio, Node) at `/var/lib/picoclaw/roboclaw/mcp-server/` (root:picoclaw, read-only), patched by the role with `hosts/roles/picoclaw/files/picoclaw-hardware-mcp.governed.patch` plus `governor-motion.js`; the role fails if any `post("/drive" \| "/turn" \| "/velocity")` remains |
+| Motion tools | `drive`, `turn`, `explore`, `go_to_room`, `follow_nearest`, `map_room` → the motion bridge socket `/run/robot-motion/motion.sock` → `/cmd_vel_in` + `/safety/heartbeat` → governor |
+| `stop` | latches the governor's e-stop (clearing needs `safety-reset`, a human) and calls the car's `/stop` |
+| Other tools | `status`, `get_sensors`, `horn`, `scan_surroundings` still call the car's HTTP API (no motion). `navigate_to`, `explore_frontier` (Nav2) and `follow_start` (vision follow-me) are disabled: they would drive around the governor |
+| DefenseClaw | in-process Lite hook `/var/lib/picoclaw/.defenseclaw/bin/picoclaw_hook.py` (root:picoclaw, read-only; FFI into the Edge engine, strict); log `.defenseclaw/logs/dclaw_hook.log`. The Edge Connector daemon runs next to it for Fleet ([Edge Connector](../security/edge-connector.md)) |
+| NATS rights | publish `/.picoclaw.>`, `robot.pi.>` (may latch the e-stop), **not** `robot.pi.safety.reset` |
+| AIBOM | `/var/lib/picoclaw/.picoclaw` and `/var/lib/picoclaw/roboclaw` scanned nightly |
+| Backups | `/var/lib/picoclaw` and `/etc/picoclaw` are in the Pi's restic paths (minus logs, binaries, `node_modules`) |
+
+The roboclaw code isn't a git repository (Pi `~/workspace/roboclaw`, a copy on dgx-1 and on the Jetson), so the change
+lives as a patch in this repo. If roboclaw becomes a repo, commit the patched file there and drop the patch.
+
+## Remaining gaps before the robot drives on its own
+
+1. The car's HTTP API accepts anyone on the LAN. Give its firmware one caller (the governor's address or a shared
+   token) for `/drive`, `/turn`, `/velocity`. Until then picoclaw's own `exec`/`web_fetch` tools could still
+   `curl` the car: the MCP server no longer does, but the agent's network access isn't filtered.
+2. When Nav2 arrives it must publish `/cmd_vel_in`, not `/cmd_vel`; then re-enable `navigate_to`/`explore_frontier`.
+3. The Jetson's copy of the same MCP server (`tools/picoclaw_only`, for Hermes) still calls `/drive`/`/turn` directly;
+   Hermes' include list exposes only two messaging tools, but that is a client-side filter.
+
+## Edge Connector limits that affect picoclaw
+
+The C engine's tool table lacks `message`, `i2c`, `serial`, `spawn`, `cron` (fail closed, `INVALID_INPUT`), and the
+OSS Fleet gateway denies every escalated call, so picoclaw keeps its in-process hook.
+
+## Operate and roll back
+
+```bash
+# on the Pi
+systemctl status picoclaw robot-motion-bridge
+journalctl -u picoclaw -f
+journalctl -t robot-motion-bridge          # one MOTION line per request, with uid=995
+sudo systemctl stop picoclaw               # stop the agent (e.g. before the on-blocks test)
+```
+
+Rollback to the old, ungoverned setup: `sudo systemctl disable --now picoclaw`, then
+`systemctl --user enable --now picoclaw-gateway` as the login user. The role stops the old unit on every run, so don't
+run `robot.yml` until the change is reverted in the repo.
+
+## Waiting
+
+End-to-end reply over NATS (needs the model, busy in the DGXMM session); `robot.*` tools in the LiteLLM MCP gateway with
+approval rules (P5.5).

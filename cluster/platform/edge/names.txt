@@ -26,6 +26,7 @@ ntfy               edge
 ca                 edge
 id                 edge
 ops                edge
+docs               edge
 phoenix            edge
 temporal           edge
 mlflow             edge

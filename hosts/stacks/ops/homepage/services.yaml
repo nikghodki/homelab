@@ -55,6 +55,14 @@
         icon: home-assistant.svg
         siteMonitor: https://ha.nghodki.ai/
 
+- Docs:
+    - Docs:
+        href: https://docs.nghodki.ai
+        description: Fleet operator docs (built from main every 15 min)
+        icon: mdi-book-open-page-variant
+        # The browser URL is behind Pocket ID (302 when signed out); the check asks the docs server on the stack network.
+        siteMonitor: http://docs:8080/healthz
+
 - Security & Identity:
     - Pocket ID:
         href: https://id.nghodki.ai

@@ -19,6 +19,8 @@ endpoints:
   - {name: ha.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: ha.nghodki.ai}, <<: *web}
   # Homepage behind oauth2-proxy (P1.15). Signed out, oauth2-proxy answers 302 to Pocket ID; ignore-redirect checks that 302.
   - {name: ops.nghodki.ai (Homepage), group: web, url: "https://192.168.86.11/", headers: {Host: ops.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
+  # Docs site on the Dell's ops stack (runbooks/docs-site.md). Signed out, oauth2-proxy-docs answers 302 to Pocket ID.
+  - {name: docs.nghodki.ai, group: web, url: "https://192.168.86.11/", headers: {Host: docs.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}
   # The alerting stack's own routes through the front door (the phone uses Tailscale HTTPS to the Dell instead).
   - {name: ntfy.nghodki.ai, group: web, url: "https://192.168.86.11/v1/health", headers: {Host: ntfy.nghodki.ai}, client: {insecure: true}, interval: 1m, conditions: ["[STATUS] == 200", "[BODY].healthy == true"], alerts: [{type: ntfy}]}
   - {name: status.nghodki.ai, group: web, url: "https://192.168.86.11/health", headers: {Host: status.nghodki.ai}, client: {insecure: true}, <<: *web}
@@ -76,3 +78,10 @@ external-endpoints:
     token: "{{ gatus_heartbeat_token }}"
     heartbeat: {interval: 15m}
     alerts: [{type: ntfy, failure-threshold: 1, description: "no Watchdog heartbeat from dgx-2's Alertmanager for 15 min"}]
+  # Key docs_docs-build. The docs-build timer on this host (role docs_site) posts after every run: success=false while
+  # the latest main doesn't build (the last good site stays up); no post for 1 h means the timer or GitHub access broke.
+  - name: docs build
+    group: docs
+    token: "{{ gatus_docs_build_token }}"
+    heartbeat: {interval: 1h}
+    alerts: [{type: ntfy, failure-threshold: 1, description: "docs-build failed or silent for 1 h (journal tag docs-build)"}]

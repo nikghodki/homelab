@@ -1,0 +1,214 @@
+# Operator docs for the homelab fleet, built with MkDocs Material (setup copied from DGXMM).
+# Private: served only by the Dell behind oauth2-proxy + Pocket ID at https://docs.nghodki.ai (runbooks/docs-site.md).
+# Never GitHub Pages. Build from the repo root:
+#   pip install --require-hashes -r docs-site/requirements-docs.txt && mkdocs build --strict -f docs-site/mkdocs.yml
+site_name: Homelab fleet
+site_description: What the home AI fleet is, where everything runs, how to change it, and what breaks when a piece is down.
+site_url: https://docs.nghodki.ai/
+copyright: nikghodki homelab. Private, admins only.
+
+docs_dir: content/docs
+site_dir: site
+# no repo_url: Material would fetch repository facts from api.github.com in the reader's browser
+
+strict: true
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+theme:
+  name: material
+  language: en
+  font: false  # system fonts: nothing is loaded from Google Fonts
+  icon:
+    logo: material/server-network
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+# Mermaid is served from the site itself (fetched and checked by hooks/mermaid.py), so the theme never loads it
+# from a CDN.
+extra_javascript:
+  - assets/javascripts/mermaid.min.js
+
+hooks:
+  - hooks/mermaid.py
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # GitHub's heading ids, so the same #anchors work on github.com and on the site
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+
+# From the old meta.json files: top-level separators are the tabs, each folder is a section with its index first.
+nav:
+  - Home: index.md
+  - Start here:
+      - Overview:
+          - overview/index.md
+          - overview/flows.md
+          - overview/glossary.md
+      - Hosts:
+          - hosts/index.md
+          - hosts/dgx-1.md
+          - hosts/dgx-2.md
+          - hosts/jetson.md
+          - hosts/pi.md
+          - hosts/omarchy.md
+          - hosts/macbook-air.md
+      - Network:
+          - network/index.md
+          - network/lan.md
+          - network/tailscale.md
+          - network/dns.md
+          - network/front-door.md
+          - network/cluster-network.md
+          - network/ports.md
+  - Security:
+      - Security and identity:
+          - security/index.md
+          - security/pki.md
+          - security/secrets.md
+          - security/identity.md
+          - security/defenseclaw.md
+          - security/edge-connector.md
+          - security/scanning.md
+          - security/hardening.md
+  - Running it:
+      - Observability and alerting:
+          - observability/index.md
+          - observability/dashboards.md
+          - observability/alert-rules.md
+          - observability/gatus.md
+          - observability/alert-delivery.md
+          - observability/failure-scenarios.md
+      - Platform:
+          - platform/index.md
+          - platform/k3s.md
+          - platform/argocd.md
+          - platform/kyverno.md
+          - platform/cnpg.md
+          - platform/docker-stacks.md
+          - platform/image-signing.md
+      - Services:
+          - services/index.md
+          - services/litellm.md
+          - services/open-webui.md
+          - services/nats.md
+          - services/fleet-broker.md
+          - services/pocket-id.md
+          - services/homepage.md
+          - services/docs-site.md
+          - services/observe-stack.md
+          - services/phoenix.md
+          - services/gatus-ntfy.md
+          - services/temporal.md
+          - services/mlflow.md
+          - services/home-assistant.md
+          - services/voice.md
+          - services/backup-server.md
+      - Agents and AI:
+          - agents/index.md
+          - agents/hermes.md
+          - agents/picoclaw.md
+          - agents/model-plane.md
+          - agents/cards-and-tools.md
+          - agents/openbot.md
+      - Robotics and simulation:
+          - robotics/index.md
+          - robotics/ros-zenoh.md
+          - robotics/safety-governor.md
+          - robotics/simulation.md
+      - Operations:
+          - operations/index.md
+          - operations/deploy.md
+          - operations/how-to-add.md
+          - operations/secrets-rotation.md
+          - operations/upgrades.md
+          - operations/backups.md
+          - operations/incidents.md
+          - operations/incident-gpu-oom.md
+          - operations/troubleshooting.md
+  - Building it:
+      - Development and CI:
+          - development/index.md
+          - development/ci.md
+          - development/rules.md
+      - Decisions and status:
+          - decisions/index.md
+          - decisions/status.md
+          - decisions/known-limits.md
+          - decisions/discrepancies.md
+      - History:
+          - history/index.md

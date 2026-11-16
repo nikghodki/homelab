@@ -1,0 +1,65 @@
+---
+title: Known limits and upstream issues
+description: Limits of the fleet as built, and the eight upstream issue drafts (not posted).
+---
+
+## Fleet limits (as built, 2026-11-15)
+
+| Area | Limit | Mitigation / plan |
+|---|---|---|
+| Availability | dgx-1 is a single point of failure for web, DNS, NATS, Fleet, LiteLLM and the operator's tools (F6) | P3.3 moved web and DNS into k3s (cut over 2026-11-15); the nginx-gateway routes (model, dgxmanager, ha), NATS, Fleet and LiteLLM still need dgx-1 (P3.7) |
+| Availability | A GPU job can take a Spark and all its services down (unified memory) | caps on our jobs, earlyoom/gpu-oom-guard (not in Git), P2.7 reserves |
+| Availability | Alerting needs the Dell or dgx-2; both down = silence | accepted |
+| Network | Everything is on Wi-Fi; a router reboot hits every host | P0.11 for the Sparks |
+| Network | No UPS: a power cut hard-stops everything (R10) | buy a UPS; NUT order in architecture §17.3 |
+| Security | Temporal gRPC (no mTLS), Zenoh (no auth), MLflow job API (basic auth over HTTP), fleet-metrics (open) on the LAN | LAN-only binding; mTLS before Tailscale exposure |
+| Security | The car's HTTP API accepts anyone on the LAN (including picoclaw's own `exec`/`web_fetch` and the Jetson's MCP copy); picoclaw's MCP motion tools are governed since #73 | [picoclaw gaps](../agents/picoclaw.md) |
+| Security | The age key is in the cluster and decrypts everything | a cluster-only key (decision 0006) |
+| Security / availability | Kyverno Enforces with failurePolicy Fail: if both admission replicas are down (both Sparks), new pods in enforced namespaces are refused; our own images are refused until the GHCR packages are public | break-glass B; make the packages public |
+| Security | LiteLLM guardrail not enabled; DefenseClaw judge off; no webhooks | after the DGXMM session |
+| Security | SSH password authentication still enabled | after every admin path has a key |
+| Recovery | Backups conflict with decision 0002; no off-site copy; no restore test | user decision |
+| Recovery | Pocket ID, Temporal, MLflow, Grafana data live in Docker volumes that the backups don't cover | add dumps |
+| Ops | edge-caddy/nginx-gateway (the relay), LiteLLM, Open WebUI, HA, Hermes are hand-run: not in Ansible or Argo CD; Renovate can't see them | P3.7, P4.5 |
+| Ops | No incident runbooks yet (P3.9) | [Incident playbooks](../operations/incidents.md) |
+| Ops | The Dell is weak (2 cores, 8 GB, HDD) | decision 0009 |
+| Robot | Not driving autonomously: mock sink; on-blocks test pending | P5.2 final test |
+
+## Upstream issue drafts (`docs/upstream-issues/`, not posted)
+
+Checked upstream on 2026-11-15: the latest DefenseClaw release is 1.0.9 (2026-11-12); the latest mcp-scanner is 4.8.7.
+The user decides what to post. When one is posted, add the link to its file and to the README table there.
+
+| # | Issue | Target | Status | Workaround here |
+|---|---|---|---|---|
+| 1 | Edge Connector doesn't build against mbedTLS 3.6 (deprecated API + `-Werror`) | defenseclaw | not reported; still on `main` | `-Wno-error=deprecated-declarations` |
+| 2 | OSS Fleet gateway blocks every escalated hash; no allow API | defenseclaw | feature request; default-deny is documented | picoclaw stays on its in-process hook |
+| 3 | picoclaw tools missing from the C tool table; `picoclaw_hook.py` is FFI-only | defenseclaw | hook part in open PR #1343; table not reported | same |
+| 4 | Fleet MQTT client is MQTT 5 only; docs say 3.1.1 | defenseclaw | not reported | dedicated Mosquitto broker (D24) |
+| 5 | `policy edit scanner -p` writes lowercase severity keys next to uppercase | defenseclaw | not reported | edit YAML by hand; CI test |
+| 6 | Hermes connector: one `HERMES_HOME` per account; a second profile stops the gateway | defenseclaw | not reported (add the exact error line before posting) | one Linux user per profile |
+| 7 | `skill-scanner` not found under a systemd user unit → every skill quarantined; `skill restore` fails | defenseclaw | not reported (related #796 closed, #1428 open) | PATH drop-in; manual restore |
+| 8 | mcp-scanner 4.8.7 pins `litellm==1.93.2` (two advisories) | mcp-scanner | relaxed on `main` (#289), unreleased; floor PRs #290, #295, #315 open: comment, don't file | OSV exceptions until 2026-12-15 |
+
+When a release fixes one, update `runbooks/edge-connector.md`, `policies/README.md`, `.github/osv-scanner.toml` and these
+docs.
+
+## Design risks (design §10), current state
+
+| # | Risk | State |
+|---|---|---|
+| R1 | Jetson is a quorum member and runs home/robot | live; schedule Spark maintenance only when the Jetson is healthy |
+| R2 | Wi-Fi drops | live (everything on Wi-Fi) |
+| R3 | dgx-2 batch starves services | happened (2026-11-15, both Sparks) |
+| R4 | shared memory bandwidth slows the robot model | not measured (no `robot-fast` yet) |
+| R5 | Omarchy too weak for OpenBot | confirmed (decision 0004) |
+| R6 | KServe/vLLM images on arm64/GB10 | pilot not started |
+| R7 | MacBook Air unprotected | accepted |
+| R8 | GitHub Free doesn't enforce checks | procedural rule (0001) |
+| R9 | losing the age key | offline copies; restore drill quarterly (not yet done) |
+| R10 | no UPS | open |
+| R11 | CopilotKit Intelligence licensing | confirmed (0004) |
+| R12 | LiteLLM is critical for everything | pinned 1.109.1; HA later |
+| R13 | Isaac Sim limits on Spark | headless only |
+| R14 | sim-to-real gap | staged gates (architecture §15.5) |
+| R15 | sim jobs vs LLM batch on dgx-2 | job caps; DGXMM budget later |

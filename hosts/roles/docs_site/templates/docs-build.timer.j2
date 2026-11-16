@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (roles/docs_site)
+[Unit]
+Description=Build the docs site every 15 minutes and at boot
+
+[Timer]
+OnBootSec=2min
+OnCalendar={{ docs_site_schedule }}
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

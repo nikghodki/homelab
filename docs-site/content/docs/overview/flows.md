@@ -1,0 +1,106 @@
+---
+title: Main flows
+description: The paths a web request, a metric, an alert, a deploy, a model call and a robot command take through the fleet.
+---
+
+These are the paths that matter most when something breaks. Each one names the hosts and ports involved.
+
+## A browser opens `https://grafana.nghodki.ai`
+
+```mermaid
+sequenceDiagram
+  participant B as Browser (LAN or tailnet)
+  participant DNS as edge-dns (k3s, port 53 on a Spark)
+  participant C as edge-caddy (k3s, port 443 on a Spark)
+  participant G as Grafana (dgx-2 port 3000)
+  participant P as Pocket ID (dgx-2 port 1411)
+  B->>DNS: grafana.nghodki.ai A?
+  DNS-->>B: the answering Spark's Tailscale IP (tailnet) or 192.168.86.11 (LAN VIP)
+  B->>C: TLS, wildcard cert from the homelab web CA
+  C->>G: reverse_proxy 192.168.86.36:3000
+  G-->>B: redirect to id.nghodki.ai (OIDC, PKCE)
+  B->>C: id.nghodki.ai
+  C->>P: reverse_proxy 192.168.86.36:1411
+  P-->>B: passkey prompt, then back to Grafana
+```
+
+- DNS: tailnet clients use Tailscale split DNS, which points `nghodki.ai` at both Sparks' Tailscale addresses; each
+  edge-dns replica answers with its own Spark (P3.3, [DNS](../network/dns.md)). LAN clients would have to use the
+  VIP 192.168.86.11 as their resolver for `nghodki.ai` (unverified how each LAN device is configured; the Nest
+  router's DHCP doesn't hand it out by itself).
+- model, dgxmanager and ha go one hop further: the Caddy pod → edge-caddy on 192.168.86.44:80 → nginx-gateway.
+- TLS: the device must trust the homelab web CA, installed once from `http://ca.nghodki.ai`. See [PKI](../security/pki.md).
+- Every service behind the front door has the same shape. The full table is in [Front door](../network/front-door.md).
+
+## A metric or a log line
+
+```mermaid
+flowchart LR
+  FM["fleet-metrics :9109"] --> OC
+  DCGM["dcgm-exporter 127.0.0.1:9400 (Sparks)"] --> OC
+  J["journald"] --> OC
+  X["extra scrapes: Fleet API, safety governor"] --> OC
+  OC["otelcol-contrib on each host"] -- "OTLP gRPC 192.168.86.36:4319" --> OF["otel-fleet (dgx-2)"]
+  DC["DefenseClaw gateways"] -- "OTLP 4317/4318" --> OD["otel-defenseclaw (dgx-2)"]
+  OF --> VM[VictoriaMetrics] & L[Loki]
+  OD --> VM & L & T[Tempo]
+  VM --> GR[Grafana]
+  L --> GR
+  T --> GR
+```
+
+Details: [Observability](../observability/index.md).
+
+## An alert
+
+```mermaid
+flowchart LR
+  VMA["vmalert (dgx-2)"] --> AM["Alertmanager (dgx-2)"]
+  AM -- "LAN http 192.168.86.49:8085" --> NT["ntfy (Dell)"]
+  GT["Gatus (Dell)"] --> NT
+  NT -- "Tailscale HTTPS" --> PH[Phone ntfy app]
+  AM -- "Watchdog every 5 min" --> GT
+  AM -- "AlertingHostDown (Dell gone)" --> NS["ntfy.sh backup topic"] --> PH
+```
+
+Details: [Alert delivery](../observability/alert-delivery.md).
+
+## A change
+
+1. A pull request to `nikghodki/homelab`. CI runs (lint, secret scanning, code/dependency/config scans, Kubernetes
+   checks, AI scanners, AIBOM, unit tests).
+2. Merge only when `gh pr checks <n> --watch` exits 0 (decision 0001).
+3. Host changes: someone runs the playbook on dgx-1 (`--check --diff` first). Cluster changes: Argo CD polls `main`
+   every 2 minutes and applies `cluster/` and `policies/kyverno` (about 3 minutes end to end).
+
+Details: [Deploying](../operations/deploy.md).
+
+## A model call
+
+```mermaid
+flowchart LR
+  A["Agent or Open WebUI"] -- "http(s)://model.nghodki.ai/v1" --> C["edge-caddy (dgx-1)"]
+  C --> N["nginx-gateway (dgx-1)"] --> L["litellm-proxy :4000"]
+  L --> D["DGXMM-started engine (vLLM / llama.cpp)"]
+```
+
+Hermes's main profile calls `http://model.nghodki.ai/v1` with model `qwen3.8-27b` (a model name, not an alias: the
+alias plan, P2.0, is still open). The DefenseClaw guardrail plugin for LiteLLM is written and tested but not enabled
+yet (P2.4). Details: [Model plane](../agents/model-plane.md).
+
+## A robot command and an e-stop
+
+```mermaid
+flowchart LR
+  PC["picoclaw MCP motion tools"] --> MB["motion bridge socket"] --> CMD
+  CMD["ROS /cmd_vel_in (Twist)"] --> G["safety governor (Pi)"]
+  SCAN["ROS /scan from MS200 LiDAR (Pi)"] --> G
+  HB["ROS /safety/heartbeat or NATS robot.pi.cmd.heartbeat"] --> G
+  ES["NATS robot.pi.safety.estop (any payload) or /safety/estop true"] --> G
+  RS["NATS robot.pi.safety.reset = RESET (user operator only)"] --> G
+  G --> SINK["sink: mock (default); http_velocity only for the on-blocks test"]
+  G --> ST["ROS /safety/status, NATS robot.pi.safety.status, metrics 127.0.0.1:9113"]
+```
+
+ROS traffic goes through the Zenoh router on the Jetson (`tcp/192.168.86.211:7447`). Details:
+[Safety governor](../robotics/safety-governor.md).

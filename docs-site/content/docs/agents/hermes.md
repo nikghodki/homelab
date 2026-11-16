@@ -1,0 +1,77 @@
+---
+title: "Hermes"
+description: "The home agent on the Jetson: two profiles as two Linux users, their gateways, MCP servers, DefenseClaw coverage, skills status and rollback."
+---
+
+Hermes (Hermes Agent, version 0.21.6 per its agent card) is the front door for people: it answers questions, reads and
+(after approval) changes Home Assistant, and will send the robot on errands. It runs host-installed on the Jetson until
+P4.5 moves it into k3s (`agents` namespace, Jetson-pinned).
+
+## Two profiles, two users (P0.15)
+
+DefenseClaw's Hermes connector covers one `HERMES_HOME` per account, so each profile is its own Linux user with its own
+DefenseClaw (runbooks/hermes-profiles.md).
+
+| | Profile main | Profile nikhil-ghodki |
+|---|---|---|
+| Linux user | `nikjetson` (uid 1000) | `hermes-nikhil` (uid 2002, linger on) |
+| Unit | user `hermes-gateway` (`~/.hermes/hermes-agent/.hermes/bin/hermes gateway run`) | user `hermes-gateway`, own checkout of the same commit (`setup-hermes.sh --runtime-only`) |
+| Platforms | `api_server` on 0.0.0.0:8642 | Slack, Home Assistant, `api_server` on 100.78.145.123:8643 (Tailscale only). WhatsApp never paired |
+| Model | `qwen3.8-27b` at `http://model.nghodki.ai/v1` (chat completions, 256k context, 16k max tokens) | (unverified) |
+| MCP servers | `homeassistant` | `homeassistant` (all tools), `picoclaw_only` (2 tools included) |
+| DefenseClaw gateway | 127.0.0.1:18970 | 127.0.0.1:18980 (`gateway.port` 18971) |
+| Data | `~/.hermes`, `~/hermes-homes` | `/home/hermes-nikhil/.hermes` |
+
+The old `hermes-gateway-nikhil-ghodki` unit under nikjetson is disabled but kept; its data is still in
+`~nikjetson/hermes-homes/nikhil-ghodki`. Roll back: stop `hermes-gateway` as hermes-nikhil, then
+`systemctl --user enable --now hermes-gateway-nikhil-ghodki` as nikjetson. Delete the old copy once the new one has been
+used for a while.
+
+`wedding`, `home-board` and `vision-ai` were removed from both configs on 2026-11-15 (they failed at every start; the
+Home Board is decommissioned, vision is skipped). Backups of the configs are in `~/.hermes/backups/config/` of each
+account. Left for the profile owner: hermes-nikhil's `skills/smart-home/home-board` skill and a memory line still
+describe the old board. Only servers in `policies/defenseclaw/mcp-servers.yaml` are approved, and a nightly drift check
+watches them ([DefenseClaw](../security/defenseclaw.md)).
+
+## The picoclaw MCP for hermes-nikhil
+
+`picoclaw_only` runs nikjetson's `~/workspace/roboclaw/mcp-server/picoclaw-hardware-mcp.js` with Hermes' bundled Node
+(`~/.hermes/tools/node-26.7.0-linux-arm64/bin/node`; `/usr/bin/node` is gone since the JetPack 7 reflash), through
+read-only ACLs (`setfacl`: x on the parent folders, rX on `mcp-server`). It reaches NATS as user `hermes`
+(`~/.picoclaw-nats-credentials`, 0600, from `secrets/bus.enc.yaml`). Hermes includes only
+`send_to_picoclaw_agent` and `check_picoclaw_agent_connection`.
+
+## DefenseClaw coverage
+
+Both accounts: DefenseClaw 1.0.9, action mode, tool calls fail closed, HITL at MEDIUM, policy `homelab`
+(`defenseclaw_policy_users: [nikjetson, hermes-nikhil]` in `host_vars/jetson.yml`), PATH drop-in (scanners in
+`~/.local/bin`), OTLP to dgx-2 with `sensitive` redaction. DefenseClaw can't scan the local/private MCP servers (a
+path launcher isn't allowlisted); they're kept with a warning. Nightly DefenseClaw AIBOM for nikjetson (03:15).
+
+## Skills
+
+After the scanner-PATH outage quarantined 76 of 77 skills, they were recovered; a few stay blocked for real static
+findings ([DefenseClaw](../security/defenseclaw.md)). The skill scanner runs static-only until the model is back; then, as
+each user: `defenseclaw setup skill-scanner --use-llm` and `defenseclaw skill scan all`.
+
+## Agent card
+
+`agents/hermes/card.yaml` (draft until LiteLLM's A2A gateway serves it, P4.10): skills `home-status` (read-only),
+`home-control` (approval), `robot-errand` (approval). URL `https://hermes.nghodki.ai/a2a` is a placeholder (no such DNS
+name). a2a-scanner checks it in CI.
+
+## Operate
+
+```bash
+# on the Jetson
+systemctl --user status hermes-gateway defenseclaw-gateway
+journalctl --user -u hermes-gateway -f
+sudo -u hermes-nikhil XDG_RUNTIME_DIR=/run/user/2002 systemctl --user status hermes-gateway defenseclaw-gateway
+~/.local/bin/defenseclaw status
+```
+
+## Waiting
+
+- Chat tests for both profiles (after the DGXMM session).
+- P4.5: key, scopes, A2A, memory, traces; its MCP tools move behind LiteLLM.
+- Hermes on WhatsApp as an alert and approval channel (D12) is not built.

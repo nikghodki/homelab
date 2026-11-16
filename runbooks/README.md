@@ -23,4 +23,5 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [kyverno.md](kyverno.md) (admission policies, Audit → Enforce),
 [mcp-admission.md](mcp-admission.md) (approved MCP servers, DefenseClaw admission, nightly tool drift check),
 [hardening.md](hardening.md) (Lynis remediation: host hardening, documented exceptions, roll back),
-[edge.md](edge.md) (the `*.nghodki.ai` front door in k3s: kube-vip, CoreDNS, Caddy; adding routes; the cutover).
+[edge.md](edge.md) (the `*.nghodki.ai` front door in k3s: kube-vip, CoreDNS, Caddy; adding routes; the cutover),
+[docs-site.md](docs-site.md) (the private docs site on the Dell: build, hosting, updates, roll back, adding a page).

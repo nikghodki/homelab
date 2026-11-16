@@ -1,0 +1,38 @@
+---
+title: Agents and AI
+description: The agents in the fleet, the model plane under them, and the planned agent contract.
+---
+
+| Agent | Host | Runs as | Model | Tools | DefenseClaw | Status |
+|---|---|---|---|---|---|---|
+| [Hermes](hermes.md), profile main | Jetson | `nikjetson`, user unit `hermes-gateway` | `qwen3.8-27b` via `http://model.nghodki.ai/v1` | MCP `homeassistant` | Hermes connector, action, fail closed | running; chat test waits for the model (DGXMM session) |
+| [Hermes](hermes.md), profile nikhil-ghodki | Jetson | `hermes-nikhil` | via LiteLLM (unverified which) | MCP `picoclaw_only`, `homeassistant` | own install, same policy | running |
+| [picoclaw](picoclaw.md) | Pi | own user `picoclaw`, system unit `picoclaw` | via LiteLLM (key in `/etc/picoclaw/picoclaw.env`) | MCP `picoclaw-hardware` (motion through the safety governor's motion bridge) | in-process Edge engine hook + Edge Connector daemon | running; end-to-end reply over NATS waits for the model |
+| OpenBot / computer-use agent | Dell | — | — | — | — | [pending decision 0004](openbot.md) |
+| Coding agents (Claude Code, Codex, OpenCode) | dgx-1 | the operator | — | — | DefenseClaw on dgx-1 has no connectors yet | as used |
+
+## The model plane
+
+DGXMM owns the GPUs and starts engines; LiteLLM is the gateway; agents should call aliases, not models. Aliases are
+not decided yet (P2.0). See [Model plane](model-plane.md).
+
+## The agent contract (planned, P4.4)
+
+Every agent will have a folder `agents/<name>/`:
+
+| File | Holds | Exists today |
+|---|---|---|
+| `card.yaml` | A2A agent card, scanned by a2a-scanner | `agents/hermes/card.yaml` |
+| `radar.yaml` | optional `{framework, path}` for Agentic Radar | none (Hermes and picoclaw use frameworks Radar doesn't cover) |
+| `scopes.yaml` | models, MCP servers/tools, A2A peers, NATS subjects | no |
+| `budget.yaml` | monthly token limit, rate limit | no |
+| `defenseclaw.yaml` | route (hook / Edge / agent-gateway), tier | no |
+
+CI would turn `scopes.yaml` into the agent's LiteLLM key (models + MCP tools + A2A peers), NATS user and Postgres
+schema; `ops agent-freeze <name>` would revoke all three. None of this is built: NATS users and Hermes's tool lists are
+set by hand today.
+
+## Approved MCP tools
+
+Tool definitions for the MCP servers agents use are pinned and scanned in CI: see
+[Agent cards and MCP tools](cards-and-tools.md).

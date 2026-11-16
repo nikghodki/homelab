@@ -1,4 +1,0 @@
-{
-  "title": "Security and identity",
-  "pages": ["index", "pki", "secrets", "identity", "defenseclaw", "edge-connector", "scanning", "hardening"]
-}

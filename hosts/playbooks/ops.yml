@@ -1,6 +1,7 @@
-# Ops launcher on the Dell: Homepage behind oauth2-proxy at ops.nghodki.ai (plan P1.15, runbooks/sign-in.md).
+# Ops launcher on the Dell: Homepage behind oauth2-proxy at ops.nghodki.ai (plan P1.15, runbooks/sign-in.md), and the
+# private docs site at docs.nghodki.ai (role docs_site builds it, the stack serves it; runbooks/docs-site.md).
 # Always --check --diff first. Docker at boot is set by playbooks/alerting.yml.
-- name: Ops launcher
+- name: Ops launcher and docs site
   hosts: alerting
   become: true
   pre_tasks:
@@ -9,13 +10,26 @@
         file: "{{ playbook_dir }}/../../secrets/console.enc.yaml"
         name: console_secrets
       no_log: true
+    - name: Load docs secrets from SOPS
+      community.sops.load_vars:
+        file: "{{ playbook_dir }}/../../secrets/docs.enc.yaml"
+        name: docs_secrets
+      no_log: true
   vars:
     oidc_ops_secret: "{{ console_secrets.oidc_ops_secret }}"
     oauth2_proxy_ops_cookie_secret: "{{ console_secrets.oauth2_proxy_ops_cookie_secret }}"
+    oidc_docs_secret: "{{ console_secrets.oidc_docs_secret }}"
+    oauth2_proxy_docs_cookie_secret: "{{ console_secrets.oauth2_proxy_docs_cookie_secret }}"
   roles:
+    # First, so /srv/docs exists before the stack's `docs` container mounts it
+    - role: docs_site
+      vars:
+        docs_site_deploy_key: "{{ docs_secrets.docs_deploy_key }}"
+        docs_site_gatus_token: "{{ docs_secrets.docs_build_gatus_token }}"
     - role: compose_stack
       vars:
         compose_stack_name: ops
         compose_stack_src: "{{ playbook_dir }}/../stacks/ops"
         compose_stack_private_templates:
-          oauth2-proxy: 65532   # distroless nonroot
+          oauth2-proxy: 65532        # distroless nonroot
+          oauth2-proxy-docs: 65532   # same image

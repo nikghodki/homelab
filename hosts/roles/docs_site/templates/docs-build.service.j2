@@ -1,0 +1,19 @@
+# Managed by homelab Ansible (roles/docs_site)
+[Unit]
+Description=Build the docs site from {{ docs_site_branch }} and swap it in (runbooks/docs-site.md)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/docs-build
+# Results go to the journal through `logger -t docs-build`; the job's own output (git, pip, mkdocs) is tagged apart.
+SyslogIdentifier=docs-build-job
+TimeoutStartSec=20min
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+NoNewPrivileges=true
