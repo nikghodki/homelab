@@ -38,7 +38,8 @@
         href: https://dgxmanager.nghodki.ai
         description: DGX Model Manager
         icon: mdi-chip
-        siteMonitor: https://dgxmanager.nghodki.ai/dgxmm/
+        # The UI is behind Pocket ID (302 when signed out); /dgxmm/healthz is open for checks.
+        siteMonitor: https://dgxmanager.nghodki.ai/dgxmm/healthz
 
 - ML:
     - MLflow:

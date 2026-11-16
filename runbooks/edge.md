@@ -28,12 +28,15 @@ dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and n
 - **Not through Caddy**: `nats`, `fleet` (dgx-1), `backup` (dgx-2), the host names (`jetson`, `pi`, ...) and
   `k8s` (the API VIP on the LAN; on the tailnet, the answering Spark's Tailscale IP).
 - **The model plane** (what nginx-gateway served until 2026-11-15) is the `(model_plane)` snippet, used by
-  `model.nghodki.ai` and the door by IP (dgxmanager: DGXMM UI only, `/` → `/dgxmm/` 302) or an unknown name
-  (nginx's default server): `/v1/*` and `/health*` → LiteLLM `10.100.136.1:4000` (no buffering, 30 min timeouts),
-  `/dgxmm/*` → DGXMM `10.100.136.1:8090` (SSE, 1 h read timeout, 1 MB request limit), `/dgxmm/ondemand/*` → 404
-  (LiteLLM-only, on the Docker network), `/v1` and `/dgxmm` → 301 to the slashed path, anything else → a JSON 404.
+  `model.nghodki.ai` and the door by IP or an unknown name (nginx's default server): `/v1/*` and `/health*` → LiteLLM
+  `10.100.136.1:4000` (no buffering, 30 min timeouts), `/v1` → 301 to the slashed path, `/dgxmm*` → 308 to
+  `dgxmanager.nghodki.ai`, anything else → a JSON 404.
   `10.100.136.1` is dgx-1's direct-cable address: only the two Sparks (where Caddy runs) reach it.
-  `dgxmanager.nghodki.ai` serves the DGXMM UI only (2026-11-15); `/v1/` there returns a JSON 404 pointing at `model.nghodki.ai`.
+  `dgxmanager.nghodki.ai` serves the DGXMM UI only (2026-11-15), behind sign-in (2026-11-16, `session_check admins`:
+  DGXMM has no login of its own): the `(dgxmm_ui)` snippet, `/dgxmm/*` → DGXMM `10.100.136.1:8090` (SSE, 1 h read
+  timeout, 1 MB request limit), `/dgxmm/ondemand/*` → 404 (LiteLLM-only, on the Docker network), `/` → `/dgxmm/` 302,
+  `/v1/` → a JSON 404 pointing at `model.nghodki.ai`. `/dgxmm/healthz` (the SPA shell) is open for the checks.
+  `litellm-admin.nghodki.ai` is behind the same sign-in, then LiteLLM's own UI login.
 - **DGXMM** publishes `:8090` only on `10.100.136.1` and trusts `X-Forwarded-For` from `10.100.136.2` (the Caddy pod
   on dgx-2) and `172.23.0.1` (the pod on dgx-1, masqueraded onto the Docker network `gateway`):
   `DGXMM_BIND` / `DGXMM_TRUSTED_PROXIES` in `~/workspace/dgx-model-manager/.env` (the user's repo, not in Git here).

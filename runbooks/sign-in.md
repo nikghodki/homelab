@@ -41,6 +41,8 @@ homelab web CA (`http://ca.nghodki.ai`) and add a passkey. Ask for a second pass
 | Docs (`https://docs.nghodki.ai`) | front door sign-in; backend: the docs Caddy `192.168.86.49:4181` (Dell, `hosts/stacks/ops`, [docs-site.md](docs-site.md)) | admins |
 | Gatus status page (`https://status.nghodki.ai`) | front door sign-in (`/health` open); backend: `status-gate` `192.168.86.49:8081` (Dell, `hosts/stacks/alerting`). Not Gatus' own `security.oidc`: it panics at start when Pocket ID is unreachable, which would stop the checks during a Spark outage. The checks never go through the gate | admins |
 | MLflow (`https://mlflow.nghodki.ai`) | front door sign-in; backend: the ml stack's Caddy `192.168.86.36:4181` (dgx-2, `hosts/stacks/ml`); jobs use the basic-auth API on :5000 ([mlflow.md](mlflow.md)) | admins |
+| DGXMM (`https://dgxmanager.nghodki.ai`) | front door sign-in (`import session_check admins` in a `route`, since DGXMM's proxy needs SSE and its 1 MB limit); DGXMM has no login of its own. `/dgxmm/healthz` is open for the checks. Its backend is on dgx-1's cable address, which only the Caddy pods reach, so it needs no origin token | admins |
+| LiteLLM admin UI (`https://litellm-admin.nghodki.ai`) | front door sign-in (`session_check`), then LiteLLM's own UI login. The API on `model.nghodki.ai` stays key-only (no sign-in) | admins |
 
 Containers that talk to Pocket ID get `extra_hosts: id.nghodki.ai:<front door>` and the host's CA bundle, which includes
 the web CA (`edge-auth` resolves it through kube-dns → edge-dns, like Argo CD, and trusts only the web CA).
