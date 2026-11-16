@@ -85,18 +85,18 @@ spec:
         - name: temporal
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: temporal-ca.crt, path: ca.crt}, {key: temporal-tls.crt, path: tls.crt}, {key: temporal-tls.key, path: tls.key}]
         - name: secrets
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: ingest-token, path: ingest-token}, {key: litellm-key, path: litellm-key}, {key: ntfy-token, path: ntfy-token},
                     {key: heartbeat-token, path: heartbeat-token}, {key: origin-token, path: origin-token}]
         - name: git
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: deploy-key, path: deploy-key}]
         - name: known-hosts
           configMap:
@@ -178,22 +178,22 @@ spec:
         - name: temporal
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: temporal-ca.crt, path: ca.crt}, {key: temporal-tls.crt, path: tls.crt}, {key: temporal-tls.key, path: tls.key}]
         - name: secrets
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: litellm-key, path: litellm-key}, {key: ntfy-token, path: ntfy-token}, {key: heartbeat-token, path: heartbeat-token}]
         - name: mcp
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: mcp-grafana-auth, path: mcp-grafana}, {key: mcp-argocd-auth, path: mcp-argocd}]
         - name: ssh
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: opsro-ssh-key, path: id_ed25519}]
         - name: known-hosts
           configMap:
@@ -260,7 +260,7 @@ spec:
         - name: secrets
           secret:
             secretName: ops-agent
-            defaultMode: 0440
+            defaultMode: 288   # 0440: owner and the pod's fsGroup read
             items: [{key: origin-token, path: origin-token}]
         - name: mode
           configMap: {name: ops-mode}
