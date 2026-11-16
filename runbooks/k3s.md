@@ -136,6 +136,22 @@ See decision 0005. The Spark-to-Spark settings don't change. Update the Sparks' 
 checks; then roll one node at a time (agents, Jetson, dgx-1, dgx-2), checking nodes and the etcd member list between
 each. A changed node IP on the Jetson means remove-and-rejoin (above).
 
+## Known issues
+
+- **UDP from Docker containers to Services, bad VXLAN checksum** (fixed 2026-11-15). UDP from a Docker container
+  on a user-defined network (compose stacks; sometimes the default bridge too) to a Service IP, DNATed to a pod on
+  another node, left `flannel.1` with a bad **outer** UDP checksum; the receiving node dropped it (`nstat -az
+  UdpInCsumErrors` climbs there). TCP, host-originated UDP and k3s pods were fine. Seen on all four nodes (Dell over
+  Wi-Fi, Jetson, dgx-1 over the cable), so the fix is on all of them: software checksums on `flannel.1`
+  (`ethtool -K flannel.1 tx-checksum-ip-generic off`, which also turns off TSO on it; GSO stays on). Role
+  `flannel_offload_fix` (`playbooks/flannel-offload-fix.yml`, imported at the end of `k3s.yml`) installs ethtool,
+  `/usr/local/sbin/flannel-offload-fix`, a udev rule on `ACTION=="add", KERNEL=="flannel.1"` (k3s recreates the
+  device when it restarts) and `flannel-offload-fix.service` (oneshot, after k3s/k3s-agent, for a device that already
+  exists at boot). Check: `sudo ethtool -k flannel.1 | grep tx-checksum-ip-generic` says `off`. Test the udev path
+  without restarting k3s: `sudo ethtool -K flannel.1 tx-checksum-ip-generic on; sudo udevadm trigger --action=add
+  --sysname-match=flannel.1 --settle`, then check again. UDP test from Docker:
+  `sudo docker run --rm --network <a compose network> busybox@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec nslookup kubernetes.default.svc.cluster.local 10.43.0.10`.
+
 ## Installed on top (from Git, by Argo CD)
 
 | What | Since | Runbook |

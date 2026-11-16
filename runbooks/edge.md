@@ -102,10 +102,9 @@ don't roll on their own; Caddy reads the files at start).
 
 ## Known issues
 
-- **UDP from Docker containers on the Dell to k3s Services is dropped** (bad outer VXLAN checksum on the Dell's
-  `flannel.1`; host-originated UDP and TCP work). So Gatus checks DNS over TCP. Pods on the Dell would hit it too
-  for UDP to other nodes (cluster DNS). Fix candidate, not applied: `sudo ethtool -K flannel.1
-  tx-checksum-ip-generic off` on the Dell, persisted by the k3s role. Verify with
+- **UDP from Docker containers to k3s Services was dropped** (fixed 2026-11-15): a bad outer VXLAN checksum on
+  `flannel.1`, on every node, not just the Dell. Fixed by the `flannel_offload_fix` role (runbooks/k3s.md, known
+  issues). Gatus still checks DNS over TCP; UDP works too now. Verify with
   `sudo docker run --rm --network alerting_default --entrypoint nslookup <ntfy image> grafana.nghodki.ai 192.168.86.11`.
 - **The API VIP by IP fails TLS**: `192.168.86.10` isn't in the API server's SANs. Use `k8s.nghodki.ai`, or add the
   VIP to `k3s_tls_san` (k3s restarts: one Spark at a time, etcd healthy in between, runbooks/k3s.md).

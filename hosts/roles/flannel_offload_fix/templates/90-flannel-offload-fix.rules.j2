@@ -1,0 +1,2 @@
+# Managed by homelab Ansible (role flannel_offload_fix). k3s recreates the device when it restarts.
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="{{ flannel_offload_fix_iface }}", RUN+="{{ flannel_offload_fix_script }} %k"

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Managed by homelab Ansible (role flannel_offload_fix). runbooks/k3s.md, known issues.
+# UDP that is DNATed to a pod on another node (Docker containers -> Service IPs) left flannel.1 with a bad
+# outer VXLAN checksum and was dropped by the receiver. Software checksums on flannel.1 fix it.
+# Run by udev when flannel.1 appears and by flannel-offload-fix.service at boot. No-op without the device.
+set -eu
+IFACE="${1:-{{ flannel_offload_fix_iface }}}"
+[ -e "/sys/class/net/$IFACE" ] || exit 0
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ethtool -K "$IFACE" tx-checksum-ip-generic off

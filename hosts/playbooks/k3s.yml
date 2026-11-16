@@ -31,3 +31,6 @@
   vars: *k3s_vars
   roles:
     - role: k3s
+
+- name: Flannel VXLAN checksum fix
+  ansible.builtin.import_playbook: flannel-offload-fix.yml

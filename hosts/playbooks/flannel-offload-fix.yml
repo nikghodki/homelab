@@ -1,0 +1,6 @@
+# Software tx checksums on flannel.1 on every k3s node (runbooks/k3s.md, known issues). Always --check --diff first.
+- name: Flannel VXLAN checksum fix
+  hosts: k3s
+  become: true
+  roles:
+    - role: flannel_offload_fix
