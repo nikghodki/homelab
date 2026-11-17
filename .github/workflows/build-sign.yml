@@ -20,6 +20,7 @@ on:
       - agents/ops-agent/pyproject.toml
       - agents/ops-agent/requirements.txt
       - agents/ops-agent/ops_agent/**
+      - cluster/apps/open-webui/image/**
   workflow_dispatch:
 
 permissions: {}
@@ -54,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [mlflow, ros-zenoh, ops-agent]
+        image: [mlflow, ros-zenoh, ops-agent, open-webui]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -86,11 +87,14 @@ jobs:
           FILE: ${{ steps.spec.outputs.file }}
           IMAGE: ${{ steps.spec.outputs.image }}
           TAGS: ${{ steps.spec.outputs.tags }}
+          SPEC_PLATFORMS: ${{ steps.spec.outputs.platforms }}
         run: |
+          # An image may build fewer platforms than PLATFORMS (image-spec.sh `platforms=`; open-webui: arm64 only)
+          platforms="${SPEC_PLATFORMS:-$PLATFORMS}"
           tag_args=(); IFS=, read -ra tags <<< "$TAGS"; for t in "${tags[@]}"; do tag_args+=(--tag "$t"); done
           # BuildKit SPDX SBOM and provenance per platform go inside the image index (so the signature covers them).
           # Layer cache in the registry (`:buildcache`, written only from here): unchanged layers aren't rebuilt.
-          docker buildx build "$CONTEXT" --file "$FILE" --platform "$PLATFORMS" --push "${tag_args[@]}" \
+          docker buildx build "$CONTEXT" --file "$FILE" --platform "$platforms" --push "${tag_args[@]}" \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --label "org.opencontainers.image.revision=$GITHUB_SHA" \
             --sbom=true --provenance=mode=max \
@@ -122,6 +126,7 @@ jobs:
           REF: ${{ steps.spec.outputs.image }}@${{ steps.build.outputs.digest }}
           TAGS: ${{ steps.spec.outputs.tags }}
           IMAGE: ${{ matrix.image }}
+          SPEC_PLATFORMS: ${{ steps.spec.outputs.platforms }}
         run: |
           # cosign v3 stores a Sigstore bundle; its JSON/text output carries no certificate fields, so the proof is
           # the exit status with the exact identity, and a refusal for a different one.
@@ -136,7 +141,7 @@ jobs:
             --certificate-identity "$CERT_IDENTITY" --certificate-oidc-issuer "$CERT_ISSUER" > /dev/null
           {
             echo "### $IMAGE"
-            echo "- \`$REF\` ($PLATFORMS)"
+            echo "- \`$REF\` (${SPEC_PLATFORMS:-$PLATFORMS})"
             echo "- tags: \`$TAGS\`"
             echo "- \`cosign verify\`: ok for identity \`$CERT_IDENTITY\`, issuer \`$CERT_ISSUER\`"
             echo "- \`cosign verify\` with \`...@refs/heads/not-main\`: refused"

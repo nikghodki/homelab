@@ -72,6 +72,19 @@
       "prBodyNotes": [
         "Run `.github/scripts/defenseclaw-bundle.py sync` on dgx-1, port any printed diffs, push to this branch."
       ]
+    },
+    {
+      "description": "Open WebUI, the base of the Ask Me overlay (cluster/apps/open-webui/image/Dockerfile). The PR's CI builds the overlay, so a patch that no longer applies fails it. After the merge build-sign pushes ghcr.io/nikghodki/open-webui:<tag>-askme.<n>; pin its digest in cluster/apps/open-webui/open-webui.yaml (runbooks/open-webui.md, Ask Me overlay)",
+      "matchDepNames": [
+        "ghcr.io/open-webui/open-webui"
+      ],
+      "matchFileNames": [
+        "cluster/apps/open-webui/image/Dockerfile"
+      ],
+      "automerge": false,
+      "prBodyNotes": [
+        "CI step \"Open WebUI overlay builds on its pinned base\" applies the Ask Me patch to this version; if it fails, update `cluster/apps/open-webui/image/patch_branding.py`. On a new upstream version reset `# askme-revision:` to 1. After merge: take the digest from the build-sign run summary and pin it in `cluster/apps/open-webui/open-webui.yaml` (back up webui.db first: runbooks/open-webui.md, Upgrade)."
+      ]
     }
   ],
   "pip-compile": {
