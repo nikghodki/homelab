@@ -36,6 +36,13 @@ clients:
     callbackURLs: [https://litellm-admin.nghodki.ai/sso/callback]
     launchURL: https://litellm-admin.nghodki.ai
     groups: [admins]      # LiteLLM maps the groups claim admins -> proxy_admin (GENERIC_ROLE_MAPPINGS_*); PKCE S256
+  # DGXMM's own OIDC sign-in (auth.oidc in its config.yaml), behind the front door's edge-auth: after the door the user
+  # lands straight in DGXMM (auto_redirect). admins -> DGXMM admin; nobody else may sign in. PKCE S256.
+  - id: dgxmm
+    name: DGX Model Manager
+    callbackURLs: [https://dgxmanager.nghodki.ai/dgxmm/api/auth/oidc/callback]
+    launchURL: https://dgxmanager.nghodki.ai/dgxmm/
+    groups: [admins]
   - id: edge-auth
     name: Sign-in (front door)
     callbackURLs: [https://auth.nghodki.ai/oauth2/callback]

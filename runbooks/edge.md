@@ -32,8 +32,9 @@ dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and n
   `10.100.136.1:4000` (no buffering, 30 min timeouts), `/v1` → 301 to the slashed path, `/dgxmm*` → 308 to
   `dgxmanager.nghodki.ai`, anything else → a JSON 404.
   `10.100.136.1` is dgx-1's direct-cable address: only the two Sparks (where Caddy runs) reach it.
-  `dgxmanager.nghodki.ai` serves the DGXMM UI only (2026-11-15), behind sign-in (2026-11-16, `session_check admins`:
-  DGXMM has no login of its own): the `(dgxmm_ui)` snippet, `/dgxmm/*` → DGXMM `10.100.136.1:8090` (SSE, 1 h read
+  `dgxmanager.nghodki.ai` serves the DGXMM UI only (2026-11-15), behind sign-in (2026-11-16, `session_check admins`),
+  then DGXMM's own Pocket ID sign-in (2026-11-17, client `dgxmm`, auto-redirect, [sign-in.md](sign-in.md#dgxmms-own-sign-in)):
+  the `(dgxmm_ui)` snippet, `/dgxmm/*` → DGXMM `10.100.136.1:8090` (SSE, 1 h read
   timeout, 1 MB request limit), `/dgxmm/ondemand/*` → 404 (LiteLLM-only, on the Docker network), `/` → `/dgxmm/` 302,
   `/v1/` → a JSON 404 pointing at `model.nghodki.ai`. `/dgxmm/healthz` (the SPA shell) is open for the checks.
   `litellm-admin.nghodki.ai` is behind the same sign-in, then LiteLLM's own UI login.
@@ -41,7 +42,10 @@ dgx-1's edge-caddy and nginx-gateway is gone, and edge-caddy, edge-dnsmasq and n
   on dgx-2) and `172.23.0.1` (the pod on dgx-1, masqueraded onto the Docker network `gateway`):
   `DGXMM_BIND` / `DGXMM_TRUSTED_PROXIES` in `~/workspace/dgx-model-manager/.env` (the user's repo, not in Git here).
   A new Caddy node, or a change of Docker network, needs its source address there (check with
-  `docker logs dgxmm | grep 'GET /dgxmm/'` while probing from the pod).
+  `docker logs dgxmm | grep 'GET /dgxmm/'` while probing from the pod). The same list decides whether DGXMM
+  believes `X-Forwarded-Proto: https`. That sets the `Secure` flag on its session cookie and the scheme of its
+  OIDC redirect URI (pinned by `public_url` in its config). DGXMM itself reaches `id.nghodki.ai` at the VIP
+  (`extra_hosts` in its `docker-compose.override.yaml`).
 - **Home Assistant** (`ha.nghodki.ai` → `192.168.86.211:8123`, websockets) trusts `X-Forwarded-For` from both
   Sparks' LAN IPs `192.168.86.44` and `192.168.86.36` (the pods leave from their node's IP); set in HA's UI by the
   user. Without the entry HA answers 400 to every request through that Spark's pod.
