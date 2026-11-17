@@ -8,7 +8,7 @@ deployed by Ansible (`hosts/stacks/litellm`, now the stopped fallback until 2026
 |---|---|
 | Manifests | `cluster/apps/litellm` (Argo CD app `litellm`): the proxy (Deployment, **2 replicas, one per Spark**, PDB 1, `maxSurge 0`), Redis (1 replica), NetworkPolicies; `cluster/apps/data` (app `data`): the CNPG cluster `litellm-db` |
 | Image | `ghcr.io/berriai/litellm:v1.109.1@sha256:1117…` (allowed in `policies/kyverno/restrict-registries.yaml`), 2 workers per pod; root but no capabilities and a read-only root (writes only `/tmp`) |
-| Proxy files | `cluster/apps/litellm/proxy/`: `config.yaml`, `qwen_system_merge.py` (system merge, documents to text), `defenseclaw_guardrail.py` (tests in `proxy/tests`, run in CI), `web-ca.crt` (CI checks it equals `hosts/files/pki/web-ca.crt`); one ConfigMap, hashed, so a change rolls the pods |
+| Proxy files | `cluster/apps/litellm/proxy/`: `config.yaml`, `qwen_system_merge.py` (system merge, documents to text, [DefenseClaw judge reply repair](#defenseclaw-judge-replies)), `defenseclaw_guardrail.py` (tests in `proxy/tests`, run in CI), `web-ca.crt` (CI checks it equals `hosts/files/pki/web-ca.crt`); one ConfigMap, hashed, so a change rolls the pods |
 | Addresses | proxy **`10.43.0.150:4000`** (`litellm/litellm`), database primary `10.43.0.151:5432` (`data/litellm-db-host`), Redis `10.43.0.152:6379`: fixed ClusterIPs, no cluster DNS on the model path |
 | Front door | `model.nghodki.ai` `/v1/*`, `/health*` and `litellm-admin.nghodki.ai` → `10.43.0.150:4000` first, the stopped Docker copy (`10.100.136.1:4000`) while the pods' health check fails (`lb_policy first`). On /v1, with both down a request waits up to 90 s (`lb_try_duration`) instead of failing |
 | Database | CNPG `data/litellm-db`: Postgres 17.12, 2 instances (primary placed on dgx-2, standby on dgx-1, asynchronous streaming), 10 Gi local-path each, 256 Mi/1 Gi; owner `litellm` (Secret `litellm-db-app`) |
@@ -137,8 +137,8 @@ backstop only; the rate limits are what bound a scanner):
 | Alias | Models | Limits | Used by |
 |---|---|---|---|
 | `picoclaw-pi` | `qwen3.8-27b` | — | picoclaw on the Pi (`/etc/picoclaw/picoclaw.env`, `.security.yml` entry `dgx-qwen`); rotated 2026-11-15 |
-| `defenseclaw-dgx1` | `qwen3.8-27b` | 20 rpm, 100k tpm, 2 in flight, $5/day | dgx-1 DefenseClaw LLM judge (`DEFENSECLAW_LLM_KEY`) |
-| `defenseclaw-jetson-judge` | `qwen3.8-27b` | 60 rpm, 600k tpm, 6 in flight, $5/day | both Jetson DefenseClaw installs: skill-scanner LLM analyzer and guardrail judge |
+| `defenseclaw-dgx1` | `qwen3.8-27b`, `qwen3.8-27b-nothink` (alias `qwen3.8-27b` → `-nothink` since 2026-11-17) | 20 rpm, 100k tpm, 2 in flight, $5/day | dgx-1 DefenseClaw LLM judge (`DEFENSECLAW_LLM_KEY`) |
+| `defenseclaw-jetson-judge` | `qwen3.8-27b`, `qwen3.8-27b-nothink` (alias `qwen3.8-27b` → `-nothink`) | 200 rpm, 600k tpm, 6 in flight, $5/day | both Jetson DefenseClaw installs: skill, plugin and MCP scanner LLM analyzers and the guardrail judge |
 | `cisco-aibom` | `qwen3.8-27b` | 10 rpm, 100k tpm, 1 in flight, $5/day | Cisco AIBOM agentic stage, every host (`/etc/cisco-aibom/llm.env`) |
 | `hermes`, `claude-code`, `open-webui`, … | all | — | reviewed and kept (P0.17) |
 | `claude-code`, `codex`, `cursor` | all | — | coding tools on a Mac, one key per tool, created by the user in the admin UI and kept in the Mac's Keychain (runbooks/dev-tools.md). `cursor` is reserved: Cursor's own models can't reach LiteLLM |
@@ -204,14 +204,53 @@ The static routes `qwen3.6-35b` (`vllm-qwen`) and `whisper-large-v3-turbo` (`vll
 2026-11-15 with their stopped containers.
 
 `qwen3.8-27b-nothink` (added 2026-11-16 through the admin API, not by DGXMM): the same DGXMM route as `qwen3.8-27b`
-with `extra_body: {chat_template_kwargs: {enable_thinking: false}}`. The key `defenseclaw-jetson-judge` has the key
-alias `qwen3.8-27b` → `qwen3.8-27b-nothink`, so the Jetson scanners keep asking for `qwen3.8-27b` (decision 0012)
+with `extra_body: {chat_template_kwargs: {enable_thinking: false}}`. The keys `defenseclaw-jetson-judge` and (since
+2026-11-17) `defenseclaw-dgx1` have the key alias `qwen3.8-27b` → `qwen3.8-27b-nothink`, so the DefenseClaw judges
+keep asking for `qwen3.8-27b` (decision 0012)
 but get answers without the reasoning pass. Why: with thinking on, one skill or plugin analysis took 2–5 minutes
 under load, and DefenseClaw 1.0.9's plugin watcher kills its LLM call after a fixed 120 s and then quarantines the
 plugin ("the LLM judge did not run", fail closed). If DGXMM re-registers `qwen3.8-27b` with a new id, recreate the
 clone the same way (copy the decrypted `litellm_params` inside a pod, add `extra_body`, `POST /model/new`); if only its
 `api_base` changes, `PATCH /model/<id>/update` with `{"litellm_params": {"api_base": ...}}` (done 2026-11-16).
 To undo: `/key/update` with `aliases: {}`, then `/model/delete` the clone.
+
+Checked 2026-11-17: through the door with dgx-1's judge key, `qwen3.8-27b` answers from model group
+`qwen3.8-27b-nothink` with 0 reasoning tokens (also no reasoning tokens in any judge span in Phoenix since
+2026-11-16 06:16 UTC; before that the plugin judge spent all 8192 tokens thinking and answered nothing). Cold starts
+go through the same DGXMM route and succeed (about 280 s in the spend log), but DefenseClaw's plugin watcher gives up
+after its fixed 120 s, so the first scans after the model was unloaded can still fail closed (timeout, not format).
+
+Other model callers that judge: `cisco-aibom` (its arbiter, every host; observability's area, #121) still asks for
+`qwen3.8-27b` with thinking on. The Pi runs no DefenseClaw LLM judge (only the edge connector and picoclaw's regex
+hook).
+
+### DefenseClaw judge replies
+
+Even without thinking, qwen3.8-27b answers DefenseClaw 1.0.9's plugin analyzer in a shape it can't read in about 8%
+of calls: DefenseClaw wants a bare JSON array of findings, `json.loads` after stripping one leading fence, and
+anything else becomes `LLM-SCAN-ERROR` ("The LLM analyzer was enabled but returned JSON that was not the expected
+array of findings"), which the plugin watcher treats as "the LLM judge did not run" and quarantines the plugin (fail
+closed). Most of them (49 of 62 since 2026-11-16 06:16 UTC) were a single finding object instead of a one-item array.
+
+`qwen_system_merge.py` repairs these replies in `async_post_call_success_hook` (DefenseClaw does not stream), only
+when the key is `defenseclaw-jetson-judge` or `defenseclaw-dgx1` **and** the system prompt is the plugin analyzer's
+(it contains both "You are a security analyzer for OpenClaw plugins" and "Respond ONLY with the JSON array"; the
+meta-analyzer and the skill scanner want an object and are not touched):
+
+- a reply DefenseClaw already reads as an array is left as it is;
+- `<think>…</think>` (or reasoning before a lone `</think>`) and ``` fences are removed;
+- a single finding object becomes a one-item array, and `{"findings": […]}` (that key alone) its array;
+- prose before a non-empty array is dropped (findings can only make the verdict stricter).
+
+It never invents findings and never turns doubtful output into `[]`: these stay exactly as the model sent them, so
+DefenseClaw still fails closed: an empty array after prose (one reply said "let me flag the subprocess call" and then
+gave `[]`), text after the JSON, two candidate answers, broken or truncated JSON (`finish_reason` `length`),
+`{"error": …}`, an unterminated `<think>`. Each repair is logged (`DefenseClaw judge reply (<alias>): repaired: …`),
+without content. Tests: `proxy/tests/test_judge_reply_repair.py` (CI, Checks job).
+
+Measured on the 758 plugin judge replies in Phoenix from 2026-11-16 06:16 UTC to 2026-11-17 02:00 UTC: DefenseClaw
+reads 696 (91.8%) as they are, 746 (98.4%) after the repair (48 objects to arrays, 2 prose dropped); the other 12 are
+left and still fail closed.
 
 ## DefenseClaw guardrail (P2.4)
 
@@ -353,10 +392,10 @@ keys in memory.
 
 vLLM accepts no file parts, so a client that sends one (Claude Code reading a PDF, an OpenAI `file` / `input_file` part)
 got `400 Unsupported chat content part type: 'input_file'`. Since 2026-11-16 the pre-call hook in
-`hosts/stacks/litellm/litellm-proxy/qwen_system_merge.py` turns them into text first:
+`cluster/apps/litellm/proxy/qwen_system_merge.py` turns them into text first:
 text documents as they are, PDFs as their extracted text (pypdf, per page, truncated at 160k characters), and
 scanned PDFs, URLs, file ids and other types as a one-line note to the model. Images are unchanged.
-Tests: `hosts/stacks/litellm/litellm-proxy/tests` (run in CI).
+Tests: `cluster/apps/litellm/proxy/tests` (run in CI).
 
 ## The move from Docker (2026-11-16)
 
