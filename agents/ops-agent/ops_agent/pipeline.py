@@ -59,7 +59,11 @@ async def analyse(incident_id: int, *, engine: str = "own-loop", as_of: dt.datet
         rc = await recall(gw, ctx, inc, rq)
         go = may_continue or (lambda: mode.running() and budget_ok())
         clock = timeutil.iso(as_of) if as_of else "now (live)"
-        if not go():
+        if inc["klass"] == "self" and as_of is None:
+            # alerts about the agent itself (budget, stuck, down): evidence only; it doesn't spend the model on itself
+            rca_id = store_rca(incident_id, "deterministic", None,
+                               deterministic_rca(inc, ctx, ["an alert about the agent itself: evidence only"]), [], 0, 0, 0.0)
+        elif not go():
             rca_id = store_rca(incident_id, "deterministic", None, deterministic_rca(inc, ctx), [], 0, 0, 0.0)
         elif engine == "holmesgpt":
             from .investigate import holmes  # only in the replay/bake-off environment

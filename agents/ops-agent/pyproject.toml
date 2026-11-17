@@ -1,6 +1,6 @@
 [project]
 name = "ops-agent"
-version = "0.1.6"
+version = "0.1.7"
 description = "Ambient ops agent for the home fleet (decision 0013): shadow mode, read-only"
 requires-python = ">=3.12"
 readme = "README.md"

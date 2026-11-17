@@ -97,6 +97,13 @@ def gauges() -> None:
     G_STUCK.set(float(r["oldest"] or 0))
 
 
+def reset_lost_investigations() -> None:
+    """An investigation whose worker died (a rollout, a node) leaves its incident 'investigating': Temporal retries
+    the activity within 30 minutes, so anything quiet for 40 is lost; put it back to open."""
+    db.run("UPDATE incidents SET status = 'open', tags = array_append(tags, 'investigation-lost'), updated_at = now() "
+           "WHERE replay_run IS NULL AND status = 'investigating' AND updated_at < now() - interval '40 minutes'")
+
+
 def release_held_criticals() -> None:
     if notify.in_quiet_hours():
         return
@@ -140,6 +147,7 @@ async def main() -> None:
             gauges()
             if m != "stopped":
                 release_held_criticals()
+                reset_lost_investigations()
         except Exception as e:
             log.warning("gauges: %s", e)
         now = asyncio.get_running_loop().time()
