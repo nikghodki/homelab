@@ -1,0 +1,8 @@
+##
+# Host Database
+127.0.0.1	localhost
+100.90.1.2	model.nghodki.ai
+192.168.86.211 docs.nghodki.ai ca.nghodki.ai   # old Jetson front door
+# 100.90.1.2 webui.nghodki.ai
+10.0.0.5	nghodki.ai.example.com notnghodki.ai
+255.255.255.255	broadcasthost

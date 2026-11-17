@@ -13,6 +13,7 @@ in the repo (keys, rotation, guardrail, Phoenix).
 | Addresses | fixed ClusterIPs: proxy `10.43.0.150:4000` (`litellm/litellm`), Redis `10.43.0.152:6379`. Nothing listens on the LAN or the tailnet any more |
 | Database | CNPG `data/litellm-db` (Argo CD app `data`): Postgres 17.12, primary on dgx-2, standby on dgx-1; the primary at `10.43.0.151:5432` ([CloudNativePG](../platform/cnpg.md)) |
 | URLs | `http(s)://model.nghodki.ai/v1` and `https://litellm-admin.nghodki.ai` (the admin UI): front door → `10.43.0.150:4000` first, the stopped Docker copy (`10.100.136.1:4000`) only while the pods' health check fails, until 2026-11-23 |
+| Coding tools | Claude Code, Codex and the Claude Code extension in Cursor on a Mac: [Use the home models in Claude Code, Cursor and Codex](../agents/coding-tools.md) (keys `claude-code`, `codex`) |
 | Callers | everything through the front door, except Open WebUI (`http://10.43.0.150:4000/v1`, stored in its database) and DGXMM's route sync (`10.43.0.150:4000`); the ops agent should use the ClusterIP too |
 | Relays on dgx-1 | `hosts/stacks/litellm-bridges` (`playbooks/litellm-bridges.yml`, socat): DGXMM's on-demand gateway on `10.100.136.1:8091`, the DefenseClaw gateway on `10.100.136.1:18970`; **until 2026-11-23** transition relays on `127.0.0.1:4000` and `10.100.136.1:4000` → `10.43.0.150:4000` for callers still on the old addresses |
 | Sign-in | API: LiteLLM virtual keys. Admin UI: front door sign-in, then Pocket ID SSO (client `litellm`, `admins` → `proxy_admin`); break-glass `/fallback/login` |

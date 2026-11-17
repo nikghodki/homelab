@@ -183,6 +183,7 @@ nav:
           - agents/hermes.md
           - agents/picoclaw.md
           - agents/model-plane.md
+          - agents/coding-tools.md
           - agents/cards-and-tools.md
           - agents/openbot.md
       - Robotics and simulation:

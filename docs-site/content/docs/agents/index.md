@@ -10,6 +10,7 @@ description: The agents in the fleet, the model plane under them, and the planne
 | [picoclaw](picoclaw.md) | Pi | own user `picoclaw`, system unit `picoclaw` | via LiteLLM (key in `/etc/picoclaw/picoclaw.env`) | MCP `picoclaw-hardware` (motion through the safety governor's motion bridge) | in-process Edge engine hook + Edge Connector daemon | running; end-to-end reply over NATS waits for the model |
 | OpenBot / computer-use agent | Dell | — | — | — | — | [pending decision 0004](openbot.md) |
 | Coding agents (Claude Code, Codex, OpenCode) | dgx-1 | the operator | — | — | DefenseClaw on dgx-1 has no connectors yet | as used |
+| [Coding tools on a Mac](coding-tools.md) (Claude Code, Codex, Claude Code in Cursor) | MacBook Air | the user | every DGXMM model, default `qwen3.8-27b`, via `https://model.nghodki.ai` | — | the LiteLLM guardrail | running (Claude Code) |
 
 ## The model plane
 

@@ -1,0 +1,10 @@
+{"data": [
+  {"id": "qwen3.8-27b", "object": "model", "owned_by": "openai"},
+  {"id": "qwen3.8-27b-nothink", "object": "model"},
+  {"id": "flint-nvfp4", "object": "model"},
+  {"id": "twil-8b", "object": "model"},
+  {"id": "bge-m3", "object": "model"},
+  {"id": "whisper-large-v3-turbo", "object": "model"},
+  {"id": "qwen3.8-27b", "object": "model"},
+  {"id": "openai/*", "object": "model"}
+], "object": "list"}

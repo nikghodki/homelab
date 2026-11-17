@@ -13,5 +13,10 @@ What the fleet does with it:
   `group:admins` devices. The alerting runbook suggests it as an admin device for testing the Dell's Tailscale HTTPS URL.
 - Nothing in this repo deploys to it, and nothing here should.
 
+**Coding tools.** Claude Code (terminal and the extension in Cursor) uses the home models through LiteLLM, set up
+by the user with `tools/dev-setup/install-mac.sh` ([Use the home models in Claude Code, Cursor and Codex](../agents/coding-tools.md)):
+key `claude-code` in the login Keychain, a user LaunchAgent that keeps the `/model` list in sync. The user runs it;
+the fleet still deploys nothing here.
+
 If it ever joins the fleet, it needs: an inventory entry, a Tailscale tag, a DefenseClaw install (OpenClaw connector)
 and a decision record replacing D18.

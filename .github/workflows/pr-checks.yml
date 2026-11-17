@@ -163,6 +163,9 @@ jobs:
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         working-directory: cluster/apps/litellm/proxy
         run: PYTHONPATH=. python -m pytest -q tests/test_documents_to_text.py
+      - name: "Unit tests: Mac dev-setup (installer logic on fixtures; bash, jq, awk)"
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: bash tools/dev-setup/tests/run.sh
       - name: DefenseClaw fleet policy
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         working-directory: policies/defenseclaw

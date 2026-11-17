@@ -40,4 +40,5 @@ Operational how-tos (not incidents): [simulation.md](simulation.md) (Isaac Lab a
 [nats.md](nats.md) (NATS in k3s, prepared: 3 servers, JetStream R3, the NATS VIP; the user-present cutover and rollback),
 [ops-agent.md](ops-agent.md) (the ambient ops agent; host access through the read-only `opsro` user and `ops-ro`),
 [memory-guard.md](memory-guard.md) (unified-memory OOM protection on the Sparks: earlyoom and gpu-oom-guard),
-[web-https.md](web-https.md) (the homelab web CA for `*.nghodki.ai`: install on a device, renew).
+[web-https.md](web-https.md) (the homelab web CA for `*.nghodki.ai`: install on a device, renew),
+[dev-tools.md](dev-tools.md) (Claude Code, Codex and Cursor on a Mac through LiteLLM: the installer, its sync agent, keys, the Gatus check).

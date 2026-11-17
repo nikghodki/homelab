@@ -1,0 +1,14 @@
+export PATH="$HOME/bin:$PATH"
+source "$HOME/.openclaw/completions/openclaw.zsh"
+
+# Claude Code via AWS Bedrock (disabled)
+# export CLAUDE_CODE_USE_BEDROCK=1
+# export AWS_BEARER_TOKEN_BEDROCK=not-a-real-token
+
+export ANTHROPIC_AUTH_TOKEN=not-a-real-key
+export ANTHROPIC_API_KEY="not-a-real-key"
+export ANTHROPIC_MODEL=qwen3.8-27b
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=flint-nvfp4
+export ANTHROPIC_CUSTOM_MODEL_OPTION=qwen3.8-27b
+  export OTHER_TOKEN=keep-me
+. "$HOME/.local/bin/env"
