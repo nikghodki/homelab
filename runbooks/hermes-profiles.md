@@ -124,9 +124,9 @@ warning (INFO findings from the LLM).
 ## Restarts and quarantined plugins (2026-11-17)
 
 A gateway restart reloads every plugin from disk, so anything DefenseClaw's watcher quarantined since the last start
-disappears from the running agent. Since the move of LiteLLM, the watcher's LLM judge often times out (its fixed
-120 s), so it keeps quarantining plugins with "the LLM judge did not run" in both accounts (dozens on 2026-11-16).
-After the key rotation restart on 2026-11-17:
+disappears from the running agent. The watcher kept quarantining plugins with "the LLM judge did not run" in both
+accounts (dozens on 2026-11-16); the cause is [below](#why-the-watcher-kept-quarantining-plugins). After the key
+rotation restart on 2026-11-17 (01:00 UTC):
 
 - nikjetson: chats failed with `No module named 'plugins.browser.browser_use'` (then `browserbase`). Rescanned in
   place with the LLM and restored as before (none HIGH+): `browser/browser_use`, `browser/browserbase`,
@@ -137,6 +137,94 @@ After the key rotation restart on 2026-11-17:
   `package.json`, files the plugin doesn't have) and again at 01:08 UTC after a clean manual rescan, so the restarted
   gateway has no Slack adapter. The `homeassistant` platform plugin (`~/.hermes/plugins/homeassistant`) rescanned HIGH
   and stays quarantined. Both need a human decision (allow-list or keep off).
+
+## Why the watcher kept quarantining plugins
+
+Found 2026-11-17 (qwen3.8-27b loaded, so not a timeout): the watcher blocked `browser/browser_use` with "scanner
+failure (fail-closed): the LLM judge did not run … judge openai/qwen3.8-27b: The LLM analyzer was enabled but returned
+JSON that was not the expected array of findings". A manual rescan passed. After the restore the watcher allowed it,
+and the rescan after the next restart blocked it again.
+
+- **Cause.** DefenseClaw 1.0.9's plugin analyzer accepts only a bare JSON array. qwen3.8-27b, even with thinking off,
+  answers about 8% of plugin judge calls differently. Of 758 calls (2026-11-16 06:16 UTC to 2026-11-17 02:00 UTC),
+  62 failed: 49 sent one finding object instead of a one-item array, and the rest were prose, broken JSON or
+  `{"error": …}`. Each failure is `LLM-SCAN-ERROR`, which the watcher treats as a failed scan and quarantines (fail
+  closed), even for a plugin it admitted minutes before.
+- **Fix.** LiteLLM repairs these replies, but only for the judge keys and the plugin analyzer's prompt. It never
+  invents findings and leaves doubtful replies unchanged, so DefenseClaw still fails closed (#189;
+  [litellm.md](litellm.md#defenseclaw-judge-replies)). Measured on those 758 replies, DefenseClaw reads 98.4%, up
+  from 91.8%. Replaying the `browser_use` judge prompt 10 times parsed 10/10 both before and after the change: on
+  that prompt the failure is intermittent, so the corpus is the meaningful number. Both judge keys
+  (`defenseclaw-jetson-judge`, `defenseclaw-dgx1`) map `qwen3.8-27b` to `qwen3.8-27b-nothink` (no reasoning tokens).
+- **Still possible.** The watcher's LLM call has a fixed 120 s limit, so a scan while the model is cold (about 280 s
+  to load) still times out and fails closed. The fix also doesn't help when the judge is given no code (next point).
+- **The judge can be given no code at all.** DefenseClaw sends at most 50,000 bytes of source and stops at the first
+  file that doesn't fit. Slack's `adapter.py` is 372 KB and dingtalk's is 52 KB, so for these plugins the judge gets
+  only `## Plugin: <name>\n\n## Source files\n`. It then answers `[]`, or hallucinates: "CRITICAL Credential
+  Exfiltration @ src/index.ts:42", "eval @ src/handler.ts", for files these Python plugins don't have. Restoring
+  such a plugin doesn't last, because the next rescan can hallucinate again. Upstream draft:
+  [docs/upstream-issues/09](../docs/upstream-issues/09-plugin-judge-unparseable-reply-quarantines.md).
+
+### Restore after the fix (2026-11-17, 02:20–03:20 UTC)
+
+Each quarantine copy was rescanned with the LLM by `hosts/files/defenseclaw/plugin_rescan_restore.py` (as the profile
+user). A plugin was copied back only if the LLM ran and nothing was HIGH or above, and `git status` of the restored
+path was clean every time (the files are the checkout's own). The watcher then scanned each one again. Nothing was
+allow-listed.
+
+| | nikjetson | hermes-nikhil |
+|---|---|---|
+| Scope | every plugin whose files were gone and whose latest block was a scanner failure (59 + a retry) | `browser/browser_use` (already back since 02:08 UTC), `web/firecrawl`, `platforms/slack`; then `browser/browserbase` (quarantined again at 02:09 UTC, before the fix rolled out) |
+| Restored and admitted by the watcher (before the restart) | 41: `cron_providers/chronos`, `dashboard_auth/*` (4), `disk-cleanup`, `hermes-achievements/dashboard`, `image_gen/*` (8), `model-providers/*` (9), `platforms/{email,line,matrix,telegram,wecom}`, `video_gen/*` (4), `web/*` (8) | `browser/browser_use`, `browser/browserbase`, `web/firecrawl`, `platforms/slack` |
+| Rejected by the watcher's own LLM rescan | `platforms/dingtalk` (CRITICAL, hallucinated: `src/config.ts`, `src/processor.ts`), `platforms/mattermost` (HIGH: `_load_batch_image` reads `file://` URLs, `adapter.py:373`, real) | after the restart, see below |
+| Kept: HIGH or CRITICAL on the rescan | `google_meet`, `kanban/dashboard` (`exec()` in `dist/index.js`), `memory/byterover`, `memory/retaindb`, `platforms/{a2a,buzz,discord,irc,ntfy,photon,raft,simplex,sms,teams,whatsapp}`, `~/.hermes/plugins/homeassistant` | — |
+
+Unchanged since before: nikjetson's `platforms/slack` (static HIGH `PATH-ENV-FILE`, besides hallucinated LLM
+findings), `computer_use/cua`, `observability/langfuse`, `platforms/{feishu,google_chat}` and
+`whatsapp-agent-platform` stay quarantined for findings. The other hermes-nikhil plugins that are still in quarantine
+for scanner failures (`image_gen/*`, `model-providers/*`, `web/*`, `video_gen/*`, `dashboard_auth/*`, most
+platforms) weren't in scope; `plugin_rescan_restore.py scanner-failures` as hermes-nikhil would do them.
+
+**After the single restart of each gateway (03:20 UTC):**
+
+- 5 minutes later (03:25–03:27 UTC): every restored plugin was still in place in both accounts, except the two the
+  watcher had already rejected before the restart (nikjetson `platforms/dingtalk`, `platforms/mattermost`).
+  nikjetson logged no import errors. hermes-nikhil logged `No module named 'plugins.browser.browserbase'` at start-up
+  (`tools.browser_tool`): browserbase had been quarantined again at 02:09 UTC, before the fix rolled out. It was
+  restored at 03:21 UTC and admitted at 03:23 UTC, but the running agent only picks it up at the next restart. Slack
+  connected on hermes-nikhil ("Socket Mode connected", "slack connected"). Test chats ("what time is it?", no tools)
+  answered 200 on both API servers, and the Pi's governor logged no command.
+- The watcher's rescan after the restart (cycle complete 03:32 UTC for hermes-nikhil, 03:34 UTC for nikjetson)
+  rejected three of them again:
+  - hermes-nikhil `platforms/slack`, CRITICAL: hallucinated (`src/index.ts:42`, `src/index.ts:18`; the judge saw no
+    code).
+  - hermes-nikhil `web/firecrawl`, HIGH: "Credential leakage in client cache key", `provider.py:186`. This is real
+    code, but the same finding was MEDIUM in all three manual rescans and in the watcher's 02:29 UTC scan: the model
+    varies on the severity.
+  - nikjetson `platforms/email`, CRITICAL: hallucinated (`src/config.ts`, `src/processor.ts`).
+
+  Nothing else was rejected (31 verdicts). The running agents keep what they loaded at 03:20 UTC: Slack stays
+  connected and `tools.web_tools` keeps firecrawl until the next restart of hermes-nikhil's gateway. After that
+  restart, Slack is gone and `tools.web_tools` breaks again (`No module named 'plugins.web.firecrawl'`), unless a
+  human decides first (allow-list or keep them off). End state: nikjetson 40 of the 43 restored plugins in place;
+  hermes-nikhil `browser/browser_use` and `browser/browserbase` in place, Slack and firecrawl quarantined.
+
+## After any Hermes restart
+
+1. Wait for the watcher's rescan to finish (`grep '\[rescan\]\|watcher verdict' ~/.defenseclaw/gateway.log`, about 30–60 s
+   per plugin), then look for import errors: `grep -i 'no module named' ~/.hermes/logs/agent.log` (the log is in local
+   time, PST; DefenseClaw logs in UTC).
+2. List what is missing and why: the newest `quarantine_records` row per `original_path` in `~/.defenseclaw/audit.db`
+   (read-only), for paths that no longer exist. A scanner failure ("the LLM judge did not run", a timeout, a 429) is
+   not a finding.
+3. As the profile user, in a login shell, from a copy of `hosts/files/defenseclaw/plugin_rescan_restore.py`:
+   `plugin_rescan_restore.py scanner-failures`, or `named <category>/<plugin> …`. It restores only what rescans with
+   the LLM and nothing HIGH or above, and never allow-lists anything.
+4. Check the watcher's verdict for each restored plugin (platform plugins are logged by bare name, `plugin slack`).
+   A plugin that is imported at start-up (`tools.browser_tool` needs `browser/browserbase`) is only picked up by the
+   next restart, and a restart triggers the next rescan, so restore everything first and restart once.
+5. Plugins the watcher rejects with findings about files the plugin doesn't have (Slack, dingtalk) need a human
+   decision: allow-list them, or leave them off until DefenseClaw stops judging empty prompts.
 
 ## Rollback
 
