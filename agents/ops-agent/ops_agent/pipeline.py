@@ -53,6 +53,7 @@ async def analyse(incident_id: int, *, engine: str = "own-loop", as_of: dt.datet
     gw = Gateway()
     ctx = ToolContext(incident_id=incident_id, as_of=as_of, docs_commit=docs_commit, frozen=frozen or {})
     db.run("UPDATE incidents SET status = 'investigating', updated_at = now() WHERE id = %s", incident_id)
+    ok = False
     try:
         fl, rq = await first_look(gw, ctx, inc)
         rc = await recall(gw, ctx, inc, rq)
@@ -74,8 +75,12 @@ async def analyse(incident_id: int, *, engine: str = "own-loop", as_of: dt.datet
             rca["trace"] = res.trace[-30:]
             rca_id = store_rca(incident_id, engine if res.rca else "deterministic", settings().model_deep, rca,
                                res.notes, res.tokens, res.tool_calls, res.seconds)
+        ok = True
     finally:
         await gw.close()
+        if not ok:   # cancelled (Stop) or failed: don't leave it "investigating"
+            db.run("UPDATE incidents SET status = 'open', updated_at = now() WHERE id = %s AND status = 'investigating'",
+                   incident_id)
     db.run("UPDATE incidents SET status = CASE WHEN status = 'investigating' THEN 'rca_ready' ELSE status END, "
            "updated_at = now() WHERE id = %s", incident_id)
     return rca_id

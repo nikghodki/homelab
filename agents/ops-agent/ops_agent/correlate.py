@@ -146,8 +146,10 @@ def from_k8s_event(ev: dict) -> Event | None:
         return None
     obj = ev.get("involvedObject") or ev.get("regarding") or {}
     ns = obj.get("namespace") or ev.get("metadata", {}).get("namespace", "")
-    if reason == "Unhealthy" and int(ev.get("count") or (ev.get("series") or {}).get("count") or 1) < 3:
-        return None  # a single failed probe is noise
+    count = int(ev.get("count") or (ev.get("series") or {}).get("count") or 1)
+    # a failed probe, a pod waiting for a node or a restart back-off during a rollout is normal once or twice
+    if reason in ("Unhealthy", "FailedScheduling", "BackOff") and count < 3:
+        return None
     labels = {"namespace": ns, "kind": obj.get("kind", ""), "name": obj.get("name", ""), "reason": reason,
               "node": (ev.get("source") or {}).get("host", "") or ev.get("reportingInstance", "")}
     t = ev.get("lastTimestamp") or ev.get("eventTime") or ev.get("metadata", {}).get("creationTimestamp")
