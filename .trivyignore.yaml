@@ -27,6 +27,11 @@ misconfigurations:
   - id: KSV-0108
     paths: ["cluster/platform/edge/coredns.yaml", "cluster/platform/edge/caddy.yaml", "cluster/apps/nats/tailnet-service.yaml"]
     statement: edge-dns-tailnet / edge-caddy-tailnet / nats-tailnet answer on the Sparks' Tailscale IPs by design (decisions 0007, 0014)
+  # The Ask Me overlay keeps the upstream Open WebUI image's user (root: the image's files are root's). The pod drops
+  # every capability, forbids privilege escalation and has a read-only root (cluster/apps/open-webui/open-webui.yaml).
+  - id: DS-0002
+    paths: ["cluster/apps/open-webui/image/Dockerfile"]
+    statement: overlay of the upstream Open WebUI image, which runs as root; the pod is unprivileged with no capabilities
 
 # Image vulnerabilities with no fixed upstream image yet (nightly-scan.yml scans every pinned image with this file).
 # Each one is scoped to the vulnerable package version (purls), has a reason, and expires 30 days out at most:

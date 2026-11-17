@@ -144,6 +144,12 @@ jobs:
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
         run: .github/scripts/check-kubernetes.sh "$KUBECONFORM_IMAGE" "$KYVERNO_IMAGE"
 
+      - name: Open WebUI overlay builds on its pinned base (only when cluster/apps/open-webui/image changes)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' }}
+        env:
+          BASE: ${{ steps.scope.outputs.base }}
+        run: .github/scripts/open-webui-overlay-check.sh "$BASE"
+
       # --- unit tests
       - name: "Unit tests: fleet-metrics"
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
@@ -191,6 +197,10 @@ jobs:
       - name: Ops agent host access (ops-ro dispatcher and root helper)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python -m pytest -q hosts/roles/ops_agent_access/files/tests
+      - name: Open WebUI overlay patch (Ask Me branding)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: cluster/apps/open-webui/image
+        run: python -m pytest -q tests
       - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python -m pytest -q .github/scripts/tests

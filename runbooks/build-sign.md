@@ -26,6 +26,7 @@ The fleet's own images are built by GitHub Actions from the Dockerfiles in this 
 |---|---|---|
 | `ghcr.io/nikghodki/mlflow` | `hosts/stacks/ml/mlflow/Dockerfile` (tag = compose `image:` tag) | MLflow on dgx-2 (still built locally by compose; the k3s move is P3.7) |
 | `ghcr.io/nikghodki/ros-zenoh` | `hosts/roles/ros_zenoh_router/templates/Dockerfile.j2`, rendered with the role defaults (tag = `ros_zenoh_router_image_tag`) | Zenoh router on the Jetson (still built locally by Ansible) |
+| `ghcr.io/nikghodki/open-webui` | `cluster/apps/open-webui/image/Dockerfile`: the upstream Open WebUI image plus the Ask Me patch, **linux/arm64 only** (image-spec.sh `platforms=`); tag = upstream tag + `-askme.<revision>` | Open WebUI in k3s ([open-webui.md](open-webui.md), "Ask Me overlay") |
 
 **Not built in CI:** `robots/sim/mujoco` (~12 GB: JAX CUDA 13 wheels). A hosted runner has about 14 GB of free disk,
 the arm64 half would run under QEMU, and the push alone would take most of a run; decision 0008. It stays a local

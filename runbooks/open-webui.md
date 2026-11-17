@@ -20,6 +20,26 @@ container on dgx-1, `~/open-webui`).
 Open WebUI would create a new database and make its first visitor admin. If the pod sits in `Init:CrashLoopBackOff`,
 the volume lost its data: restore it (below), don't delete the check.
 
+## Ask Me overlay
+
+The UI is called **Ask Me**. Open WebUI appends " (Open WebUI)" to any `WEBUI_NAME` other than its default
+(`backend/open_webui/env.py`), so the pod runs a small overlay of the upstream image, `ghcr.io/nikghodki/open-webui`:
+
+| | |
+|---|---|
+| Source | `cluster/apps/open-webui/image/`: `Dockerfile` (FROM the upstream image by digest), `patch_branding.py` (tests in `tests/`, run in CI), `LICENSE.open-webui` (copied to `/app/LICENSE.open-webui`) |
+| Patch | drops the two lines that add the suffix (the licence comment above them stays) and sets the static `<title>` (shown until the app sets it from `WEBUI_NAME`). Each edit must match exactly once, or the build fails with "the Ask Me patch no longer applies: ...". Logo and favicon stay upstream's |
+| Tag | `<upstream tag>-askme.<revision>`, e.g. `v0.13.3-askme.1` (`# askme-revision:` in the Dockerfile; bump it when the patch changes on the same upstream version, reset it to 1 on a new one) |
+| Build | `build-sign.yml` on main (signed, SBOM attested; Kyverno's `verify-images` admits it), linux/arm64 only; the manifest pins the digest |
+| Upgrades | Renovate opens PRs for the FROM line (rule in `renovate.json`). The PR's "Open WebUI overlay builds on its pinned base" step builds the overlay, so a patch that no longer applies fails the PR. After merge: the digest from the build-sign run summary goes into `open-webui.yaml` (all three containers), as in [Upgrade](#upgrade) |
+| Package | `ghcr.io/nikghodki/open-webui` must be **public** (nodes and Kyverno pull without a credential; runbooks/build-sign.md, "Visibility"). It holds nothing private: upstream's image plus the patch |
+
+**Licence.** The Open WebUI License is BSD-3 plus a branding clause: changing or removing the "Open WebUI" branding
+is allowed only for deployments with **at most 50 end users in any rolling 30 days** (or with written permission or an
+enterprise licence). This household deployment qualifies; the rebrand relies on that clause. Copyright notices in
+the source are kept and the licence ships in the image. The image is public, so anyone who runs or redistributes this
+rebranded build is bound by the same clause (more than 50 users: the branding must stay).
+
 ## Model connection
 
 Open WebUI keeps its OpenAI connection in its database (config key `openai.api_base_urls`, with the key in
