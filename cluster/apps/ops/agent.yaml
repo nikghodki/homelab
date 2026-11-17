@@ -14,6 +14,9 @@ metadata:
 spec:
   replicas: 2
   revisionHistoryLimit: 3
+  # one pod per Spark (required anti-affinity): a surge pod has nowhere to go, so replace one at a time
+  strategy:
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
   selector:
     matchLabels: {app.kubernetes.io/name: ops-ingest}
   template:
@@ -113,6 +116,9 @@ metadata:
 spec:
   replicas: 2
   revisionHistoryLimit: 3
+  # one pod per Spark (required anti-affinity): a surge pod has nowhere to go, so replace one at a time
+  strategy:
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
   selector:
     matchLabels: {app.kubernetes.io/name: ops-worker}
   template:
@@ -210,6 +216,9 @@ metadata:
 spec:
   replicas: 2
   revisionHistoryLimit: 3
+  # one pod per Spark (required anti-affinity): a surge pod has nowhere to go, so replace one at a time
+  strategy:
+    rollingUpdate: {maxUnavailable: 1, maxSurge: 0}
   selector:
     matchLabels: {app.kubernetes.io/name: ops-portal}
   template:
