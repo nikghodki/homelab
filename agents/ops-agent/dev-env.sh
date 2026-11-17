@@ -13,6 +13,6 @@ sops -d --extract '["opsro_ssh_key"]' ~/homelab/secrets/ops-agent.enc.yaml > "$t
 for h in 192.168.86.44 192.168.86.36 192.168.86.211 192.168.86.49 192.168.86.39; do ssh-keygen -F $h -f ~/.ssh/known_hosts | grep -v "^#"; done > "$t"/kh
 kubectl -n ops get secret ops-db-app -o jsonpath='{.data.uri}' | base64 -d | sed 's#@ops-db-rw[^:/]*:#@10.43.0.143:#' > "$t"/dsn
 export MCP_TOKEN_DIR="$t" OPSRO_KEY_FILE="$t"/id OPSRO_KNOWN_HOSTS="$t"/kh LLM_KEY_FILE="$t"/litellm-key OPS_DB_DSN_FILE="$t"/dsn \
-       LLM_BASE_URL=http://10.43.0.150:4000/v1 MODE_FILE=/nonexistent
+       LLM_BASE_URL=http://10.43.0.150:4000/v1 MODE_FILE=/nonexistent REPLAY_YIELD=0
 cd "$(dirname "$0")"
 PATH=$HOME/.venvs/ops-agent/bin:$PATH "$@"

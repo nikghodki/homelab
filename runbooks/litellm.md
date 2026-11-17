@@ -81,7 +81,7 @@ Everything reaches LiteLLM through the front door (`http://model.nghodki.ai/v1`)
 |---|---|---|
 | Open WebUI (k3s) | `http://10.43.0.150:4000/v1` (**in its database**, `openai.api_base_urls`; runbooks/open-webui.md) | `open-webui` |
 | DGXMM's route sync (Docker, dgx-1) | `litellm_url: http://10.43.0.150:4000` (DGXMM's `config.yaml`) | master key |
-| Ops agent (being built) | its `LLM_BASE_URL`; use `http://10.43.0.150:4000/v1` (default `10.100.136.1:4000`, the transition relay) | `ops-agent` |
+| Ops agent (k3s, decision 0013) | `LLM_BASE_URL` default `http://10.43.0.150:4000/v1`; its replay harness on dgx-1 the same address | `ops-agent`; replays `ops-agent-eval` |
 | Hermes (Jetson, both profiles), DefenseClaw (Jetson, dgx-1, Pi), picoclaw (Pi), Cisco AIBOM (every host, dgx-1 since 2026-11-16 too) | `http://model.nghodki.ai/v1` (dgx-1's DefenseClaw: `~/.defenseclaw/config.yaml` `llm.base_url`, changed by hand) | as below |
 | Claude Code, Codex and the Claude Code extension in Cursor on a Mac (`tools/dev-setup/install-mac.sh`, runbooks/dev-tools.md) | `https://model.nghodki.ai` (`/v1/messages`, `/v1/responses`, `/v1/models`) | `claude-code`, `codex` |
 

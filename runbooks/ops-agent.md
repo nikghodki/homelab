@@ -77,12 +77,15 @@ ClusterIPs, with the clock set back to each incident (metrics and logs stop ther
 on `main` then, live-only tools answer from recorded output):
 
 ```bash
-~/homelab-wt/.tools/ops-env.sh python -m ops_agent replay run --engine own-loop      # or --engine holmesgpt
-~/homelab-wt/.tools/ops-env.sh python -m ops_agent replay show <run>                 # RCA next to the gold
-~/homelab-wt/.tools/ops-env.sh python -m ops_agent replay score <run> G1 --root-cause yes --correct 4 --total 5
+agents/ops-agent/dev-env.sh python -m ops_agent replay run --engine own-loop      # or --engine holmesgpt
+agents/ops-agent/dev-env.sh python -m ops_agent replay show <run>                 # RCA next to the gold
+agents/ops-agent/dev-env.sh python -m ops_agent replay score <run> G1 --root-cause yes --correct 4 --total 5
 ```
 
-(`ops-env.sh` puts the agent's credentials in a private temp dir for the duration of the command.) Results: the
+(`dev-env.sh` puts the agent's credentials in a private temp dir for the duration of the command; it needs
+`~/.venvs/ops-agent` with the agent's requirements, and HolmesGPT in `~/.venvs/holmes` for that engine. Replays use their
+own LiteLLM key, `ops-agent-eval` (1 request in flight), and count their tokens apart from the live budget (engines
+`replay-*`, `REPLAY_DAILY_TOKEN_BUDGET`, default 1 M); they never take the live key's two slots.) Results: the
 portal's Replay page and the design's §11.5.
 
 ### Troubleshooting
