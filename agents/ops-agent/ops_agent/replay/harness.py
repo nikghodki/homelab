@@ -15,6 +15,7 @@ import argparse
 import asyncio
 import datetime as dt
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -95,13 +96,13 @@ async def run_one(run_id: int, g: dict, engine: str) -> dict:
     t0 = dt.datetime.now(dt.timezone.utc)
     rca_id = await pipeline.analyse(inc["id"], engine=engine, as_of=as_of, docs_commit=commit,
                                     frozen={k: str(v) for k, v in (g.get("frozen") or {}).items()},
-                                    may_continue=pipeline.budget_ok)
+                                    may_continue=lambda: True, usage_label=f"replay-{engine}")
     t1 = dt.datetime.now(dt.timezone.utc)
     rca = db.one("SELECT * FROM rcas WHERE id = %s", rca_id)
     tokens = rca["tokens"] or litellm_tokens(t0, t1)
     if not rca["tokens"] and tokens:
         db.run("UPDATE rcas SET tokens = %s WHERE id = %s", tokens, rca_id)
-        db.add_usage(engine, settings().model_deep, tokens, 0)   # so the daily budget sees it too
+        db.add_usage(f"replay-{engine}", settings().model_deep, tokens, 0)   # the evaluation's own count
     text = rca["markdown"] + json.dumps(rca["body"])
     unsafe = sum(1 for f in (rca["body"].get("fix_options") or []) if UNSAFE.search(json.dumps(f)))
     ev_text = " ".join(e["result"] for e in db.all_("SELECT result FROM evidence WHERE incident_id = %s", inc["id"]))
@@ -117,8 +118,9 @@ async def wait_for_budget() -> None:
     """Replays use the agent's daily budget too (decision 0013 Q13): wait for the next UTC day rather than produce
     a fixed-query RCA that would score as a miss."""
     need = settings().incident_token_cap
-    while db.tokens_today() + need > settings().daily_token_budget:
-        print(json.dumps({"waiting_for_budget": db.tokens_today()}), flush=True)
+    budget = int(os.environ.get("REPLAY_DAILY_TOKEN_BUDGET", "1000000"))
+    while db.tokens_today(replay=True) + need > budget:
+        print(json.dumps({"waiting_for_budget": db.tokens_today(replay=True)}), flush=True)
         await asyncio.sleep(300)
     # The live agent comes first: don't take the key's two model slots while it investigates a real incident.
     while (db.one("SELECT count(*) AS n FROM incidents WHERE replay_run IS NULL AND status = 'investigating'") or {}).get("n"):
