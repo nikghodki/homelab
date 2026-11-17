@@ -164,6 +164,7 @@ nav:
       - Services:
           - services/index.md
           - services/litellm.md
+          - services/ops-agent.md
           - services/open-webui.md
           - services/nats.md
           - services/fleet-broker.md

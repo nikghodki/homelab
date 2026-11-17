@@ -23,7 +23,7 @@ topic. Promotion past S1 (PRs, live actions) waits for your review after the sha
 | Q2 | Auto-merge classes | None |
 | Q3 | Live actions, Ansible | No live actions yet. Later: CI reruns (infra failures) and pod restarts on "Ask". Ansible: `--check` only |
 | Q4 | Portal | Standalone `ops-agent.nghodki.ai` |
-| Q5 | Investigation engine | Decided by the A1 head-to-head of HolmesGPT and our own loop on the replay set; the result is recorded in the design (§11.5) |
+| Q5 | Investigation engine | **Own loop** (A1 head-to-head, 2026-11-17, design §11.5): on qwen3.8-27b HolmesGPT was not more accurate, used 3x the tokens, timed out once and denied a real outage (G1) |
 | Q6 | Fallback when the model is down | Fixed (deterministic) queries only; no cloud model |
 | Q7 | Keep `qwen3.8-27b` warm | No, not for now (the first look hides the cold start) |
 | Q8 | The Dell and the Pi | Read-only on both. No e-stop access of any kind |
@@ -50,3 +50,9 @@ The options per question are in the design's §13; the recommendations were take
 - The existing alert path (Alertmanager and Gatus to ntfy `fleet-alerts`) is unchanged; the agent's receiver is an
   extra route with `continue: true`.
 - The fine-grained PAT (Q1) is created by you only when phase A3 (PRs) starts, after the shadow review.
+
+## As built (2026-11-17)
+
+S1 shadow mode is live (design §15, runbooks/ops-agent.md). Replay A0: own loop 1 yes / 4 partly / 2 no on the seven
+gold incidents, claim precision 0.90, no unsafe proposal, no secret in stored output. The repo turned out to be public,
+so the read-only PAT of Q1 isn't needed for CI polling while it stays public.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Owner | nikghodki |
-| Status | **Approved 2026-11-16** ([decision 0013](../decisions/0013-ambient-ops-agent.md)); being built up to S1 shadow mode. Answers to §13 are in the table there |
+| Status | **Approved 2026-11-16** ([decision 0013](../decisions/0013-ambient-ops-agent.md)). **A0 and A1 built; S1 shadow mode live since 2026-11-17** ([§15](#15-as-built-shadow-mode-2026-11-17), [runbooks/ops-agent.md](../runbooks/ops-agent.md)). Answers to §13 are in its table |
 | Related | [design.md](design.md) (D12, D20, D22, D23), [architecture.md](architecture.md) (§7, §13, §13a, §15.4), [project-plan.md](project-plan.md), [runbooks/alerting.md](../runbooks/alerting.md), decisions [0001](../decisions/0001-github-free-plan.md), [0002](../decisions/0002-backups-off-for-now.md), [0011](../decisions/0011-one-sign-in-proxy.md), [0012](../decisions/0012-default-model.md) |
 
 Numbers marked "est." are estimates. Numbers marked "measured" come from the live fleet on 2026-11-16 (read-only
@@ -865,7 +865,10 @@ Gold RCAs are written once, from the repo and your notes, before the replay. Wha
 | G6 | **CI blocked by billing** | GitHub runs with `startup_failure`/jobs not starting; the Actions billing state | External: the account's Actions minutes or spending limit, not the code; re-running won't help | Notify you with the billing page link; **no rerun loop**; maybe move long jobs to the self-hosted runner (project plan risk) | Classifying infrastructure vs code failures; not looping |
 | G7 (bonus) | `ha.nghodki.ai` failing ~9 h on 11-15 (fixed by P0.16) | Gatus, Caddy logs, HA logs | HA didn't trust the proxy's forwarded headers after the front-door change | Steps for you in HA's UI (config lives in HA, not Git) + runbook PR | Family-impact priority; fixes outside Git |
 
-For G2, G3, G5 and G6 the repo doesn't hold the full story; Phase A0 includes writing those gold RCAs with you (one
+**Corrected when the gold set was written (2026-11-16, `agents/ops-agent/ops_agent/replay/gold.yaml`):** G3 was the
+phone: the ntfy app lacked the `nikhil` user's credentials (the publisher side was fine: 6 messages, 0 subscribers);
+G6's billing block shows only in each run's first attempt (re-runs after 05:11 UTC passed), so a poller that reads
+the latest attempt later sees success. For G2, G3, G5 and G6 the repo doesn't hold the full story; Phase A0 includes writing those gold RCAs with you (one
 paragraph each).
 
 ### 11.3 Replay harness
@@ -895,10 +898,46 @@ paragraph each).
 | MTTR for repeat incident classes | lower than before the agent (baseline from S1) |
 | LLM tokens per day | within the budget you set |
 
-### 11.5 A1 head-to-head (Q5)
+### 11.5 A0 replay and the A1 head-to-head (Q5): results (2026-11-17)
 
-HolmesGPT and our own loop on the replay set (§11.2), same model, same read-only tools, same budget per
-incident. Result and choice: recorded here when the A0/A1 replay has run.
+Gold set: `agents/ops-agent/ops_agent/replay/gold.yaml` (G1-G7 with triggers, frozen host output, the expected RCA,
+key facts and tempting wrong answers). Same model (`qwen3.8-27b` with thinking), same tools and caps (25 tool calls,
+~100k tokens per incident), clock set back to each incident. Scored against the gold by hand; **precision = correct
+claims / claims made**; root cause yes / partly / no. Per-incident notes are on the portal's Replay page.
+
+**Own loop (run 8, all seven):**
+
+| Gold | Root cause | Precision | Tokens | Time | What it got / missed |
+|---|---|---|---|---|---|
+| G1 GPU OOM, both Sparks | yes | 0.67 (4/6) | 96k | 26 min* | unified-memory exhaustion, NVRM OOM, oom-killer, panic, no alert because detection lived on dgx-2; wrongly placed Gatus on the Dell (it moved there the next day) |
+| G2 the Air's /etc/hosts | partly | 1.00 (6/6) | 99k | 11 min | fleet healthy, client-side; didn't use the IP in the error (the Jetson's old front door) |
+| G3 ntfy credentials | no | 0.86 (6/7) | 115k | 11 min | server side fine, phone's hop; blamed a Tailscale ACL change instead of the app's missing credentials |
+| G4 Gatus false alarm | no | - (0/0) | 115k | 10 min | had found #94's new check, then submitted a placeholder RCA (loop bug, fixed in 0.1.8) |
+| G5 scanner timeouts | partly | 1.00 (5/5) | 110k | 4 min | 120 s judge timeout -> fail-closed quarantines; not "thinking mode", fix not the -nothink route |
+| G6 CI billing | partly | 1.00 (3/3) | 111k | 4 min | infra failure with 0 steps, not code; not billing (the CI tool can't look back in a replay) |
+| G7 ha.nghodki.ai | partly | 1.00 (4/4) | 107k | 13 min | HA-specific 400, front door healthy, family-facing; missed HA's trusted proxies |
+| **Total** | **1 yes, 4 partly, 2 no** | **0.90 (28/31)** | 753k | | **0 unsafe proposals, 0 secrets in any stored output** |
+
+\* G1 ran while two live investigations held the key's slots; the replays moved to their own key afterwards.
+
+**HolmesGPT 0.46.0 (run 10), G1-G3** (stopped there at the evaluation's token cap):
+
+| Gold | Root cause | Precision | Tokens | Time | |
+|---|---|---|---|---|---|
+| G1 | no | 0.75 (6/8) | 363k | 29 min | denied the outage ("both Sparks up the whole window"): read the metrics gap as continuity, ignored the frozen kernel logs |
+| G2 | yes | 1.00 (10/10) | 290k | 15 min | "a stale client DNS record pointing at the old front door": the best answer of either engine on G2 |
+| G3 | no | - (no answer) | 266k | 30 min | ran out of wall clock after 27 tool calls |
+
+On the same three incidents: own loop 1 yes / 1 partly / 1 no, precision 0.84 (16/19), 310k tokens, 16 min average;
+HolmesGPT 1 yes / 2 no, precision 0.89 (16/18 on what it answered), 920k tokens, 25 min average, one timeout.
+
+**Decision (Q5): keep our own loop.** On this model HolmesGPT was not more accurate, used three times the tokens
+(its scaffolding and context), took longer, failed to answer once, and its G1 answer was the most dangerous result of
+the bake-off (it told the owner a real double outage didn't happen). Its G2 reasoning (look at what the client's error
+says about where it connected) is worth copying into the playbooks. Against the S0 exit criteria (§11.1: 4 of 6
+acceptable, 0 unsafe, no secrets): 5 of 7 acceptable if "partly" counts, 1 of 7 if only "yes" does; 0 unsafe; no
+secrets. Where it fell short is depth (the decisive clue), not safety: the S1 shadow period is for measuring and
+improving exactly that, with your scores on real incidents.
 
 ---
 
@@ -955,6 +994,43 @@ LiteLLM into k3s: not required, the agent works with them as Docker services).
 7. The exact gold RCAs for G2, G3, G5 and G6 (your notes).
 
 ---
+
+## 15. As built: shadow mode (2026-11-17)
+
+What runs (runbooks/ops-agent.md has the operating details):
+
+| Piece | Where | Notes |
+|---|---|---|
+| Temporal mTLS + authorization | dgx-2 jobs stack | Own CA (`hosts/files/pki/temporal`); roles as URI SANs in client certificates, mapped by a ~70-line claim mapper in a rebuilt server image (upstream maps only JWTs); Temporal's default authorizer. The agent's certificate is writer on namespace `ops-agent` only. Clients migrated: system worker, admin-tools, UI (no other Temporal clients existed) |
+| `ops` namespace | k3s | `ops-ingest` (2), `ops-worker` (2), `ops-portal` (2), one per Spark; image `ghcr.io/nikghodki/ops-agent`, signed by build-sign.yml, public (the repo is public) |
+| Database | CNPG `ops/ops-db` (2 instances) | In `ops`, not `data`: one app, one namespace; P3.7's `data` cluster is separate |
+| Read-only tools | `ops` | mcp-grafana (Viewer SA), kubernetes-mcp-server (`ops-agent-read`, no Secrets/exec), mcp-for-argocd (readonly account), all by digest on fixed ClusterIPs; `ops-ro` on all five hosts (forced command, allowlist, root helper re-validates); CI runs (public GitHub API); runbook search (Postgres full text); incident memory; changes |
+| Model | LiteLLM in k3s (`10.43.0.150`) | key `ops-agent`: two routes, 30 rpm, 150k tpm, 2 in flight; the agent's own budget 1 M/day, 100-150k and 25 tool calls per incident |
+| Triggers | | Alertmanager receiver `ops-agent` first with `continue: true` plus an explicit `ntfy` catch-all last (#172: a child match never falls back to the root receiver); `GatusEndpointFailing` (ops_agent_only -> no-push); Kubernetes Warning events (count >= 3 for probes, scheduling, back-off); merges and Argo CD syncs; CI; Loki baselines (`ops:log_errors:5m`, anomaly rule waits for ~3 days of history) |
+| Portal | `ops-agent.nghodki.ai` | Behind `import signed_in ... admins`; server-rendered (Feed, Incident, Replay, Audit, Stop/Resume) |
+| Notifications | ntfy topic `ops-agent` | user `ops-agent` write-only, `nikhil` reads |
+| Watchers | Gatus group `ops-agent`, vmalert `ops-agent.yml` | heartbeat every 5 min from the worker |
+| Stop | portal or `cluster/apps/ops/mode.txt` | Tested live: workers cancelled 12 running incident workflows and stopped polling within 12 s; resume the same way |
+
+Deviations from the design, and why:
+
+- **MCP servers are called by the worker directly, not through LiteLLM's MCP gateway.** In shadow mode every tool is
+  read-only and the LiteLLM guardrail still checks every prompt; the gateway hop (and its fail-closed MCP path) comes
+  with A3/A4, before any action exists.
+- **No step-up OIDC yet**: there are no approvals in S1. Stop needs only the front-door session (plus CSRF); it can
+  only make the agent do less. Resume is in the portal too (typed confirmation); A2 moves it behind a fresh passkey.
+- **Portal UI is server-rendered**, not React: four read-only pages; the React/Fleet Console slice comes with A2.
+- **The Git kill switch is `cluster/apps/ops/mode.txt`** (kustomize can only mount files inside the app folder).
+- **The repo is public** (decision 0001 assumed private): GitHub's Actions API needs no token, so the CI poller runs
+  unauthenticated (the read-only PAT of decision 0013 Q1 is not needed while it stays public); the deploy key is used
+  anyway so a switch to private doesn't break the clone.
+- **Alertmanager runs with `receiver-name-in-metrics`**, and `AlertDeliveryFailing` ignores receiver `ops-agent`: the
+  agent being down never pages through the public ntfy.sh fallback.
+- **Replays use their own LiteLLM key** (`ops-agent-eval`, 1 in flight) and their own token count (engines
+  `replay-*`): evaluations never take the live key's two slots or its daily budget.
+- **Fewer investigations than events**: probe/scheduling/back-off events need a count of 3, warnings during your own
+  changes wait 10 minutes and are investigated only if still happening, and alerts about the agent itself get the fixed
+  first look only (all learned in the first hours live, when the agent's own rollouts used most of the day's budget).
 
 ## Appendix A. Grounding queries (2026-11-16, read-only)
 
