@@ -107,6 +107,7 @@ jobs:
       - name: Sign (keyless) and attest the SBOM
         env:
           REF: ${{ steps.spec.outputs.image }}@${{ steps.build.outputs.digest }}
+          SPEC_PLATFORMS: ${{ steps.spec.outputs.platforms }}
         run: |
           # Fulcio/Rekor answer 5xx now and then; cosign itself retries only twice.
           retry() { for i in 1 2 3 4; do "$@" && return 0; echo "attempt $i failed; retrying in $((i * 20)) s"; sleep $((i * 20)); done; return 1; }
@@ -114,7 +115,10 @@ jobs:
           # The full BuildKit SBOM (with every file) stays in the signed index. The cosign attestation is the arm64
           # SBOM at package level: Rekor refuses entries over ~32 MB, and the ROS image's full SPDX is ~28 MB
           # (~38 MB as a DSSE envelope); without the file list it is ~3 MB.
-          docker buildx imagetools inspect "$REF" --format '{{ json (index .SBOM "linux/arm64").SPDX }}' > sbom-full.spdx.json
+          # A multi-platform index has one SBOM per platform; a single-platform image (open-webui) has just one.
+          if [[ "${SPEC_PLATFORMS:-$PLATFORMS}" == *,* ]]; then sbom='{{ json (index .SBOM "linux/arm64").SPDX }}'
+          else sbom='{{ json .SBOM.SPDX }}'; fi
+          docker buildx imagetools inspect "$REF" --format "$sbom" > sbom-full.spdx.json
           test -s sbom-full.spdx.json && [ "$(head -c 4 sbom-full.spdx.json)" != "null" ]
           jq -c 'del(.files) | .packages |= map(del(.hasFiles))
             | .relationships |= map(select((.spdxElementId | startswith("SPDXRef-File-") | not)
