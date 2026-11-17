@@ -1,0 +1,14 @@
+# Managed by homelab Ansible (role hermes_api_guard). runbooks/open-webui.md, "Hermes".
+# Stop (or disable) to remove the rule; it never touches Hermes.
+[Unit]
+Description=Hermes API server (:{{ hermes_api_guard_port }}) only from {{ hermes_api_guard_sources | join(', ') }}
+After=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft -f {{ hermes_api_guard_file }}
+ExecStop=/usr/sbin/nft delete table inet hermes_api_guard
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

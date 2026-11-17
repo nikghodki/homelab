@@ -201,6 +201,10 @@ jobs:
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         working-directory: cluster/apps/open-webui/image
         run: python -m pytest -q tests
+      - name: Open WebUI TPS meter and settings Job (counting, status throttling, settings.yaml contract)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        working-directory: cluster/apps/open-webui
+        run: python -m pytest -q functions/tests config/tests
       - name: CI scripts (DefenseClaw bundle, MCP tool hashes)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python -m pytest -q .github/scripts/tests

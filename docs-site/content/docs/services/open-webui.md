@@ -1,17 +1,18 @@
 ---
 title: Open WebUI
-description: The chat UI for people (including family), backed by LiteLLM; in k3s on dgx-1 since 2026-11-16.
+description: "Ask Me", the chat UI for people (including family), backed by LiteLLM and (admins only) the Hermes agent; in k3s on dgx-1 since 2026-11-16.
 ---
 
 | | |
 |---|---|
-| Runs as | k3s pod `open-webui/open-webui` on dgx-1 (Argo CD app `open-webui`, `cluster/apps/open-webui`), `ghcr.io/open-webui/open-webui:v0.13.3` by digest, read-only root, no capabilities, limits 2 CPU / 3 Gi |
+| Runs as | k3s pod `open-webui/open-webui` on dgx-1 (Argo CD app `open-webui`, `cluster/apps/open-webui`), `ghcr.io/nikghodki/open-webui:v0.13.3-askme.1` by digest (upstream plus the Ask Me patch), read-only root, no capabilities, limits 2 CPU / 3 Gi |
 | Address | fixed ClusterIP `10.43.0.130:8080`; nothing published on the LAN |
 | URL | `https://webui.nghodki.ai` (front door; 30 min timeouts for streaming) |
 | Sign-in | Open WebUI's own accounts, including family accounts. Pocket ID after the family list (P1.13) |
 | Data | PVC `open-webui-data` (local-path on dgx-1): `webui.db`, the built-in Chroma DB, the embedding-model cache. The pod refuses to start on an empty volume |
-| Models | LiteLLM in k3s at `http://10.43.0.150:4000/v1` (since 2026-11-16; stored in Open WebUI's database, `openai.api_base_urls`, not the env: `runbooks/open-webui.md`, "Model connection"), key `open-webui` (KSOPS Secret) |
-| Network policy | in: the front door's Caddy pods only; out: DNS, LiteLLM, internet HTTP/S |
+| Models | **Ask Me — direct (qwen3.8-27b)** (default, everyone) through LiteLLM `http://10.43.0.150:4000/v1`; **Ask Me — Hermes agent** (admins only) through Hermes on the Jetson `:8642`. Stored in Open WebUI's database, set from Git by the PostSync Job `open-webui-config` (`runbooks/open-webui.md`, "Config from Git") |
+| TPS | global filter `tps_meter`: live tok/s while streaming, then tok/s, tokens, first-token time, total |
+| Network policy | in: the front door's Caddy pods and the config Job; out: DNS, LiteLLM, Hermes (Jetson :8642), internet HTTP/S |
 | Backups | its SQLite DB is snapshotted before each restic run on dgx-1 (`restic_backup_sqlite`, the PV path) |
 | Health | Gatus `webui.nghodki.ai`; Homepage monitor `/health`; probes on `/health` |
 | AIBOM | the nightly scan still names the Docker container `open-webui` (stopped; observability session) |

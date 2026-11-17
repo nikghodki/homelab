@@ -73,7 +73,8 @@ ros2-kilted topic hz /scan                       # ROS CLI inside the router con
 ## Gotchas
 
 - `/usr/bin/node` is gone since the JetPack 7 reflash. The second profile's MCP server uses Hermes' bundled Node.
-- Hermes' main profile `api_server` listens on all interfaces (0.0.0.0:8642), so it is reachable on the LAN.
+- Hermes' main profile `api_server` listens on all interfaces (0.0.0.0:8642); since 2026-11-17 the nftables table
+  `hermes_api_guard` admits only loopback and dgx-1 (Open WebUI's Hermes model; `runbooks/open-webui.md`, "Hermes").
 - The Jetson is on Wi-Fi and is an etcd member. A Wi-Fi drop takes it out of quorum until it reconnects (decision 0005).
 - `ros2-kilted` only works while the router container runs.
 - The tegra kernel has no iptables `NFLOG` target and no `physdev` match (not even as modules). k3s's network policy

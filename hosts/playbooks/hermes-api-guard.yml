@@ -1,0 +1,7 @@
+# Hermes' main-profile API server (:8642 on the Jetson) only from dgx-1 (Open WebUI) and loopback
+# (runbooks/open-webui.md, "Hermes"). Always --check --diff first. Doesn't restart Hermes.
+- name: Hermes API guard
+  hosts: jetson
+  become: true
+  roles:
+    - role: hermes_api_guard

@@ -16,7 +16,7 @@ DefenseClaw (runbooks/hermes-profiles.md).
 |---|---|---|
 | Linux user | `nikjetson` (uid 1000) | `hermes-nikhil` (uid 2002, linger on) |
 | Unit | user `hermes-gateway` (`~/.hermes/hermes-agent/.hermes/bin/hermes gateway run`) | user `hermes-gateway`, own checkout of the same commit (`setup-hermes.sh --runtime-only`) |
-| Platforms | `api_server` on 0.0.0.0:8642 | Slack, Home Assistant, `api_server` on 100.78.145.123:8643 (Tailscale only). WhatsApp never paired |
+| Platforms | `api_server` on 0.0.0.0:8642 (nftables: loopback and dgx-1 only; Open WebUI's "Ask Me — Hermes agent", admins only) | Slack, Home Assistant, `api_server` on 100.78.145.123:8643 (Tailscale only). WhatsApp never paired |
 | Model | `qwen3.8-27b` at `http://model.nghodki.ai/v1` (chat completions, 256k context, 16k max tokens) | (unverified) |
 | MCP servers | `homeassistant` | `homeassistant` (all tools), `picoclaw_only` (2 tools included) |
 | DefenseClaw gateway | 127.0.0.1:18970 | 127.0.0.1:18980 (`gateway.port` 18971) |

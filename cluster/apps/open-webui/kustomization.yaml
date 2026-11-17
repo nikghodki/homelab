@@ -1,10 +1,20 @@
 # Open WebUI, the chat UI for people (family included), backed by LiteLLM (plan P3.7, runbooks/open-webui.md).
-# Moved from a hand-run Docker container on dgx-1 (~/open-webui) on 2026-11-16.
+# Moved from a hand-run Docker container on dgx-1 (~/open-webui) on 2026-11-16. "Ask Me" since 2026-11-17: the overlay image
+# (image/), settings and functions from Git (config/, functions/), applied by the PostSync Job open-webui-config.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: open-webui
 resources:
   - namespace.yaml
   - open-webui.yaml
+  - config-job.yaml
 generators:
   - secret-generator.yaml
+# Settings, the script that applies them and the functions (runbooks/open-webui.md, "Config from Git"). Hashed name:
+# a change makes a new ConfigMap, Argo CD syncs, and the PostSync Job applies it.
+configMapGenerator:
+  - name: open-webui-config
+    files:
+      - config/settings.yaml
+      - config/apply_config.py
+      - functions/tps_meter.py

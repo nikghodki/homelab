@@ -1,0 +1,79 @@
+# Open WebUI's settings from Git (runbooks/open-webui.md, "Config from Git"): after every Argo CD sync this Job applies
+# config/settings.yaml (connections, model names and access, the admins group, default model, API-key policy) and the
+# functions in functions/ through Open WebUI's admin API, then reads the effective values back and fails if any differs.
+# Open WebUI keeps these in its database, where they win over env vars, so env alone is never enough.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: open-webui-config
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: open-webui-config
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation  # the last run (and its log) stays until the next sync
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 1200
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: open-webui-config}
+    spec:
+      serviceAccountName: open-webui-config
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      nodeSelector: {kubernetes.io/hostname: dgx-1}  # the Open WebUI image is already there
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: apply
+          # Same image as the app (Python, PyYAML); the script uses only the standard library and yaml.
+          image: ghcr.io/nikghodki/open-webui:v0.13.3-askme.1@sha256:572982d55bcce9d7cd74483dcb3e95fddc52e177d494dbd7ef66b73591179c4a
+          command: ["python3", "/config/apply_config.py", "--settings", "/config/settings.yaml"]
+          env:
+            - {name: OWUI_URL, value: "http://10.43.0.130:8080"}
+            - {name: HOME, value: /tmp}
+            - {name: PYTHONDONTWRITEBYTECODE, value: "1"}
+            - name: OWUI_ADMIN_API_KEY
+              valueFrom: {secretKeyRef: {name: open-webui, key: OWUI_ADMIN_API_KEY}}
+            - name: LITELLM_API_KEY
+              valueFrom: {secretKeyRef: {name: open-webui, key: OPENAI_API_KEY}}
+            - name: HERMES_API_KEY
+              valueFrom: {secretKeyRef: {name: open-webui, key: HERMES_API_KEY}}
+          resources:
+            requests: {cpu: 10m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /config, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap: {name: open-webui-config}
+        - name: tmp
+          emptyDir: {sizeLimit: 16Mi}
+---
+# The Job talks only to Open WebUI.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: open-webui-config
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: open-webui-config}
+  policyTypes: [Ingress, Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: open-webui}
+      ports:
+        - {port: 8080, protocol: TCP}

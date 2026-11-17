@@ -1,0 +1,82 @@
+# Open WebUI settings applied from Git by the Job open-webui-config (apply_config.py; runbooks/open-webui.md,
+# "Config from Git"). Open WebUI keeps these in its database, where they override env vars, so they are set through
+# its admin API after every sync and read back. Anything not listed here is left as it is. No secrets in this file:
+# connection keys are named by the environment variable that holds them (from the KSOPS Secret open-webui).
+
+# Admin API keys: only the Job's key exists (the admin's, from SOPS). Family accounts may not create keys
+# (permission features.api_keys stays off). The key may only call these paths.
+api_keys:
+  enable: true
+  endpoint_restrictions: true
+  allowed_endpoints:
+    - /api/v1/auths        # who am I, admin config, test users (add)
+    - /api/v1/users        # admin list, test user cleanup
+    - /api/v1/groups
+    - /api/v1/functions
+    - /api/v1/models
+    - /api/v1/configs
+    - /openai              # connections
+    - /api/models          # effective model list
+    - /api/chat/completions  # the Job's and the runbook's smoke tests
+
+# Groups. `members: admins` = every account with the admin role (the household admin), nobody else.
+groups:
+  - name: admins
+    description: Household admins. Only they see the Hermes agent (robot and home tools).
+    members: admins
+
+# OpenAI-compatible connections, in this order (Open WebUI numbers them). Index 0 is the direct path.
+connections:
+  - url: http://10.43.0.150:4000/v1        # LiteLLM in k3s (fixed ClusterIP)
+    key_env: LITELLM_API_KEY                # LiteLLM virtual key "open-webui"
+    config:
+      enable: true
+      connection_type: external
+      auth_type: bearer
+      tags: []
+  - url: http://192.168.86.211:8642/v1     # Hermes api_server, main profile (nikjetson), on the Jetson
+    key_env: HERMES_API_KEY                 # API_SERVER_KEY of that profile (secrets/hermes.enc.yaml)
+    config:
+      enable: true
+      connection_type: external
+      auth_type: bearer
+      prefix_id: hermes                     # its model shows up as hermes.hermes-agent
+      model_ids: [hermes-agent]
+      tags: [{name: agent}]
+
+# Model entries (names, access, capabilities). A model without an entry is visible to admins only.
+models:
+  - id: qwen3.8-27b
+    name: Ask Me — direct (qwen3.8-27b)
+    access: public                          # every signed-in account
+    description: Straight to the model through LiteLLM. Fast, no tools.
+    capabilities: &caps
+      vision: true
+      file_upload: true
+      web_search: true
+      image_generation: true
+      code_interpreter: true
+      terminal: true
+      citations: true
+      status_updates: true
+      memory: true
+      builtin_tools: true
+      usage: true                           # asks for stream_options.include_usage: exact tokens for the TPS meter
+  - id: hermes.hermes-agent
+    name: Ask Me — Hermes agent
+    access: {groups: [admins]}              # admins only: Hermes has home and robot tools
+    description: The Hermes agent on the Jetson (main profile). It runs tools on its own; slower. Admins only.
+    capabilities: *caps
+
+# Default model for new chats (the direct one)
+default_models: qwen3.8-27b
+model_order: [qwen3.8-27b, hermes.hermes-agent]
+
+# Functions (files next to this one, in the same ConfigMap)
+functions:
+  - id: tps_meter
+    name: TPS meter
+    file: tps_meter.py
+    description: Live tok/s while a reply streams; then tok/s, output tokens, time to first token, total time.
+    active: true
+    global: true                            # every model, Hermes included

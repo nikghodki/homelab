@@ -7,6 +7,8 @@ type: Opaque
 stringData:
     WEBUI_SECRET_KEY: ENC[AES256_GCM,data:evmhqkMdwaFmqaVJGaKAvCtT77i5d6iD1FcBobDGX/V95Phpv9YsB9CkmEb6ZFixjfZ792txCN213vc6hVD6Mg==,iv:fkFjq05Ggydx3gqcoD6hPW1PwDu503wTzgixDfa0whY=,tag:2xHGMY68FTy3WHJ6HOF0aA==,type:str]
     OPENAI_API_KEY: ENC[AES256_GCM,data:eKJzpdRiZ9HUEp81fJlTSTT+ZvM2krYwPw==,iv:wx8y9wsVJIzfgj+Y5fW7J4w6FpnLDcS/EP/lKeecdzU=,tag:/Lbl6TOCDG8qIudsy5KDbQ==,type:str]
+    OWUI_ADMIN_API_KEY: ENC[AES256_GCM,data:4kcsX6NTeT7QWhVu48QF/kJQxdF1laFLkkkv/eljn4CBmcEcigk5lgw+f//nhJxDhHoy3QJdYtfW+9yvctG0uHGSmg==,iv:Ee5pZdZ17Y1fkcLF/zJRBgkRwuOlzNlscI/EIUZjelo=,tag:DC/1R/Gfzo+AdoH8U5vW1g==,type:str]
+    HERMES_API_KEY: ENC[AES256_GCM,data:4AasCXoLT9P2Fb3W03qRrC7ODMlnM2N15lP0As7mylAoH1XWdujQt/gw2AqYloTVrH9DAmROkdihOcA9VgH1wA==,iv:5VxhnFK9nmilhbCio9JQHbMFnhPMwdQFqFeP+wRkvwo=,tag:PNlRAMsnNmNO3xNa9fuHSg==,type:str]
 sops:
     age:
         - enc: |
@@ -19,6 +21,6 @@ sops:
             -----END AGE ENCRYPTED FILE-----
           recipient: age1v2qm43q8m6v97ng0rr34td3ukvcv2rjh9y4kk5qvt2u5wxh9xpdqv6tjf9
     encrypted_regex: ^(data|stringData)$
-    lastmodified: "2026-11-16T20:24:34Z"
-    mac: ENC[AES256_GCM,data:H9MvNrtwRh8CK7sM+LSOcN3kzSzntLQ+gBLcVXTZS+gXvPb3dvlsbPd2gjFc5NJThnuBUKqPyRh0GGZm9gVaM7sGk9QxZ+yoOFI5L3TIqTlCdG1hmEgXXkf6+k7r1wjzyWc7DY1DDeclOi2NZYXlxYXHt0r/gI0CyUpeHStRfWQ=,iv:wz3loXeLz2iDpjQ+zV1eOd5z4qZWNooa1HYxIHeiyKo=,tag:sROVLaKI4pfWcNfyZ91F9g==,type:str]
+    lastmodified: "2026-11-17T00:37:08Z"
+    mac: ENC[AES256_GCM,data:ZeuFOEhZLO6wg4L8WEPZb+HkiXvfT2QkJBuhMA5bCe75+HXk6C8x2Bl3SyfvEKgEOc8eN+9wGh14Wq07NomNjfVtU+pGRLnglxamMsa79c1O0qDl2r9JOUhFdGKOMh1gFpBRfyRk6KZHN+GOO/23bYmerpcoQtpQlWairVuJSwM=,iv:Tn1wMNZc0EFqJqQzze0cYvQG4tgbCd5aAureQjYl+js=,tag:fuNU5jh1dnaQ8Qsp/CaRLA==,type:str]
     version: 3.13.3
