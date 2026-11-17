@@ -23,6 +23,9 @@ CI (`pr-checks.yml` job `scans`):
   `tools.json` and fails on HIGH/CRITICAL. A reviewed false positive can be listed under `accepted_findings` in
   `server.yaml`; it is pinned to the tool's sha256, so it lapses as soon as the tool changes.
 
+`tools/dev-setup/` is not an MCP server: it holds the Mac installer for the coding tools (`install-mac.sh`, its tests;
+runbooks/dev-tools.md).
+
 ## Re-exporting a server
 
 On the host that runs it (stdlib Python, nothing to install):

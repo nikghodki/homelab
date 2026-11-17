@@ -82,7 +82,8 @@ Everything reaches LiteLLM through the front door (`http://model.nghodki.ai/v1`)
 | Open WebUI (k3s) | `http://10.43.0.150:4000/v1` (**in its database**, `openai.api_base_urls`; runbooks/open-webui.md) | `open-webui` |
 | DGXMM's route sync (Docker, dgx-1) | `litellm_url: http://10.43.0.150:4000` (DGXMM's `config.yaml`) | master key |
 | Ops agent (being built) | its `LLM_BASE_URL`; use `http://10.43.0.150:4000/v1` (default `10.100.136.1:4000`, the transition relay) | `ops-agent` |
-| Hermes (Jetson, both profiles), DefenseClaw (Jetson, dgx-1, Pi), picoclaw (Pi), Cisco AIBOM (every host, dgx-1 since 2026-11-16 too), Claude Code on the MacBook Air | `http://model.nghodki.ai/v1` (dgx-1's DefenseClaw: `~/.defenseclaw/config.yaml` `llm.base_url`, changed by hand) | as below |
+| Hermes (Jetson, both profiles), DefenseClaw (Jetson, dgx-1, Pi), picoclaw (Pi), Cisco AIBOM (every host, dgx-1 since 2026-11-16 too) | `http://model.nghodki.ai/v1` (dgx-1's DefenseClaw: `~/.defenseclaw/config.yaml` `llm.base_url`, changed by hand) | as below |
+| Claude Code, Codex and the Claude Code extension in Cursor on a Mac (`tools/dev-setup/install-mac.sh`, runbooks/dev-tools.md) | `https://model.nghodki.ai` (`/v1/messages`, `/v1/responses`, `/v1/models`) | `claude-code`, `codex` |
 
 ## Admin UI sign-in
 
@@ -140,6 +141,8 @@ backstop only; the rate limits are what bound a scanner):
 | `defenseclaw-jetson-judge` | `qwen3.8-27b` | 60 rpm, 600k tpm, 6 in flight, $5/day | both Jetson DefenseClaw installs: skill-scanner LLM analyzer and guardrail judge |
 | `cisco-aibom` | `qwen3.8-27b` | 10 rpm, 100k tpm, 1 in flight, $5/day | Cisco AIBOM agentic stage, every host (`/etc/cisco-aibom/llm.env`) |
 | `hermes`, `claude-code`, `open-webui`, … | all | — | reviewed and kept (P0.17) |
+| `claude-code`, `codex`, `cursor` | all | — | coding tools on a Mac, one key per tool, created by the user in the admin UI and kept in the Mac's Keychain (runbooks/dev-tools.md). `cursor` is reserved: Cursor's own models can't reach LiteLLM |
+| `gatus-models` | `qwen3.8-27b` | `allowed_routes` `/v1/models`, `/models` only; 2 rpm, $0.01 | Gatus check that `/v1/models` lists the default model (`gatus_litellm_models_key` in `secrets/observe.enc.yaml`) |
 
 `defenseclaw-jetson` (qwen3.8-27b), replaced by `defenseclaw-jetson-judge`, was deleted on 2026-11-16 (last used
 2026-11-16 04:01 UTC, during the switch-over; no request after that in `LiteLLM_DailyUserSpend` or the spend log).

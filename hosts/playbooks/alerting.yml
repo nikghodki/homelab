@@ -34,6 +34,8 @@
     ntfy_ops_agent_token: "{{ observe_secrets.ntfy_ops_agent_token }}"
     gatus_ops_agent_heartbeat_token: "{{ observe_secrets.gatus_ops_agent_heartbeat_token }}"
     gatus_docs_build_token: "{{ docs_secrets.docs_build_gatus_token }}"
+    # LiteLLM key gatus-models (list-only): the check that /v1/models still lists the default model
+    gatus_litellm_models_key: "{{ observe_secrets.gatus_litellm_models_key }}"
     # The front door's token (decision 0011): status-gate passes only requests with it to Gatus' UI
     edge_origin_token: "{{ console_secrets.edge_origin_token }}"
   roles:

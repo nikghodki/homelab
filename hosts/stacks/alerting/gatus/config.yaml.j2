@@ -15,6 +15,9 @@ alerting:
 x-web: &web {interval: 1m, conditions: ["[STATUS] < 400"], alerts: [{type: ntfy}]}
 endpoints:
   - {name: model.nghodki.ai (LiteLLM), group: web, url: "http://192.168.86.11/health/liveliness", headers: {Host: model.nghodki.ai}, interval: 1m, conditions: ["[STATUS] == 200"], alerts: [{type: ntfy}]}
+  # The model list the coding tools read (runbooks/dev-tools.md): /v1/models must still list the default model. Key alias
+  # gatus-models: only qwen3.8-27b, only the /v1/models and /models routes (a chat gets 403), so it can't use the model.
+  - {name: model.nghodki.ai lists qwen3.8-27b, group: web, url: "https://192.168.86.11/v1/models", headers: {Host: model.nghodki.ai, Authorization: "Bearer {{ gatus_litellm_models_key }}"}, client: {insecure: true}, interval: 5m, conditions: ["[STATUS] == 200", "[BODY].data[0].id == qwen3.8-27b"], alerts: [{type: ntfy}]}
   - {name: webui.nghodki.ai, group: web, url: "http://192.168.86.11/", headers: {Host: webui.nghodki.ai}, <<: *web}
   # DGXMM and the LiteLLM admin UI are signed in by the front door too: signed out, the door answers 302 to Pocket ID.
   - {name: dgxmanager.nghodki.ai, group: web, url: "https://192.168.86.11/", headers: {Host: dgxmanager.nghodki.ai}, client: {insecure: true, ignore-redirect: true}, interval: 1m, conditions: ["[STATUS] == 302"], alerts: [{type: ntfy}]}

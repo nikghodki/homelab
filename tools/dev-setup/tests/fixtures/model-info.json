@@ -1,0 +1,8 @@
+{"data": [
+  {"model_name": "qwen3.8-27b", "model_info": {"mode": null}},
+  {"model_name": "qwen3.8-27b-nothink", "model_info": {}},
+  {"model_name": "flint-nvfp4", "model_info": {"mode": "chat"}},
+  {"model_name": "twil-8b", "model_info": {"mode": "completion"}},
+  {"model_name": "bge-m3", "model_info": {"mode": "embedding"}},
+  {"model_name": "whisper-large-v3-turbo", "model_info": {"mode": "audio_transcription"}}
+]}
