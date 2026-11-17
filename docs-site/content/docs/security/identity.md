@@ -29,6 +29,7 @@ Groups: `admins`, `family`. Users: `nikghodki` (admin, in `admins`). Nobody is i
 | `edge-auth` | `https://auth.nghodki.ai/oauth2/callback` | yes (S256) | admins | `edge/edge-auth` (oauth2-proxy in k3s) for Homepage, docs, Gatus' status page, MLflow; each route also checks its group |
 | `temporal` | `https://temporal.nghodki.ai/auth/sso/callback` | **no** (Temporal UI 2.58 doesn't send it) | admins | Temporal UI's own OIDC |
 | `argocd` | `https://argocd.nghodki.ai/auth/callback` | yes (S256) | admins | Argo CD OIDC; RBAC `g, admins, role:admin`, no default role |
+| `dgxmm` | `https://dgxmanager.nghodki.ai/dgxmm/api/auth/oidc/callback` | yes (S256) | admins | DGXMM's own OIDC sign-in behind the front door (`auth.oidc` in its `config.yaml`); `groups`: `admins` → admin, anyone else refused; auto-redirect, so after the door you land in DGXMM |
 | `litellm` | `https://litellm-admin.nghodki.ai/sso/callback` | yes (S256) | admins | LiteLLM generic OIDC SSO; `admins` → `proxy_admin` (tied to the existing admin user by email), anyone else `internal_user_viewer` |
 
 Every client with an allowed group is group-restricted (`isGroupRestricted`; Pocket ID 2.x doesn't enforce the
@@ -106,6 +107,7 @@ Full recipe, rotation and troubleshooting: `runbooks/sign-in.md`.
 | Argo CD | `argocd --core --kube-context argocd ...` on dgx-1 needs no login; for the UI, temporarily enable local admin (runbooks/argocd.md) |
 | Temporal UI | the CLI: `sudo docker compose exec admin-tools temporal ...` on dgx-2. The UI exits and restarts until Pocket ID is back |
 | MLflow | job API on 192.168.86.36:5000 with basic auth (`mlflow_api_password`) |
+| DGXMM | the password form stays on: `https://dgxmanager.nghodki.ai/dgxmm/login?local=1`; with the door closed too, `ssh -L 8090:10.100.136.1:8090 nikghodki-dgx@<dgx-1>` and `http://localhost:8090/dgxmm/login?local=1`, local `admin` |
 | LiteLLM admin UI | on dgx-1 `kubectl -n litellm port-forward svc/litellm 4000:4000`, plus `ssh -L 4000:127.0.0.1:4000 nikghodki-dgx@<dgx-1>`, open `http://localhost:4000/fallback/login`, user `nikghodki`, password `litellm_ui_password` in `secrets/litellm.enc.yaml` (the master key works too) |
 
 ## Gotchas

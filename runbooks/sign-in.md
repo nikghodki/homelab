@@ -104,11 +104,49 @@ homelab web CA (`http://ca.nghodki.ai`) and add a passkey. Ask for a second pass
 | Docs (`https://docs.nghodki.ai`) | front door sign-in; backend: the docs Caddy `192.168.86.49:4181` (Dell, `hosts/stacks/ops`, [docs-site.md](docs-site.md)) | admins |
 | Gatus status page (`https://status.nghodki.ai`) | front door sign-in (`/health` open); backend: `status-gate` `192.168.86.49:8081` (Dell, `hosts/stacks/alerting`). Not Gatus' own `security.oidc`: it panics at start when Pocket ID is unreachable, which would stop the checks during a Spark outage. The checks never go through the gate | admins |
 | MLflow (`https://mlflow.nghodki.ai`) | front door sign-in; backend: the ml stack's Caddy `192.168.86.36:4181` (dgx-2, `hosts/stacks/ml`); jobs use the basic-auth API on :5000 ([mlflow.md](mlflow.md)) | admins |
-| DGXMM (`https://dgxmanager.nghodki.ai`) | front door sign-in (`import session_check admins` in a `route`, since DGXMM's proxy needs SSE and its 1 MB limit); DGXMM has no login of its own. `/dgxmm/healthz` is open for the checks. Its backend is on dgx-1's cable address, which only the Caddy pods reach, so it needs no origin token | admins |
+| DGXMM (`https://dgxmanager.nghodki.ai`) | front door sign-in (`import session_check admins` in a `route`, since DGXMM's proxy needs SSE and its 1 MB limit), then DGXMM's own OIDC sign-in (client `dgxmm`, PKCE S256, scope `groups`; `admins` → DGXMM admin, anyone else refused; `auto_redirect`, so after the door you land in DGXMM without a prompt) ([below](#dgxmms-own-sign-in)). `/dgxmm/healthz` is open for the checks. Its backend is on dgx-1's cable address, which only the Caddy pods reach, so it needs no origin token | admins |
 | LiteLLM admin UI (`https://litellm-admin.nghodki.ai`) | front door sign-in (`session_check`), then LiteLLM's generic OIDC SSO (client `litellm`, PKCE S256, scope `groups`; `GENERIC_ROLE_MAPPINGS_*`: `admins` → `proxy_admin`). The Pocket ID user is tied to LiteLLM's existing admin user `default_user_id` by email, so no new LiteLLM user is created (SSO stays free below 5 users). Break-glass: `/fallback/login` ([litellm.md](litellm.md#admin-ui-sign-in)). The API on `model.nghodki.ai` stays key-only | admins |
 
 Containers that talk to Pocket ID get `extra_hosts: id.nghodki.ai:<front door>` and the host's CA bundle, which includes
 the web CA (`edge-auth` resolves it through kube-dns → edge-dns, like Argo CD, and trusts only the web CA).
+
+## DGXMM's own sign-in
+
+Since 2026-11-17, DGXMM (`~/workspace/dgx-model-manager` on dgx-1, its own public repo) signs people in with Pocket ID
+itself: generic OIDC in DGXMM ([its docs](https://github.com/nikghodki/dgxmodelmanager/blob/main/docs/user-guide/single-sign-on.md)),
+client `dgxmm` here. The front door's edge-auth still guards the host. Because the Pocket ID session from that
+sign-in is still valid, DGXMM's redirect comes straight back.
+
+| | |
+|---|---|
+| Client | `dgxmm` in `identity/pocket-id.yaml`: callback `https://dgxmanager.nghodki.ai/dgxmm/api/auth/oidc/callback`, PKCE S256, allowed group `admins` |
+| Secret | `oidc_dgxmm_secret` in `secrets/console.enc.yaml`, copied (mode 600) to `~/workspace/dgx-model-manager/secrets/oidc_client_secret` on dgx-1. DGXMM reads it at every sign-in, so a rotation needs no restart |
+| Config | `auth.oidc` in DGXMM's `config.yaml` (not in Git): issuer `https://id.nghodki.ai`, `client_id: dgxmm`, `public_url: https://dgxmanager.nghodki.ai`, `role_mapping` `groups`: `admins` → admin, `auto_redirect: true`, `ca_bundle: /etc/ssl/certs/host-ca-certificates.crt` |
+| Reaching Pocket ID | `~/workspace/dgx-model-manager/docker-compose.override.yaml` (untracked; `./install.sh` keeps it): `extra_hosts: id.nghodki.ai:192.168.86.11` (the VIP, like the other stacks) and the host CA bundle (with the web CA) mounted read-only at `/etc/ssl/certs/host-ca-certificates.crt` |
+| Users | The first SSO sign-in created the DGXMM user `nikghodki` (admin, marked SSO). Its role is re-read from `groups` at every sign-in; an SSO session ends 12 h after its sign-in at the latest. The local accounts (`admin`, `vmghodki`) are unchanged |
+| Break-glass | The password form stays on: `https://dgxmanager.nghodki.ai/dgxmm/login?local=1`. With Pocket ID down, the door is closed too, so go direct: `ssh -L 8090:10.100.136.1:8090 nikghodki-dgx@<dgx-1>`, open `http://localhost:8090/dgxmm/login?local=1`, and sign in with the local `admin` |
+| Turn it off | set `auth.oidc.enabled: false` in `config.yaml` and `docker restart dgxmm`. SSO sessions end, and password sign-in stays |
+
+Rotate the client secret: in the Pocket ID UI (OIDC clients → dgxmm → new secret), put it in `oidc_dgxmm_secret`
+(`sops set --value-stdin`) and write it into DGXMM without printing it:
+`sops -d --extract '["oidc_dgxmm_secret"]' secrets/console.enc.yaml > ~/workspace/dgx-model-manager/secrets/oidc_client_secret`
+(an in-place write, so the mounted file updates; mode 600).
+
+Verified at the cut-over (2026-11-17), with a one-time sign-in link (`pocketid_sync.py --login-link`, exchanged
+through the API, never printed) and a cookie jar:
+
+- door → edge-auth → DGXMM: `/dgxmm/` → `id.nghodki.ai/authorize` (edge-auth) → back. DGXMM's
+  `/api/auth/oidc/login` → `authorize` (client `dgxmm`, S256) → callback 303 → `/dgxmm/deployments`.
+  `/dgxmm/api/auth/me` returned 200 `nikghodki`, `admin`, `sso`. The session cookie is Secure, HttpOnly, path
+  `/dgxmm`.
+- A throwaway Pocket ID user in a throwaway group (both deleted afterwards) was refused twice. Pocket ID refused
+  it, because the client admits only `admins`. With that group allowed for a moment, DGXMM itself refused it
+  (`sso_error=denied`, audited `sso_login_denied`, no DGXMM user created).
+- Password sign-in still works: a throwaway local user, created and deleted by the SSO admin, signed in with 200.
+- Gatus: all 54 endpoints green, including the DGXMM checks.
+- The deploy (`./install.sh` on dgx-1, image built beforehand) interrupted DGXMM, and with it LiteLLM's on-demand
+  models, for **15.7 s**. That was measured at 4 Hz on `:8090` and on the relay `:8091`, both out
+  10:48:56–10:49:12 UTC. A call through `model.nghodki.ai` answered afterwards.
 
 ## Apps without their own login: one block in the Caddyfile
 
