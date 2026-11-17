@@ -26,6 +26,15 @@ class IncidentWorkflow:
 
     @workflow.run
     async def run(self, incident_id: int) -> str:
+        # During one of the owner's own changes most warnings are the change settling (a pod rolling, a sync in
+        # progress): wait 10 minutes and investigate only if it is still happening (design §4.2 "during-change").
+        if workflow.patched("during-change-recheck"):
+            wait = await workflow.execute_activity(A.recheck_delay, incident_id, start_to_close_timeout=timedelta(minutes=1))
+            if wait:
+                await workflow.sleep(timedelta(seconds=wait))
+                if not await workflow.execute_activity(A.still_relevant, incident_id,
+                                                       start_to_close_timeout=timedelta(minutes=1)):
+                    return "transient during a change"
         await workflow.execute_activity(
             A.analyse_incident, incident_id, task_queue=INVESTIGATE_QUEUE,
             start_to_close_timeout=timedelta(minutes=30), heartbeat_timeout=timedelta(minutes=3),

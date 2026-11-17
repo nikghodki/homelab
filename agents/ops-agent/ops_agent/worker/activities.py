@@ -36,6 +36,36 @@ async def analyse_incident(incident_id: int) -> int:
 
 
 @activity.defn
+async def recheck_delay(incident_id: int) -> int:
+    """Seconds to wait before investigating: 600 for a warning during a change (not family-facing), else 0."""
+    inc = db.one("SELECT severity, family_impact, during_change FROM incidents WHERE id = %s", incident_id)
+    if inc and inc["during_change"] and inc["severity"] != "critical" and not inc["family_impact"]:
+        return 600
+    return 0
+
+
+@activity.defn
+async def still_relevant(incident_id: int) -> bool:
+    """After the wait: resolved, or (for cluster events) quiet for 5 minutes = transient; close it without the model."""
+    inc = db.one("SELECT status, source FROM incidents WHERE id = %s", incident_id)
+    if inc["status"] in ("resolved", "closed"):
+        relevant = False
+    elif inc["source"] == "k8s":
+        relevant = bool(db.one("SELECT count(*) AS n FROM events WHERE incident_id = %s AND received_at > now() - interval '5 minutes'",
+                               incident_id)["n"])
+    else:
+        relevant = True
+    if not relevant:
+        rca = {"summary": "Transient during one of your changes: it stopped by itself within 10 minutes; not investigated.",
+               "confidence": "none", "root_cause": "the change in progress (see during_change)", "claims": [],
+               "fix_options": [{"description": "nothing to do", "kind": "none"}]}
+        pipeline.store_rca(incident_id, "deterministic", None, rca, ["closed as transient during a change"], 0, 0, 0.0)
+        db.run("UPDATE incidents SET status = 'closed', resolved_at = coalesce(resolved_at, now()), updated_at = now(), "
+               "tags = array_append(tags, 'transient') WHERE id = %s", incident_id)
+    return relevant
+
+
+@activity.defn
 async def notify_incident(incident_id: int) -> str:
     _stopped()
     inc = db.one("SELECT * FROM incidents WHERE id = %s", incident_id)

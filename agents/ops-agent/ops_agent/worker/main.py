@@ -113,7 +113,7 @@ async def main() -> None:
     start_http_server(9100)
     client = await connect()
     await ensure_schedules(client)
-    acts = [A.notify_incident, A.close_incident, A.send_digest]
+    acts = [A.notify_incident, A.close_incident, A.send_digest, A.recheck_delay, A.still_relevant]
     workers: list[Worker] = []
     tasks: list[asyncio.Task] = []
     last_hb = 0.0
