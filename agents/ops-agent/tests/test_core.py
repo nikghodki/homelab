@@ -4,7 +4,7 @@ import json
 import pytest
 
 from ops_agent import correlate, redact, timeutil
-from ops_agent.investigate.own_loop import self_check, to_markdown
+from ops_agent.investigate.own_loop import _looks_empty, self_check, to_markdown
 from ops_agent.playbooks import steps_for
 from ops_agent.tools import hosts
 from ops_agent.tools.gateway import _fmt_logs, _fmt_prom
@@ -127,3 +127,9 @@ def test_formatters():
                                  "line": json.dumps({"MESSAGE": "Out of memory: Killed process 1", "SYSLOG_IDENTIFIER": "kernel"})}] * 3})
     text, _ = _fmt_logs(logs)
     assert "x3 dgx-1" in text and "kernel: Out of memory" in text
+
+
+def test_placeholder_rca_is_refused():
+    assert _looks_empty({"summary": "placeholder", "root_cause": "placeholder"})
+    assert _looks_empty({"summary": "", "root_cause": ""})
+    assert not _looks_empty({"summary": "The check expects 403 from the Dell's own port", "root_cause": "a check added by #94"})

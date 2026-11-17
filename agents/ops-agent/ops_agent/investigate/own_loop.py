@@ -70,16 +70,29 @@ async def investigate(gw: Gateway, ctx: ToolContext, brief: str, first_look: str
                                             f"RECALL (runbooks, past incidents):\n{recall}\n\nInvestigate, then call submit_rca."}]
     tools = TOOL_SPECS + [prompts.SUBMIT_RCA]
     forced = False
+    asked_final = False
+    final_turns = 0
     length_retries = 0
     last_prompt = 0
     while True:
         # stop before the next call would cross the cap (each call re-sends the conversation)
         over = (res.tool_calls >= s.max_tool_calls or res.tokens + int(last_prompt * 1.3) >= s.incident_token_cap
                 or time.monotonic() - t0 > s.investigation_minutes * 60)
+        if asked_final:
+            final_turns += 1
+            if final_turns > 3:
+                res.notes.append("no RCA after three final prompts")
+                break
         if not may_continue():
             res.notes.append("stopped by the Stop switch or the daily token budget")
             break
-        choice = {"type": "function", "function": {"name": "submit_rca"}} if (over or forced) else None
+        # Named tool_choice makes the engine's guided decoding fill the schema, which qwen did with "placeholder"
+        # values (replay G4). Ask in words instead and keep tool_choice auto.
+        if (over or forced) and not asked_final:
+            messages.append({"role": "user", "content": "The investigation budget is used up. Call submit_rca now "
+                             "with your actual findings (cite the evidence refs you have)."})
+            asked_final = True
+        choice = None
         try:
             r, n = await chat(llm, s.model_deep, messages, tools, tool_choice=choice, engine=engine)
         except APIStatusError as e:
@@ -128,6 +141,11 @@ async def investigate(gw: Gateway, ctx: ToolContext, brief: str, first_look: str
             except ValueError:
                 args = {}
             if c.function.name == "submit_rca":
+                if _looks_empty(args):
+                    messages.append({"role": "tool", "tool_call_id": c.id, "content": "That RCA is empty or a "
+                                     "placeholder. Submit your actual findings."})
+                    forced = True
+                    continue
                 res.rca = args
                 done = True
                 messages.append({"role": "tool", "tool_call_id": c.id, "content": "received"})
@@ -182,6 +200,11 @@ def _shrink_old_results(messages: list[dict], keep: int = 6, head: int = 400) ->
         c = m["content"]
         ref = c.split(" ", 2)[1] if c.startswith("<<<EVIDENCE") else ""
         m["content"] = c[:head] + f"\n[older result shortened to save tokens; full text is evidence {ref}]"
+
+
+def _looks_empty(rca: dict) -> bool:
+    text = " ".join(str(rca.get(k, "")) for k in ("summary", "root_cause")).strip().lower()
+    return len(text) < 30 or "placeholder" in text or text in ("", "unknown")
 
 
 def _json_answer(text: str) -> dict:

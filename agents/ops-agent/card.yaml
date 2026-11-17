@@ -6,7 +6,7 @@ description: >-
   CI; investigates with read-only tools and the local model; writes root-cause analyses and notifies. It changes
   nothing: no pull requests, no restarts, no syncs, no silences.
 url: https://ops-agent.nghodki.ai
-version: 0.1.7
+version: 0.1.8
 protocolVersion: 0.3.0
 provider:
   organization: nikghodki homelab
