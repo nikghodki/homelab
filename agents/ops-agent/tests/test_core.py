@@ -47,6 +47,8 @@ def test_k8s_events_filtered():
     assert ev.klass == "container_restart" and ev.incident_key() == "k8s:edge/Pod/edge-caddy-x:container_restart"
     assert correlate.from_k8s_event({**base, "type": "Normal"}) is None
     assert correlate.from_k8s_event({**base, "reason": "Unhealthy", "count": 1}) is None
+    assert correlate.from_k8s_event({**base, "reason": "FailedScheduling", "count": 2}) is None
+    assert correlate.from_k8s_event({**base, "reason": "BackOff", "count": 1}) is None
     assert correlate.from_k8s_event({**base, "reason": "Scheduled"}) is None
 
 

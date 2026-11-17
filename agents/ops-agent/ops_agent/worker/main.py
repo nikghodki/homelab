@@ -53,6 +53,9 @@ async def cancel_running(client) -> int:
     async for wf in client.list_workflows("ExecutionStatus = 'Running' AND WorkflowType = 'IncidentWorkflow'"):
         await client.get_workflow_handle(wf.id).cancel()
         n += 1
+    # an investigation cut short is not "investigating" any more: back to open, marked as such
+    db.run("UPDATE incidents SET status = 'open', tags = array_append(tags, 'stopped-before-rca'), updated_at = now() "
+           "WHERE replay_run IS NULL AND status = 'investigating'")
     return n
 
 
