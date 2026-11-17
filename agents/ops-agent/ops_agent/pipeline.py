@@ -47,7 +47,7 @@ def budget_ok() -> bool:
 
 async def analyse(incident_id: int, *, engine: str = "own-loop", as_of: dt.datetime | None = None,
                   docs_commit: str | None = None, frozen: dict | None = None,
-                  may_continue: Callable[[], bool] | None = None) -> int:
+                  may_continue: Callable[[], bool] | None = None, usage_label: str | None = None) -> int:
     """Run the whole investigation and store an RCA row. Returns the RCA id."""
     inc, events = load_incident(incident_id)
     gw = Gateway()
@@ -69,7 +69,7 @@ async def analyse(incident_id: int, *, engine: str = "own-loop", as_of: dt.datet
         else:
             ctx.phase = "investigate"
             res = await own_loop.investigate(gw, ctx, prompts.incident_brief(inc, events, clock), fl, rc,
-                                             may_continue=go, engine=engine)
+                                             may_continue=go, engine=usage_label or engine)
             known = {r["ref"] for r in db.all_("SELECT ref FROM evidence WHERE incident_id = %s", incident_id)}
             rca = own_loop.self_check(res.rca, known) if res.rca else deterministic_rca(inc, ctx, res.notes)
             rca["trace"] = res.trace[-30:]

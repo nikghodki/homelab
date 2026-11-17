@@ -113,6 +113,9 @@ def add_usage(engine: str, model: str, prompt: int, completion: int) -> None:
         engine, model, prompt, completion)
 
 
-def tokens_today() -> int:
-    r = one("SELECT coalesce(sum(prompt_tokens + completion_tokens), 0) AS t FROM llm_usage WHERE day = current_date")
+def tokens_today(replay: bool = False) -> int:
+    """Live use (the agent's daily budget, decision 0013 Q13) or, with replay=True, the evaluation runs' own count.
+    Replays are logged under engines named replay-*; the key's rate limits still bound both together."""
+    cond = "engine LIKE 'replay-%%'" if replay else "engine NOT LIKE 'replay-%%'"
+    r = one(f"SELECT coalesce(sum(prompt_tokens + completion_tokens), 0) AS t FROM llm_usage WHERE day = current_date AND {cond}")
     return int(r["t"]) if r else 0
