@@ -78,6 +78,8 @@ def test_redaction():
     again, k = redact.redact(out)            # redacted text stays as it is
     assert again == out and k == 0
     assert redact.redact("see docs/secrets-rotation.md:12-20")[1] == 0
+    assert redact.redact("FailedScheduling Pod/ops/ops-portal-767f685b89-b25wz: 0/4 nodes")[1] == 0
+    assert redact.redact("token " + "tk_" + "a1" * 14 + "b")[0].count("REDACTED") == 1
 
 
 def test_time_window_clamps_to_replay_clock():
