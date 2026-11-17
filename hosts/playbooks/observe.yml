@@ -17,6 +17,7 @@
     # Used by the alertmanager template (ntfy and Gatus run on the Dell: playbooks/alerting.yml)
     ntfy_alerts_password: "{{ observe_secrets.ntfy_alerts_password }}"
     gatus_heartbeat_token: "{{ observe_secrets.gatus_heartbeat_token }}"
+    ops_agent_ingest_token: "{{ observe_secrets.ops_agent_ingest_token }}"
     ntfy_sh_backup_topic: "{{ observe_secrets.ntfy_sh_backup_topic_token }}"
   roles:
     - role: compose_stack

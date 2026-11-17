@@ -14,8 +14,13 @@ enable-login: true
 auth-users:
   - "alerts:{{ ntfy_alerts_password_hash }}:user"
   - "nikhil:{{ ntfy_phone_password_hash }}:user"
+  - "ops-agent:{{ ntfy_ops_agent_password_hash }}:user"
 auth-access:
   - "alerts:fleet-alerts:rw"
   - "nikhil:fleet-alerts:ro"
+  # The ops agent's own topic (decision 0013): it can only write there; the phone reads it
+  - "ops-agent:ops-agent:wo"
+  - "nikhil:ops-agent:ro"
 auth-tokens:
   - "alerts:{{ ntfy_alerts_token }}:gatus"
+  - "ops-agent:{{ ntfy_ops_agent_token }}:ops-agent"

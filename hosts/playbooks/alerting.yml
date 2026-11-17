@@ -30,6 +30,9 @@
     ntfy_alerts_token: "{{ observe_secrets.ntfy_alerts_token }}"
     ntfy_phone_password_hash: "{{ observe_secrets.ntfy_phone_password_hash }}"
     gatus_heartbeat_token: "{{ observe_secrets.gatus_heartbeat_token }}"
+    ntfy_ops_agent_password_hash: "{{ observe_secrets.ntfy_ops_agent_password_hash }}"
+    ntfy_ops_agent_token: "{{ observe_secrets.ntfy_ops_agent_token }}"
+    gatus_ops_agent_heartbeat_token: "{{ observe_secrets.gatus_ops_agent_heartbeat_token }}"
     gatus_docs_build_token: "{{ docs_secrets.docs_build_gatus_token }}"
     # The front door's token (decision 0011): status-gate passes only requests with it to Gatus' UI
     edge_origin_token: "{{ console_secrets.edge_origin_token }}"

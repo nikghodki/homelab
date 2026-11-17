@@ -42,6 +42,8 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
+      # receiver_name on the notification metrics: AlertDeliveryFailing must not count the ops agent's receiver
+      - --enable-feature=receiver-name-in-metrics
     volumes:
       - am-data:/alertmanager
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
@@ -53,6 +55,7 @@ services:
     volumes:
       - loki-data:/loki
       - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - ./loki/rules:/etc/loki/rules:ro
     # Peak 1,135 MiB (cgroup, with page cache), RSS max 801 MiB in 3 days; queries over 30 days can spike.
     mem_limit: 3g
 

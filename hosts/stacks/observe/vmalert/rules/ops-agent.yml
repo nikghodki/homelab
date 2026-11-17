@@ -1,0 +1,58 @@
+# The ops agent (decision 0013, runbooks/ops-agent.md).
+# 1. Inputs it needs that would duplicate an existing ntfy alert: labelled ops_agent_only, routed only to the agent
+#    (alertmanager.yml.j2 sends them to the no-push receiver after the ops-agent route).
+# 2. Watching the watcher: these go to ntfy like any other alert.
+groups:
+  - name: ops-agent-inputs
+    interval: 1m
+    rules:
+      # Gatus pages through its own ntfy alerts; the agent gets the same failures as alerts to investigate.
+      - alert: GatusEndpointFailing
+        expr: gatus_results_endpoint_success == 0
+        for: 3m
+        labels: {severity: warning, ops_agent_only: "true"}
+        annotations:
+          summary: "Gatus: '{{ $labels.name }}' ({{ $labels.group }}) failing"
+      # A (host, unit) logs errors at 5x its usual rate (7-day median of the 5-minute counts) and above an absolute
+      # floor. Needs ~3 days of history first, so a new deployment doesn't call everything an anomaly.
+      - alert: OpsLogErrorAnomaly
+        expr: >-
+          (avg_over_time(ops:log_errors:5m[30m]) > 50)
+          and on (host_name, unit) (avg_over_time(ops:log_errors:5m[30m]) > 5 * (quantile_over_time(0.5, ops:log_errors:5m[7d]) + 1))
+          and on (host_name, unit) (count_over_time(ops:log_errors:5m[7d]) > 800)
+        for: 10m
+        labels: {severity: warning, ops_agent_only: "true"}
+        annotations:
+          summary: "errors in the logs of {{ $labels.unit }} on {{ $labels.host_name }}: {{ $value | humanize }} per 5 min, over 5x its usual rate"
+  - name: ops-agent-self
+    interval: 1m
+    rules:
+      - alert: OpsAgentDown
+        expr: up{job=~"ops-ingest|ops-worker"} == 0 or absent(up{job="ops-worker"})
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "ops agent {{ $labels.job }} not scraped for 15 min (the alert path itself is unaffected)"
+      - alert: OpsAgentIngestUnreachable
+        expr: sum(increase(alertmanager_notifications_failed_total{receiver_name="ops-agent"}[15m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Alertmanager can't deliver to ops-ingest (the ntfy path is unaffected)"
+      - alert: OpsAgentInvestigationStuck
+        expr: max(ops_agent_investigation_oldest_seconds) > 1800
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "an ops agent investigation has run for over 30 min"
+      - alert: OpsAgentTokenBudget
+        expr: max(ops_agent_llm_tokens_today) / max(ops_agent_llm_token_budget) > 0.8
+        labels: {severity: warning}
+        annotations:
+          summary: "the ops agent used {{ $value | humanizePercentage }} of today's LLM token budget"
+      - alert: OpsAgentStopped
+        expr: max(ops_agent_mode) == 0
+        for: 12h
+        labels: {severity: warning}
+        annotations:
+          summary: "the ops agent has been stopped for 12 h (Stop switch in the portal or mode.yaml)"

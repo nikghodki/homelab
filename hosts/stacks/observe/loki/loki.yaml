@@ -54,7 +54,24 @@ ingester:
   chunk_idle_period: 2m
   chunk_retain_period: 30s
   max_chunk_age: 30m
+# Ruler: recording rules only (the ops agent's log-error baselines, decision 0013 / design §4.3), remote-written to
+# VictoriaMetrics; vmalert does the alerting. Rules: ./rules/fake/*.yml (tenant "fake" without auth).
 ruler:
-  alertmanager_url: http://localhost:9093
+  alertmanager_url: http://alertmanager:9093
+  enable_alertmanager_v2: true
+  enable_api: false
+  evaluation_interval: 1m
+  rule_path: /loki/rules-temp
+  storage:
+    type: local
+    local:
+      directory: /etc/loki/rules
+  wal:
+    dir: /loki/ruler-wal
+  remote_write:
+    enabled: true
+    clients:
+      victoriametrics:
+        url: http://victoriametrics:8428/api/v1/write
 analytics:
   reporting_enabled: false
