@@ -1,7 +1,7 @@
 # Wi-Fi regulatory domain on the Pi (roles/wifi_regdom). Always --check --diff first. Never reboots; the kernel
 # parameter applies at the next boot, or now with -e wifi_regdom_apply_now=true (robot docked).
 - name: Wi-Fi country
-  hosts: edge
+  hosts: edge:jetson
   become: true
   roles:
     - role: wifi_regdom

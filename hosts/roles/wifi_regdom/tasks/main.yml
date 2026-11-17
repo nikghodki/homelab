@@ -37,6 +37,19 @@
     - wifi_regdom_cmdline_file.stat.exists
     - "'cfg80211.ieee80211_regdom=' not in (wifi_regdom_cmdline_now.content | b64decode)"
 
+# Hosts without a Raspberry Pi command line (the Jetson boots through extlinux) load cfg80211 as a module, so its
+# option takes effect at the next boot.
+- name: Regulatory domain as a cfg80211 module option (hosts without a Pi command line)
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/cfg80211-regdom.conf
+    content: |
+      # Managed by homelab (role wifi_regdom). Takes effect when cfg80211 loads, i.e. at the next boot.
+      options cfg80211 ieee80211_regdom={{ wifi_regdom_country }}
+    owner: root
+    group: root
+    mode: "0644"
+  when: not wifi_regdom_cmdline_file.stat.exists
+
 - name: Regulatory domain now (opt-in, wifi_regdom_apply_now)
   ansible.builtin.command:
     cmd: /usr/sbin/iw reg set {{ wifi_regdom_country }}

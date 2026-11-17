@@ -1,4 +1,5 @@
-# Wi-Fi regulatory domain (infra review 2026-11 §3.2 N7). The Pi booted with cfg80211.ieee80211_regdom=UM, which the
+# Wi-Fi regulatory domain (infra review 2026-11 §3.2 N7). The Pi gets it on its kernel command line, the Jetson as a
+# cfg80211 module option (/etc/modprobe.d); both take effect at the next boot. The Pi booted with cfg80211.ieee80211_regdom=UM, which the
 # regulatory database doesn't resolve, so it sat in WORLD (5 GHz channels passive-only) and wpa_supplicant logged
 # CTRL-EVENT-REGDOM-CHANGE about 1,080 times an hour. The router and the Sparks are US (iw reg get: DFS-FCC).
 wifi_regdom_country: US
