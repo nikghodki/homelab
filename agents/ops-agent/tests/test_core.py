@@ -79,6 +79,7 @@ def test_redaction():
     assert again == out and k == 0
     assert redact.redact("see docs/secrets-rotation.md:12-20")[1] == 0
     assert redact.redact("FailedScheduling Pod/ops/ops-portal-767f685b89-b25wz: 0/4 nodes")[1] == 0
+    assert redact.redact("x " + "QwErTyUiOpAsDfGhJkLzXcVbNmQwErTyUiOp" + " y")[1] == 1   # mixed-case letters: a secret
     assert redact.redact("token " + "tk_" + "a1" * 14 + "b")[0].count("REDACTED") == 1
 
 
