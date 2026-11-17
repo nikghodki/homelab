@@ -13,4 +13,4 @@ groups:
       - record: ops:log_errors:5m
         expr: >-
           label_replace(sum by (host_name, service_name) (count_over_time({service_name=~"edge-caddy|defenseclaw"}
-            |~ "(?i)(\\"level\\":\\"error\\"|panic|denied|fail)" [5m])), "unit", "$1", "service_name", "(.*)")
+            |~ `(?i)("level":"error"|panic|denied|fail)` [5m])), "unit", "$1", "service_name", "(.*)")
