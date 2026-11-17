@@ -8,7 +8,7 @@ t=$(mktemp -d); chmod 700 "$t"; trap 'rm -rf "$t"' EXIT
 S=~/homelab/cluster/apps/ops/ops-agent.enc.yaml
 sops -d --extract '["stringData"]["mcp-grafana-auth"]' "$S" > "$t"/mcp-grafana
 sops -d --extract '["stringData"]["mcp-argocd-auth"]' "$S" > "$t"/mcp-argocd
-sops -d --extract '["stringData"]["litellm-key"]' "$S" > "$t"/litellm-key
+sops -d --extract '["ops_agent_eval_litellm_key"]' ~/homelab/secrets/litellm.enc.yaml > "$t"/litellm-key   # the evaluation key (runbooks/ops-agent.md)
 sops -d --extract '["opsro_ssh_key"]' ~/homelab/secrets/ops-agent.enc.yaml > "$t"/id; chmod 600 "$t"/id
 for h in 192.168.86.44 192.168.86.36 192.168.86.211 192.168.86.49 192.168.86.39; do ssh-keygen -F $h -f ~/.ssh/known_hosts | grep -v "^#"; done > "$t"/kh
 kubectl -n ops get secret ops-db-app -o jsonpath='{.data.uri}' | base64 -d | sed 's#@ops-db-rw[^:/]*:#@10.43.0.143:#' > "$t"/dsn

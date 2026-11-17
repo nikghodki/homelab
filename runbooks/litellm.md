@@ -129,7 +129,7 @@ cd ~/homelab && sops -d --extract '["litellm_master_key"]' secrets/litellm.enc.y
 | `litellm_ui_password` | Admin UI login `nikghodki` |
 | `defenseclaw_dgx1_gateway_token` | copy of `DEFENSECLAW_GATEWAY_TOKEN` in dgx-1's `~/.defenseclaw/.env` (the guardrail's bearer) |
 | `phoenix_api_key` | Phoenix system API key `litellm-dgx-1` (OTLP ingest) |
-| `picoclaw_pi_litellm_key`, `defenseclaw_jetson_judge_litellm_key`, `cisco_aibom_litellm_key` | values of those virtual keys (so they can be redeployed) |
+| `picoclaw_pi_litellm_key`, `defenseclaw_jetson_judge_litellm_key`, `cisco_aibom_litellm_key`, `ops_agent_litellm_key`, `ops_agent_eval_litellm_key` | values of those virtual keys (so they can be redeployed) |
 
 Virtual keys with limits (the on-demand routes are registered without a price, so spend stays 0 and `max_budget` is a
 backstop only; the rate limits are what bound a scanner):
@@ -140,6 +140,8 @@ backstop only; the rate limits are what bound a scanner):
 | `defenseclaw-dgx1` | `qwen3.8-27b`, `qwen3.8-27b-nothink` (alias `qwen3.8-27b` → `-nothink` since 2026-11-17) | 20 rpm, 100k tpm, 2 in flight, $5/day | dgx-1 DefenseClaw LLM judge (`DEFENSECLAW_LLM_KEY`) |
 | `defenseclaw-jetson-judge` | `qwen3.8-27b`, `qwen3.8-27b-nothink` (alias `qwen3.8-27b` → `-nothink`) | 200 rpm, 600k tpm, 6 in flight, $5/day | both Jetson DefenseClaw installs: skill, plugin and MCP scanner LLM analyzers and the guardrail judge |
 | `cisco-aibom` | `qwen3.8-27b` | 10 rpm, 100k tpm, 1 in flight, $5/day | Cisco AIBOM agentic stage, every host (`/etc/cisco-aibom/llm.env`) |
+| `ops-agent` | `qwen3.8-27b`, `qwen3.8-27b-nothink` | 30 rpm, 150k tpm, 2 in flight, $5/day backstop | the ops agent's workers (decision 0013); its own budget 1 M tokens/day |
+| `ops-agent-eval` | `qwen3.8-27b`, `qwen3.8-27b-nothink` | 20 rpm, 100k tpm, 1 in flight, $5/day backstop | the ops agent's replay harness on dgx-1 (A0/A1), so evaluations never take the live key's two slots |
 | `hermes`, `claude-code`, `open-webui`, … | all | — | reviewed and kept (P0.17) |
 | `claude-code`, `codex`, `cursor` | all | — | coding tools on a Mac, one key per tool, created by the user in the admin UI and kept in the Mac's Keychain (runbooks/dev-tools.md). `cursor` is reserved: Cursor's own models can't reach LiteLLM |
 | `gatus-models` | `qwen3.8-27b` | `allowed_routes` `/v1/models`, `/models` only; 2 rpm, $0.01 | Gatus check that `/v1/models` lists the default model (`gatus_litellm_models_key` in `secrets/observe.enc.yaml`) |

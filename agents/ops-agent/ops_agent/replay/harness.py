@@ -58,8 +58,8 @@ def backfill_changes() -> None:
 def litellm_tokens(since: dt.datetime, until: dt.datetime) -> int:
     """Tokens the ops-agent key used in a window, from LiteLLM's spend log on dgx-1 (for engines that don't report)."""
     q = ("select coalesce(sum(prompt_tokens + completion_tokens), 0) from \"LiteLLM_SpendLogs\" where "
-         "metadata->>'user_api_key_alias' = 'ops-agent' and \"startTime\" between '%s' and '%s'"
-         % (since.isoformat(), until.isoformat()))
+         "metadata->>'user_api_key_alias' = '%s' and \"startTime\" between '%s' and '%s'"
+         % (os.environ.get("LLM_KEY_ALIAS", "ops-agent-eval"), since.isoformat(), until.isoformat()))
     # LiteLLM's database is the CNPG cluster data/litellm-db since LiteLLM moved into k3s (runbooks/litellm.md)
     pod = subprocess.run(["kubectl", "-n", "data", "get", "pods", "-l", "cnpg.io/cluster=litellm-db,cnpg.io/instanceRole=primary",
                           "-o", "jsonpath={.items[0].metadata.name}"], capture_output=True, text=True).stdout.strip()
