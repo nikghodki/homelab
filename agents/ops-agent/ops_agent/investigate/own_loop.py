@@ -41,7 +41,7 @@ async def chat(llm: AsyncOpenAI, model: str, messages: list[dict], tools: list[d
         kw["tool_choice"] = tool_choice or "auto"
     # The shared model plane drops connections now and then (engine restarts, queueing) and the key's own rate
     # limits answer 429: back off and retry a few times before giving up on the call.
-    for attempt, wait in enumerate((15, 45, 90, None)):
+    for attempt, wait in enumerate((15, 45, 90, 120, 180, None)):
         try:
             r = await llm.chat.completions.create(**kw)
             break

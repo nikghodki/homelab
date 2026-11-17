@@ -120,6 +120,9 @@ async def wait_for_budget() -> None:
     while db.tokens_today() + need > settings().daily_token_budget:
         print(json.dumps({"waiting_for_budget": db.tokens_today()}), flush=True)
         await asyncio.sleep(300)
+    # The live agent comes first: don't take the key's two model slots while it investigates a real incident.
+    while (db.one("SELECT count(*) AS n FROM incidents WHERE replay_run IS NULL AND status = 'investigating'") or {}).get("n"):
+        await asyncio.sleep(60)
 
 
 async def run(engine: str, only: list[str] | None, note: str | None, run_id: int | None = None) -> int:

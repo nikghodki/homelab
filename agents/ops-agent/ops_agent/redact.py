@@ -26,9 +26,11 @@ _RULES: list[tuple[str, re.Pattern[str], str]] = [
     ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), "[REDACTED:jwt]"),
     ("age-key", re.compile(r"\bAGE-SECRET-KEY-1[0-9A-Z]{50,}"), "[REDACTED:age]"),
     ("ntfy-topic", re.compile(r"(?i)ntfy\.sh/[A-Za-z0-9_-]{6,}"), "ntfy.sh/[REDACTED]"),
+    ("ntfy-token", re.compile(r"\btk_[a-z0-9]{29}\b"), "[REDACTED:ntfy]"),
 ]
 
 _TOKENISH = re.compile(r"[A-Za-z0-9+/_=-]{32,}")
+_K8S_NAME = re.compile(r"^([A-Z][A-Za-z]+/)?[a-z0-9][a-z0-9.-]*(/[a-z0-9][a-z0-9.-]*)*$")
 _HEX_DIGEST = re.compile(r"^(sha256:)?[a-f0-9]{40}$|^(sha256:)?[a-f0-9]{64}$")
 
 
@@ -53,6 +55,9 @@ def redact(text: str) -> tuple[str, int]:
         s = m.group(0)
         # Image digests and git SHAs are evidence, not secrets.
         if _HEX_DIGEST.match(s) or s.startswith("sha256") or "/" in s.strip("/") and s.count("/") > 2:
+            return s
+        # Kubernetes and host names (lowercase, digits, dashes, dots, slashes: Pod/ns/name-7d9f-x2) are evidence
+        if _K8S_NAME.match(s) and ("-" in s or "/" in s):
             return s
         if _entropy(s) >= 4.2:
             n += 1
