@@ -42,6 +42,9 @@ route:
     - matchers: ['severity="critical"']
       receiver: ntfy-critical
       repeat_interval: 30m
+    # Everything else to ntfy, as the root receiver did before the ops-agent route: an alert that matched a
+    # child route (even one with continue: true) never falls back to the parent's receiver.
+    - receiver: ntfy
 receivers:
   - name: no-push
   # ops-ingest in k3s on its fixed ClusterIP (cluster/README.md); kube-proxy on dgx-2 routes it for this container.
