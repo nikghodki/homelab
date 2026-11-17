@@ -1,0 +1,8 @@
+---
+# Who may reach Hermes' main-profile API server (0.0.0.0:8642 on the Jetson; runbooks/open-webui.md, "Hermes").
+# Hermes binds every interface and its config isn't in Git, so the Jetson drops the port for everyone else.
+# Loopback is always allowed (Hermes' own dashboard and CLI).
+hermes_api_guard_port: 8642
+hermes_api_guard_sources:
+  - 192.168.86.44   # dgx-1: Open WebUI's pod (open-webui/open-webui, pinned to dgx-1), masqueraded to the node's address
+hermes_api_guard_file: /etc/homelab/hermes-api-guard.nft

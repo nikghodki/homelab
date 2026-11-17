@@ -12,6 +12,10 @@ Both DefenseClaw installs run 1.0.9 in action mode, fail closed, with human appr
 (role `defenseclaw_policy`, `defenseclaw_policy_users` in `host_vars/jetson.yml`), and OTLP to dgx-2 with `sensitive`
 redaction.
 
+API server keys: `secrets/hermes.enc.yaml` (`hermes_api_key_nikjetson`, `hermes_api_key_hermes_nikhil`), deployed by
+hand to each account's `~/.hermes/api_server.env` (0600); both rotated on 2026-11-17. Only Open WebUI calls the main
+profile's API (runbooks/open-webui.md, "Hermes": rotation steps, the Jetson-side allow rule).
+
 ## hermes-nikhil details
 
 - Hermes runtime: its own checkout of the same commit (`~/.hermes/hermes-agent`, `setup-hermes.sh --runtime-only`), not

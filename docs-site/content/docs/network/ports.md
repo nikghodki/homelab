@@ -58,7 +58,7 @@ the Postgres instances, MLflow 5000 inside the stack.
 | Port | Bind | Service |
 |---|---|---|
 | 8123 | all | Home Assistant (host network) |
-| 8642 | all | Hermes api_server, main profile |
+| 8642 | all (nftables: loopback and dgx-1 only) | Hermes api_server, main profile (Open WebUI's Hermes model) |
 | 8643 | 100.78.145.123 | Hermes api_server, hermes-nikhil |
 | 8200 | all | RoboClaw control center |
 | 7447 | all | Zenoh router |

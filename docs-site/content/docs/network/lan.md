@@ -50,7 +50,7 @@ Services that publish on all interfaces or on a LAN address (full list in [Ports
 | dgx-2 | 4181, 5000 | MLflow (UI gate, job API) | front door token (sign-in at the door); basic auth |
 | dgx-2 | 8000 | restic rest-server (TLS) | per-host htpasswd |
 | Jetson | 8123 | Home Assistant | its own login |
-| Jetson | 8642 | Hermes api_server (main profile) | (unverified) |
+| Jetson | 8642 | Hermes api_server (main profile) | dgx-1 only (Open WebUI), nftables `hermes_api_guard` |
 | Jetson | 8200 | RoboClaw control center | (unverified) |
 | Jetson | 7447 | Zenoh router | **none** (no Zenoh auth/TLS yet) |
 | Dell | 8081 | Gatus via status-gate | front door token (sign-in at the door); `/health`, `/metrics`, heartbeat open |

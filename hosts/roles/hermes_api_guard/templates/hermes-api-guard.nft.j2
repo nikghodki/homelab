@@ -1,0 +1,13 @@
+#!/usr/sbin/nft -f
+# Managed by homelab Ansible (role hermes_api_guard). runbooks/open-webui.md, "Hermes".
+# Its own table: nothing else (k3s, Docker, iptables-nft) touches it. Recreated on every load.
+table inet hermes_api_guard
+delete table inet hermes_api_guard
+table inet hermes_api_guard {
+	chain input {
+		type filter hook input priority filter - 10; policy accept;
+		tcp dport {{ hermes_api_guard_port }} iif "lo" accept
+		tcp dport {{ hermes_api_guard_port }} ip saddr { {{ hermes_api_guard_sources | join(', ') }} } accept
+		tcp dport {{ hermes_api_guard_port }} counter drop comment "Hermes API: Open WebUI (dgx-1) only"
+	}
+}
