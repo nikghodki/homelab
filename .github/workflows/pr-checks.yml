@@ -159,10 +159,10 @@ jobs:
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         working-directory: cluster/apps/litellm/proxy
         run: PYTHONPATH=. python -m pytest -q tests/test_defenseclaw_guardrail.py
-      - name: LiteLLM request hook (system merge, file attachments as text)
+      - name: LiteLLM request hook (system merge, file attachments as text, DefenseClaw judge reply repair)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         working-directory: cluster/apps/litellm/proxy
-        run: PYTHONPATH=. python -m pytest -q tests/test_documents_to_text.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_documents_to_text.py tests/test_judge_reply_repair.py
       - name: "Unit tests: Mac dev-setup (installer logic on fixtures; bash, jq, awk)"
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: bash tools/dev-setup/tests/run.sh
