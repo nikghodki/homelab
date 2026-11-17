@@ -109,6 +109,8 @@ spec:
             # Free while LiteLLM_UserTable has fewer than 5 users. UI_USERNAME/UI_PASSWORD: break-glass (/fallback/login).
             - {name: PROXY_BASE_URL, value: "https://litellm-admin.nghodki.ai"}
             - {name: GENERIC_CLIENT_ID, value: litellm}
+            # Go straight to Pocket ID instead of LiteLLM's login page with an SSO button (/fallback/login stays for break-glass)
+            - {name: AUTO_REDIRECT_UI_LOGIN_TO_SSO, value: "true"}
             - {name: GENERIC_AUTHORIZATION_ENDPOINT, value: "https://id.nghodki.ai/authorize"}
             - {name: GENERIC_TOKEN_ENDPOINT, value: "https://id.nghodki.ai/api/oidc/token"}
             - {name: GENERIC_USERINFO_ENDPOINT, value: "https://id.nghodki.ai/api/oidc/userinfo"}
