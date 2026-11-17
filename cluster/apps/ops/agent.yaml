@@ -39,7 +39,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: ingest
-          image: ghcr.io/nikghodki/ops-agent:0.1.6
+          image: ghcr.io/nikghodki/ops-agent:0.1.7
           args: [ingest]
           env:
             - name: OPS_DB_DSN
@@ -142,7 +142,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: worker
-          image: ghcr.io/nikghodki/ops-agent:0.1.6
+          image: ghcr.io/nikghodki/ops-agent:0.1.7
           args: [worker]
           env:
             - name: OPS_DB_DSN
@@ -241,7 +241,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: portal
-          image: ghcr.io/nikghodki/ops-agent:0.1.6
+          image: ghcr.io/nikghodki/ops-agent:0.1.7
           args: [portal]
           env:
             - name: OPS_DB_DSN
