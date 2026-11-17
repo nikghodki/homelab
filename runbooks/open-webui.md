@@ -104,7 +104,8 @@ dgx-2, the Jetson and the Pi):
 ## TPS meter
 
 A global **filter function** (`functions/tps_meter.py`, tests in `functions/tests`, run in CI), on every model. While
-a reply streams the status line under the model name shows `≈ 42.0 tok/s · 128 tokens so far` (every 0.5 s, every 2 s
+a reply streams the status line under the model name shows `first token after 3.62 s` as soon as the first token
+arrives, then `≈ 42.0 tok/s · 128 tokens so far` (every 0.5 s, every 2 s
 after 60 updates: each status is also saved in the chat). When it ends: `38.2 tok/s · 512 output tokens · first token
 0.41 s · 13.8 s total`.
 
@@ -116,6 +117,17 @@ after 60 updates: each status is also saved in the chat). When it ends: `38.2 to
   when Open WebUI starts handling the request (a cold model start shows up there: ~4.5 min).
 - Valves (admin UI → Functions → TPS meter): `update_interval`, `slow_after_updates`, `slow_update_interval`,
   `pipeline_model_prefixes` (`hermes.`), `pipeline_label`. Valves are stored in the database, not in Git.
+
+### Verified 2026-11-17
+
+Through the API and a socket client like the browser's (no passkey: the admin API key, and a throwaway account):
+`/api/config` and the page say "Ask Me" (title and manifest too); the admin sees both models; a throwaway account
+(role user, in a throwaway non-admin group, deleted afterwards) saw only the direct model, got 401 for the Hermes
+model's details and 400 "Model not found" when asking it; its direct chat streamed 17 live statuses (gaps >= 0.55 s)
+and ended with `42.7 tok/s · 390 output tokens · first token 3.62 s · 12.8 s total` (exact usage). The admin's Hermes
+chats ("what time is it?", "list your tools without running any") answered in ~30 s with usage; the Pi's
+`robot-motion-bridge` and `safety-governor` journals showed no command. The rollout (Recreate) cost 39 s of
+front-door errors.
 
 ## Model connection
 

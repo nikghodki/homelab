@@ -1,7 +1,7 @@
 """
 title: TPS meter
 author: homelab (cluster/apps/open-webui/functions/tps_meter.py)
-version: 1.0.0
+version: 1.0.1
 license: MIT
 description: Live "≈ N tok/s" while a reply streams, then tok/s, output tokens, time to first token and total time.
 """
@@ -29,7 +29,8 @@ from typing import Any, Awaitable, Callable, Optional
 from pydantic import BaseModel, Field
 
 CHARS_PER_TOKEN = 4.0
-STALE_AFTER_S = 3600.0  # meters for requests that never finished (client gone) are dropped after this
+STALE_AFTER_S = 3600.0
+MIN_RATE_SPAN_S = 0.25  # live tok/s only once tokens have streamed for this long  # meters for requests that never finished (client gone) are dropped after this
 
 
 def chunk_text(chunk: dict) -> str:
@@ -143,6 +144,9 @@ class Meter:
         return self.last_emit is None or now - self.last_emit >= step
 
     def live_text(self, now: float) -> str:
+        if self.t_first is not None and now - self.t_first < MIN_RATE_SPAN_S:
+            # too early for a rate (one token would read as "0.3 tok/s" after a slow start)
+            return f"{self.label}first token after {fmt_seconds(self.t_first - self.t0)}"
         r = self.rate(now)
         speed = f"≈ {fmt_rate(r)} tok/s" if r is not None else "≈ … tok/s"
         return f"{self.label}{speed} · {self.estimated} tokens so far"

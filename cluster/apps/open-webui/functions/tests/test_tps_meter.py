@@ -165,7 +165,8 @@ def test_live_updates_throttled_to_interval():
     assert 6 <= len(live) <= 7
     times = [t for t, _, _ in live]
     assert all(b - a >= 0.5 - 1e-9 for a, b in zip(times, times[1:]))
-    assert all(s[1].startswith("≈ ") and "tok/s" in s[1] for s in live)
+    assert live[0][1].startswith("first token after")
+    assert all(s[1].startswith("≈ ") and "tok/s" in s[1] for s in live[1:])
 
 
 def test_live_updates_slow_down_after_many():
@@ -251,3 +252,14 @@ def test_non_dict_event_passes_through():
 @pytest.mark.parametrize("model_id,label", [("hermes.hermes-agent", "Agent run: "), ("qwen3.8-27b", "")])
 def test_label(model_id, label):
     assert tm.Filter()._label({"id": model_id}) == label
+
+
+def test_first_live_update_reports_the_first_token_time_not_a_rate():
+    r = Run()
+    r.inlet()
+    r.chunk(103.62, delta(text="x"))  # a cold-ish start: first token after 3.62 s
+    first = r.statuses()[0]
+    assert first == (103.62, "first token after 3.62 s", False)
+    for i in range(1, 6):
+        r.chunk(103.62 + i * 0.1, delta(text="x"))
+    assert r.statuses()[-1][1].startswith("≈ ")

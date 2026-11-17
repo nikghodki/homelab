@@ -121,6 +121,23 @@ confirmed the findings:
 New on the rescan (nikjetson): `obliteratus` went from clean to rejected (HIGH); 16 skills went from clean to
 warning (INFO findings from the LLM).
 
+## Restarts and quarantined plugins (2026-11-17)
+
+A gateway restart reloads every plugin from disk, so anything DefenseClaw's watcher quarantined since the last start
+disappears from the running agent. Since the move of LiteLLM, the watcher's LLM judge often times out (its fixed
+120 s), so it keeps quarantining plugins with "the LLM judge did not run" in both accounts (dozens on 2026-11-16).
+After the key rotation restart on 2026-11-17:
+
+- nikjetson: chats failed with `No module named 'plugins.browser.browser_use'` (then `browserbase`). Rescanned in
+  place with the LLM and restored as before (none HIGH+): `browser/browser_use`, `browser/browserbase`,
+  `browser/firecrawl`, `web/ddgs`, `web/exa`. `browserbase` was quarantined again by a timed-out watcher scan and
+  admitted on the second try.
+- hermes-nikhil: `browser/browser_use` and `browser/firecrawl` restored the same way. **Slack is down**: the watcher
+  rejected `plugins/platforms/slack` as CRITICAL on 2026-11-16 07:39 UTC (findings about `src/index.ts` and
+  `package.json`, files the plugin doesn't have) and again at 01:08 UTC after a clean manual rescan, so the restarted
+  gateway has no Slack adapter. The `homeassistant` platform plugin (`~/.hermes/plugins/homeassistant`) rescanned HIGH
+  and stays quarantined. Both need a human decision (allow-list or keep off).
+
 ## Rollback
 
 nikjetson's old `hermes-gateway-nikhil-ghodki` unit is disabled but kept, and its data is still in
