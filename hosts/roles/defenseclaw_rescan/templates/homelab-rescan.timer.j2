@@ -1,0 +1,11 @@
+# Managed by homelab Ansible (roles/defenseclaw_rescan)
+[Unit]
+Description=Weekly DefenseClaw LLM rescan (Sunday 02:00 local)
+
+[Timer]
+OnCalendar={{ defenseclaw_rescan_time }}
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

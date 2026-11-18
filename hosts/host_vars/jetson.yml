@@ -5,6 +5,10 @@ defenseclaw_policy_mcp_admission: true
 mcp_drift_enabled: true
 # Hermes is connected to DefenseClaw here, so the AIBOM has content
 defenseclaw_aibom_enabled: true
+# Weekly LLM rescan (the watch rescan, moved to a fixed Sunday 02:00 run). Both
+# per-user installs scan with the LLM analyzer; each owns its own homelab-rescan timer.
+defenseclaw_rescan_enabled: true
+defenseclaw_rescan_users: [nikjetson, hermes-nikhil]
 restic_backup_paths:
   - /home/nikjetson/.hermes
   - /home/nikjetson/hermes-homes

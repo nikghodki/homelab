@@ -1,4 +1,8 @@
 defenseclaw_fleet_enabled: true
+# Weekly LLM rescan (the watch rescan, now a fixed Sunday 02:00 run) for the
+# per-user install of the login user (nikghodki-dgx). The policy's watch is off
+# everywhere, so this timer is the only recurring LLM rescan on the host.
+defenseclaw_rescan_enabled: true
 # DefenseClaw Fleet gateway metrics (admin bearer token from secrets/fleet.enc.yaml, loaded by playbooks/collectors.yml)
 # and the LiteLLM usage exporter (who called the model API; playbooks/litellm-usage.yml, runbooks/litellm.md)
 otel_host_collector_extra_scrapes: >-

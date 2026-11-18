@@ -1,0 +1,22 @@
+# Managed by homelab Ansible (roles/defenseclaw_rescan)
+[Unit]
+Description=Weekly DefenseClaw LLM rescan (the watch rescan, moved to a fixed Sunday 02:00 run)
+After=network-online.target
+
+[Service]
+Type=oneshot
+# No EnvironmentFile: the defenseclaw CLI loads ~/.defenseclaw/.env itself
+# (checked 2026-11-17 in a scrubbed environment -- the LLM analyzer picked up
+# DEFENSECLAW_LLM_KEY without it), the same way the gateway does.
+ExecStart=/usr/bin/python3 %h/.local/bin/homelab-rescan
+# Findings at/above the policy threshold (a blocked skill) are the normal state
+# on a fleet that keeps skills quarantined: logged, not a unit failure.
+SuccessExitStatus=1
+# 6 h worst case for the whole job (the script caps each of the three scan
+# categories at the same 6 h, so this is a backstop against a hung run, not a
+# budget for a normal pass -- that takes a few minutes warm).
+TimeoutStartSec=6h
+Nice=10
+# Findings and the one-line summary go to the journal through SyslogIdentifier
+# (stdout is captured there too); the host collector ships it to Loki.
+SyslogIdentifier=homelab-rescan
