@@ -23,3 +23,8 @@
   hosts: all
   roles:
     - role: mcp_drift
+
+- name: Weekly DefenseClaw LLM rescan (the watch rescan, now a fixed Sunday 02:00 run)
+  hosts: all
+  roles:
+    - role: defenseclaw_rescan

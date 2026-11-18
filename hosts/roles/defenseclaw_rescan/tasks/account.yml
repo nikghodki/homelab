@@ -1,0 +1,48 @@
+---
+- name: "Weekly rescan job files and timer for {{ defenseclaw_rescan_account }}"
+  become: "{{ defenseclaw_rescan_account != ansible_facts['user_id'] }}"
+  become_user: "{{ defenseclaw_rescan_account }}"
+  vars:
+    defenseclaw_rescan_home: "{{ ansible_facts.getent_passwd[defenseclaw_rescan_account][4] }}"
+    defenseclaw_rescan_uid: "{{ ansible_facts.getent_passwd[defenseclaw_rescan_account][1] }}"
+  block:
+    - name: Look for the DefenseClaw CLI
+      ansible.builtin.stat:
+        path: "{{ defenseclaw_rescan_home }}/.local/bin/defenseclaw"
+      register: defenseclaw_rescan_cli_stat
+
+    - name: Job script and timer (skipped where the CLI is absent)
+      when: defenseclaw_rescan_cli_stat.stat.exists
+      block:
+        - name: Folders
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            mode: "0755"
+          loop:
+            - "{{ defenseclaw_rescan_home }}/.local/bin"
+            - "{{ defenseclaw_rescan_home }}/.config/systemd/user"
+
+        - name: Script
+          ansible.builtin.copy:
+            src: homelab-rescan.py
+            dest: "{{ defenseclaw_rescan_home }}/.local/bin/homelab-rescan"
+            mode: "0755"
+
+        - name: Service and timer
+          ansible.builtin.template:
+            src: "{{ item }}.j2"
+            dest: "{{ defenseclaw_rescan_home }}/.config/systemd/user/{{ item }}"
+            mode: "0644"
+          loop: [homelab-rescan.service, homelab-rescan.timer]
+
+        - name: Timer is enabled
+          ansible.builtin.systemd_service:
+            name: homelab-rescan.timer
+            scope: user
+            enabled: true
+            state: started
+            daemon_reload: true
+          environment:
+            XDG_RUNTIME_DIR: "/run/user/{{ defenseclaw_rescan_uid }}"
+          when: not ansible_check_mode

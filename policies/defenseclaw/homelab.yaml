@@ -142,8 +142,15 @@ firewall:
   - 443
   - 80
 watch:
-  rescan_enabled: true
-  rescan_interval_min: 30
+  # The autonomous periodic LLM rescan is off (2026-11-17): at 30 min it was the
+  # fleet's continuous qwen3.8-27b caller. The rescan now runs once a week at a
+  # fixed time via the `homelab-rescan` user timer (hosts/roles/defenseclaw_rescan,
+  # runbooks/defenseclaw-rescan.md). New installs are still scanned on install
+  # (admission.scan_on_install) and new AI components are still found by
+  # ai_discovery (5 min); only the repeated re-scan of existing assets moved to
+  # the weekly timer. rescan_interval_min is kept at 7 days as the documented cadence.
+  rescan_enabled: false
+  rescan_interval_min: 10080
 webhooks: []
 enforcement:
   max_enforcement_delay_seconds: 2

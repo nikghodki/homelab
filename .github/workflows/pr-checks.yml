@@ -191,6 +191,9 @@ jobs:
       - name: DefenseClaw AIBOM nightly diff
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python -m pytest -q hosts/roles/defenseclaw_aibom/files/tests
+      - name: DefenseClaw weekly LLM rescan (scan commands, JSON parsing, exit codes)
+        if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
+        run: python -m pytest -q hosts/roles/defenseclaw_rescan/files/tests
       - name: Sim job sampler and watchdog (measure.sh, stub docker/nvidia-smi)
         if: ${{ !cancelled() && steps.scope.outputs.code == 'true' && steps.pyci.outcome == 'success' }}
         run: python -m pytest -q robots/sim/tests

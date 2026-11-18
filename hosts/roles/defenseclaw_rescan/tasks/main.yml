@@ -1,0 +1,17 @@
+---
+- name: Weekly DefenseClaw LLM rescan
+  when: defenseclaw_rescan_enabled | bool
+  block:
+    - name: Accounts to manage
+      ansible.builtin.set_fact:
+        defenseclaw_rescan_accounts: "{{ defenseclaw_rescan_users if defenseclaw_rescan_users | length > 0 else [ansible_facts['user_id']] }}"
+
+    - name: Account home folders
+      ansible.builtin.getent:
+        database: passwd
+
+    - name: Rescan job for each account
+      ansible.builtin.include_tasks: account.yml
+      loop: "{{ defenseclaw_rescan_accounts }}"
+      loop_control:
+        loop_var: defenseclaw_rescan_account

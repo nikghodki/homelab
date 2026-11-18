@@ -1,0 +1,12 @@
+---
+# Weekly DefenseClaw LLM rescan (the watch rescan, moved from a 30-min loop to a
+# fixed weekly run so it stops being the fleet's continuous qwen3.8-27b caller).
+# The policy's watch.rescan_interval_min (policies/defenseclaw/homelab.yaml) is
+# raised to the same cadence so the gateway's own watcher stays quiet in between.
+defenseclaw_rescan_enabled: false
+# Sunday 02:00 local time. Every managed host is America/Los_Angeles (PST/PDT);
+# "2am" in the request means this local clock.
+defenseclaw_rescan_time: "Sun *-*-* 02:00:00"
+# Accounts with a per-user DefenseClaw install that has LLM scanning configured.
+# Empty means the Ansible login user only.
+defenseclaw_rescan_users: []

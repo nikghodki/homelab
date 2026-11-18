@@ -29,6 +29,7 @@ DefenseClaw itself is installed by hand with its release installer, per user. An
 | `defenseclaw_aibom` | nightly `defenseclaw aibom scan --json` (user timer `homelab-aibom.timer`, 03:15, 30 days kept) | `defenseclaw_aibom_enabled: true` (Jetson, nikjetson) |
 | `defenseclaw_policy` (MCP admission part) | merges `asset_policy` from `policies/defenseclaw/mcp-servers.yaml` into `~/.defenseclaw/config.yaml` with `defenseclaw config set --json asset_policy`, then `config validate` | `defenseclaw_policy_mcp_admission: true` (Jetson, both accounts) |
 | `mcp_drift` | nightly MCP drift check (user timer `mcp-drift.timer`, ~03:40) | `mcp_drift_enabled: true` (Jetson, both accounts) |
+| `defenseclaw_rescan` | weekly LLM rescan: the `watch` re-scan (skills/plugins/MCP with the LLM analyzer) moved from a 30-min loop to a fixed run (user timer `homelab-rescan.timer`, Sunday 02:00) | `defenseclaw_rescan_enabled: true` (Jetson both accounts, dgx-1); runbooks/defenseclaw-rescan.md |
 
 Run: `cd ~/homelab/hosts && ~/.venvs/ansible/bin/ansible-playbook playbooks/defenseclaw.yml --check --diff`.
 
@@ -46,7 +47,10 @@ Based on the built-in `default` preset. What it sets:
   (MEDIUM) and exfiltration (HIGH).
 - **Firewall:** default deny; blocks the cloud metadata addresses; allows Anthropic, GitHub, the Go proxy, npm and PyPI
   on 80/443.
-- **Watch:** rescans every 30 minutes.
+- **Watch:** the periodic LLM rescan is off (`rescan_enabled: false`, interval 7 days); it runs once a week at
+  Sunday 02:00 via the `defenseclaw_rescan` timer. Before 2026-11-17 it re-scanned every 30 minutes and was the
+  fleet's continuous `qwen3.8-27b` caller (runbooks/defenseclaw-rescan.md). New installs are still scanned on
+  install and new components are still found by `ai_discovery` (5 min, unchanged).
 - **Audit:** log all actions and scan results, keep 90 days. No webhooks.
 
 CI test `policies/defenseclaw/tests/test_homelab_policy.py` fails if an edit loosens these rules, or if severity keys
