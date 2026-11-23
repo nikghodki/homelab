@@ -24,6 +24,11 @@ HL_MARK_BEGIN='# >>> homelab models >>>'
 HL_MARK_END='# <<< homelab models <<<'
 # Written into every row this script adds to Claude Code's /model picker; how the sync agent knows the picker is its own
 HL_PICKER_TAG='homelab LiteLLM'
+# Claude Code's context window per model: it assumes 1M tokens for a name it doesn't know, so it would send prompts
+# far beyond what a homelab model accepts. The sync sets modelSettings.<model>.autoCompactWindow to the route's
+# max_input_tokens (LiteLLM /model/info, published by DGXMM); Claude Code keeps its own autocompact buffer below it
+# for the reply. Its smallest window is 100k.
+HL_WINDOW_MIN=100000
 # LiteLLM model_info.mode values that are not chat models (a route without a mode counts as chat)
 HL_NON_CHAT_MODES='embedding image_generation image_edit audio_transcription audio_speech rerank moderation ocr search video_generation'
 
@@ -93,6 +98,20 @@ hl_filter_models() {
     | unique[]' <<<"$models_json"
 }
 
+# {model: auto-compact window} for the chat models ($2, lines) from /model/info JSON ($1): max_input_tokens, only
+# where that is at least HL_WINDOW_MIN; models without a window are left out.
+hl_model_windows() {
+  local info_json=${1:-} models=$2
+  [ -n "$info_json" ] || info_json='{"data":[]}'
+  jq -c --arg models "$models" --argjson min "$HL_WINDOW_MIN" '
+    ($models | split("\n") | map(select(. != ""))) as $m
+    | [.data[]? | select(.model_name as $n | $m | index($n))
+       | select((.model_info.max_input_tokens | type) == "number")
+       | {key: .model_name, value: (.model_info.max_input_tokens | floor)}
+       | select(.value >= $min)]
+    | from_entries' <<<"$info_json"
+}
+
 # Is $1 one of the lines of $2?
 hl_in_list() {
   local needle=$1 list=$2 line
@@ -121,11 +140,39 @@ hl_hosts_unpin() {
        { print }' "$1"
 }
 
-# Claude Code settings ($1, JSON text) with our apiKeyHelper and /model picker rows for the models ($3, lines).
+# Settings ($1, JSON text) with our auto-compact windows in modelSettings: the ones we wrote before ($2,
+# {model: window}; "" = none) removed unless the user changed them since, then the new ones ($3, {model: window})
+# set where the model has no window of its own. $3 "": windows unknown (LiteLLM didn't answer), nothing touched.
+hl_claude_windows_apply() {
+  local settings=$1 prev=${2:-} windows=${3:-}
+  [ -n "$settings" ] || settings='{}'
+  [ -n "$prev" ] || prev='{}'
+  if [ -z "$windows" ]; then jq . <<<"$settings"; return; fi
+  jq --argjson p "$prev" --argjson w "$windows" '
+    ((.modelSettings // {})
+       | reduce ($p | keys[]) as $k (.;
+           if (.[$k].autoCompactWindow // null) == $p[$k]
+           then (.[$k] |= del(.autoCompactWindow)) | (if .[$k] == {} then del(.[$k]) else . end) else . end)
+       | reduce ($w | keys[]) as $k (.;
+           if (.[$k].autoCompactWindow // null) == null then .[$k].autoCompactWindow = $w[$k] else . end)) as $ms
+    | if $ms == {} then del(.modelSettings) else .modelSettings = $ms end' <<<"$settings"
+}
+
+# The windows ($2) the settings ($1) now hold as written: what the next sync may change or remove. $2 "": $3 (the
+# windows written before) stays the record.
+hl_claude_windows_owned() {
+  if [ -z "${2:-}" ]; then printf '%s\n' "${3:-}"; return; fi
+  jq -c --argjson w "$2" '(.modelSettings // {}) as $ms
+    | $w | with_entries(select(($ms[.key].autoCompactWindow // null) == .value))' <<<"$1"
+}
+
+# Claude Code settings ($1, JSON text) with our apiKeyHelper and /model picker rows for the models ($3, lines), and
+# the models' auto-compact windows ($5, {model: window}; $6 the ones written before: hl_claude_windows_apply).
 # Every other key is kept as it is (including the claudeCode.* keys some Macs have there).
 hl_claude_settings_apply() {
-  local settings=$1 helper=$2 models=$3 default=$4
+  local settings=$1 helper=$2 models=$3 default=$4 windows=${5:-} prev=${6:-}
   [ -n "$settings" ] || settings='{}'
+  settings=$(hl_claude_windows_apply "$settings" "$prev" "$windows") || return 1
   jq --arg helper "$helper" --arg models "$models" --arg default "$default" --arg tag "$HL_PICKER_TAG" '
     ($models | split("\n") | map(select(. != ""))) as $m
     | ([$default | select(. as $d | $m | index($d))] + ($m - [$default])) as $ordered
@@ -145,12 +192,12 @@ hl_claude_picker_owner() {
     else "foreign" end' <<<"$1"
 }
 
-# Claude Code settings without what hl_claude_settings_apply added.
+# Claude Code settings without what hl_claude_settings_apply added ($2: the windows it wrote, as for apply).
 hl_claude_settings_remove() {
-  jq --arg tag "$HL_PICKER_TAG" '
+  hl_claude_windows_apply "$1" "${2:-}" '{}' | jq --arg tag "$HL_PICKER_TAG" '
     (if (.apiKeyHelper // "" | test("homelab-model-key")) then del(.apiKeyHelper) else . end)
     | (if .modelPicker != null and ([.modelPicker.options[]? | (.description // "") | startswith($tag)] | all)
-       then del(.modelPicker) else . end)' <<<"$1"
+       then del(.modelPicker) else . end)'
 }
 
 # Cursor's settings.json ($1) with the Claude Code extension's environment pointed at LiteLLM: https base URL, the web
@@ -434,6 +481,15 @@ hl_fetch_models() {
   hl_filter_models "$models" "$info"
 }
 
+# The models' auto-compact windows ({model: window}, hl_model_windows) for the list ($2); fails when LiteLLM's
+# /model/info can't be read (then the windows are left as they are).
+hl_fetch_windows() {
+  local key=$1 list=$2 info
+  info=$(hl_get /v1/model/info "$key") || return 1
+  printf '%s' "$info" | jq -e '.data' >/dev/null 2>&1 || return 1
+  hl_model_windows "$info" "$list"
+}
+
 # ---------------------------------------------------------------------------------------------------------------------
 # Steps
 # ---------------------------------------------------------------------------------------------------------------------
@@ -603,8 +659,10 @@ hl_step_models() {
   key=$(hl_any_key) || key=""
   if [ -n "$key" ] && list=$(hl_fetch_models "$key") && [ -n "$list" ]; then
     HL_MODELS=$list
+    HL_WINDOWS=$(hl_fetch_windows "$key" "$list") || HL_WINDOWS=""
     printf '%s\n' "$list" | hl_write "$HL_MODELS_CACHE" 644
     hl_ok "$(printf '%s' "$list" | tr '\n' ' ')"
+    [ -z "$HL_WINDOWS" ] || hl_ok "context windows: $(jq -r 'to_entries | map("\(.key)=\(.value)") | join(" ")' <<<"$HL_WINDOWS")"
   elif [ -f "$HL_MODELS_CACHE" ]; then
     HL_MODELS=$(cat "$HL_MODELS_CACHE"); hl_warn "LiteLLM didn't list models; using the last list"
   else
@@ -667,10 +725,13 @@ hl_step_claude() {
     hl_say "  settings.json already has its own apiKeyHelper or /model picker."
     hl_confirm "  Replace them (a backup is kept)?" || { hl_warn "left as it is"; return; }
   fi
-  new=$(hl_claude_settings_apply "$cur" "$HL_HELPER claude-code" "$HL_MODELS" "$HL_DEFAULT_MODEL") || { hl_fail "jq failed"; return; }
+  local prev; prev=$(hl_state_get claude_windows)
+  new=$(hl_claude_settings_apply "$cur" "$HL_HELPER claude-code" "$HL_MODELS" "$HL_DEFAULT_MODEL" "${HL_WINDOWS:-}" "$prev") \
+    || { hl_fail "jq failed"; return; }
   jq . <<<"$new" | hl_write "$HL_CLAUDE_SETTINGS"
-  case $? in 0) hl_fix "apiKeyHelper and /model picker written (other keys untouched)" ;; 1) hl_ok "up to date" ;; *) hl_fail "could not write" ;; esac
+  case $? in 0) hl_fix "apiKeyHelper, /model picker and context windows written (other keys untouched)" ;; 1) hl_ok "up to date" ;; *) hl_fail "could not write" ;; esac
   hl_state_set claude managed
+  hl_state_set claude_windows "$(hl_claude_windows_owned "$new" "${HL_WINDOWS:-}" "$prev")"
 }
 
 # Cursor's own chat can't use LiteLLM (Cursor calls custom endpoints from its servers, which can't reach the tailnet), so
@@ -748,7 +809,7 @@ hl_step_agent() {
 
 # --sync: what the LaunchAgent runs. Quiet, never asks, never touches a file that isn't ours or didn't change.
 hl_sync() {
-  local key list
+  local key list windows
   HL_LOCK="$HL_CONF/.sync.lock"
   mkdir -p "$HL_CONF"
   # One run at a time; a lock older than 10 minutes is from a run that died
@@ -757,6 +818,7 @@ hl_sync() {
   trap 'rmdir "$HL_LOCK" 2>/dev/null' EXIT
   key=$(hl_any_key) || { hl_log "no key in the Keychain"; return 0; }
   list=$(hl_fetch_models "$key") || { hl_log "LiteLLM unreachable (HTTP ${HL_HTTP:-000}); nothing changed"; return 0; }
+  windows=$(hl_fetch_windows "$key" "$list") || windows=""
   key=""
   [ -n "$list" ] || { hl_log "LiteLLM listed no chat models; nothing changed"; return 0; }
   HL_MODELS=$list
@@ -765,8 +827,12 @@ hl_sync() {
   if [ "$(hl_state_get claude)" = managed ] && [ -f "$HL_CLAUDE_SETTINGS" ]; then
     local cur; cur=$(cat "$HL_CLAUDE_SETTINGS")
     if jq -e . >/dev/null 2>&1 <<<"$cur" && [ "$(hl_claude_picker_owner "$cur")" != foreign ]; then
-      hl_claude_settings_apply "$cur" "$(jq -r '.apiKeyHelper // empty' <<<"$cur")" "$list" "$HL_DEFAULT_MODEL" | jq . \
-        | hl_write "$HL_CLAUDE_SETTINGS" && hl_log "Claude Code /model picker updated"
+      local prev new; prev=$(hl_state_get claude_windows)
+      if new=$(hl_claude_settings_apply "$cur" "$(jq -r '.apiKeyHelper // empty' <<<"$cur")" "$list" "$HL_DEFAULT_MODEL" \
+                 "$windows" "$prev"); then
+        jq . <<<"$new" | hl_write "$HL_CLAUDE_SETTINGS" && hl_log "Claude Code /model picker and context windows updated"
+        hl_state_set claude_windows "$(hl_claude_windows_owned "$new" "$windows" "$prev")"
+      fi
     fi
   fi
   if [ "$(hl_state_get cursor)" = managed ] && [ -f "$HL_CURSOR_SETTINGS" ]; then
@@ -806,7 +872,8 @@ hl_uninstall() {
     hl_zshrc_remove "$HL_ZSHRC" | hl_write "$HL_ZSHRC" && hl_fix "shell block removed"
   fi
   if [ -f "$HL_CLAUDE_SETTINGS" ] && jq -e . "$HL_CLAUDE_SETTINGS" >/dev/null 2>&1; then
-    hl_claude_settings_remove "$(cat "$HL_CLAUDE_SETTINGS")" | jq . | hl_write "$HL_CLAUDE_SETTINGS" && hl_fix "Claude Code: apiKeyHelper and /model picker removed"
+    hl_claude_settings_remove "$(cat "$HL_CLAUDE_SETTINGS")" "$(hl_state_get claude_windows)" | jq . | hl_write "$HL_CLAUDE_SETTINGS" \
+      && hl_fix "Claude Code: apiKeyHelper, /model picker and context windows removed"
   fi
   if [ -n "$(hl_codex_managed_model "$HL_CODEX_CONFIG")" ]; then
     printf '%s\n' "$(hl_codex_config_remove "$HL_CODEX_CONFIG")" | hl_write "$HL_CODEX_CONFIG" && hl_fix "Codex: provider removed, earlier model settings restored"
