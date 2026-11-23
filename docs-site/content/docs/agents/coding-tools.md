@@ -27,6 +27,15 @@ the first request wakes it (about **4.5 minutes** for `qwen3.8-27b`, longer if m
 model that can't fit next to the running one waits in DGXMM's queue). The default everywhere is `qwen3.8-27b`
 (decision 0012).
 
+**Context windows.** Claude Code assumes a 1M-token window for a model name it doesn't know, so on a homelab model it
+would let a session grow far past what the model accepts, and the request fails instead of compacting. The sync
+agent therefore also writes each model's window into `~/.claude/settings.json` as
+`modelSettings.<model>.autoCompactWindow`: the route's `max_input_tokens` from `/v1/model/info` (DGXMM publishes
+the deployment's context length there) less 32,768 tokens for the reply, so sessions compact before they reach the
+model's limit. Models under 100k tokens get nothing, as that is Claude Code's smallest auto-compact window. A
+window you set yourself for a model (`/autocompact`) is never overwritten, and a window the agent wrote is removed
+again when the model leaves LiteLLM.
+
 ## Before you start
 
 - **Tailscale** connected on the Mac, with "Use Tailscale DNS" on: `nghodki.ai` only resolves on the tailnet.
@@ -51,7 +60,7 @@ locked to SSH sessions). Download it, check it, run it:
 ```bash
 curl -fsSLo install-mac.sh https://raw.githubusercontent.com/nikghodki/homelab/dev-setup-v1/tools/dev-setup/install-mac.sh
 shasum -a 256 install-mac.sh
-# must print: b63702e275ed8df03bb3c0acc9efdbe3ced20b26412b29cb2d784f722ae6aa8a  install-mac.sh
+# must print: e8f668a975c047798ab6208ceed22e95e536402e4e80edfc457a9dc41a982450  install-mac.sh
 bash install-mac.sh
 ```
 
