@@ -25,9 +25,9 @@ HL_MARK_END='# <<< homelab models <<<'
 # Written into every row this script adds to Claude Code's /model picker; how the sync agent knows the picker is its own
 HL_PICKER_TAG='homelab LiteLLM'
 # Claude Code's context window per model: it assumes 1M tokens for a name it doesn't know, so it would send prompts
-# far beyond what a homelab model accepts. The sync sets modelSettings.<model>.autoCompactWindow from the route's
-# max_input_tokens (LiteLLM /model/info, published by DGXMM) less room for the reply; Claude Code's minimum is 100k.
-HL_WINDOW_RESERVE=32768
+# far beyond what a homelab model accepts. The sync sets modelSettings.<model>.autoCompactWindow to the route's
+# max_input_tokens (LiteLLM /model/info, published by DGXMM); Claude Code keeps its own autocompact buffer below it
+# for the reply. Its smallest window is 100k.
 HL_WINDOW_MIN=100000
 # LiteLLM model_info.mode values that are not chat models (a route without a mode counts as chat)
 HL_NON_CHAT_MODES='embedding image_generation image_edit audio_transcription audio_speech rerank moderation ocr search video_generation'
@@ -98,16 +98,16 @@ hl_filter_models() {
     | unique[]' <<<"$models_json"
 }
 
-# {model: auto-compact window} for the chat models ($2, lines) from /model/info JSON ($1): max_input_tokens less
-# HL_WINDOW_RESERVE, only where that is at least HL_WINDOW_MIN; models without a window are left out.
+# {model: auto-compact window} for the chat models ($2, lines) from /model/info JSON ($1): max_input_tokens, only
+# where that is at least HL_WINDOW_MIN; models without a window are left out.
 hl_model_windows() {
   local info_json=${1:-} models=$2
   [ -n "$info_json" ] || info_json='{"data":[]}'
-  jq -c --arg models "$models" --argjson reserve "$HL_WINDOW_RESERVE" --argjson min "$HL_WINDOW_MIN" '
+  jq -c --arg models "$models" --argjson min "$HL_WINDOW_MIN" '
     ($models | split("\n") | map(select(. != ""))) as $m
     | [.data[]? | select(.model_name as $n | $m | index($n))
        | select((.model_info.max_input_tokens | type) == "number")
-       | {key: .model_name, value: ((.model_info.max_input_tokens - $reserve) | floor)}
+       | {key: .model_name, value: (.model_info.max_input_tokens | floor)}
        | select(.value >= $min)]
     | from_entries' <<<"$info_json"
 }

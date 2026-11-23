@@ -61,11 +61,11 @@ check "claude: empty settings" eq "$(hl_claude_settings_apply "" h "$list" qwen3
 
 # --- Claude Code context windows (modelSettings.<model>.autoCompactWindow from /model/info max_input_tokens)
 win=$(hl_model_windows "$info" "$list")
-check "windows: max_input_tokens less the reply reserve, 100k minimum, listed models only" \
-  json_eq "$win" '{"flint-nvfp4":491520,"qwen3.8-27b":229376}'
+check "windows: max_input_tokens, 100k minimum, listed models only" \
+  json_eq "$win" '{"flint-nvfp4":524288,"qwen3.8-27b":262144}'
 check "windows: none without /model/info" json_eq "$(hl_model_windows "" "$list")" '{}'
 wnew=$(hl_claude_settings_apply "$orig" "/h/.local/bin/homelab-model-key claude-code" "$list" qwen3.8-27b "$win" "")
-check "windows: written per model" eq "$(jq -c '.modelSettings | map_values(.autoCompactWindow)' <<<"$wnew")" '{"flint-nvfp4":491520,"qwen3.8-27b":229376}'
+check "windows: written per model" eq "$(jq -c '.modelSettings | map_values(.autoCompactWindow)' <<<"$wnew")" '{"flint-nvfp4":524288,"qwen3.8-27b":262144}'
 check "windows: other keys untouched" json_eq "$(jq 'del(.apiKeyHelper, .modelPicker, .modelSettings)' <<<"$wnew")" "$orig"
 check "windows: unknown (LiteLLM down) touches nothing" \
   json_eq "$(hl_claude_settings_apply "$wnew" "/h/.local/bin/homelab-model-key claude-code" "$list" qwen3.8-27b "" "$win")" "$wnew"
@@ -74,7 +74,7 @@ check "windows: owned = what is written" json_eq "$(hl_claude_windows_owned "$wn
 user='{"modelSettings":{"qwen3.8-27b":{"autoCompactWindow":150000,"effortLevel":"high"}}}'
 uout=$(hl_claude_windows_apply "$user" '{}' "$win")
 check "windows: a user's own /autocompact value is kept" eq "$(jq -c '.modelSettings["qwen3.8-27b"]' <<<"$uout")" '{"autoCompactWindow":150000,"effortLevel":"high"}'
-check "windows: ...and not recorded as ours" json_eq "$(hl_claude_windows_owned "$uout" "$win" "")" '{"flint-nvfp4":491520}'
+check "windows: ...and not recorded as ours" json_eq "$(hl_claude_windows_owned "$uout" "$win" "")" '{"flint-nvfp4":524288}'
 stale='{"modelSettings":{"gone":{"autoCompactWindow":200000,"effortLevel":"low"},"old":{"autoCompactWindow":300000},"mine":{"autoCompactWindow":123456}}}'
 sout=$(hl_claude_windows_apply "$stale" '{"gone":200000,"old":300000,"mine":200000}' '{}')
 check "windows: a model gone from LiteLLM loses our window, keeps the rest" \
@@ -167,8 +167,8 @@ hl_state_set claude managed; hl_state_set codex managed
 check "sync: picker follows LiteLLM" eq "$(jq -r '[.modelPicker.options[].model] | join(" ")' "$HL_CLAUDE_SETTINGS")" "qwen3.8-27b flint-nvfp4 qwen3.8-27b-nothink twil-8b"
 check "sync: helper kept" eq "$(jq -r .apiKeyHelper "$HL_CLAUDE_SETTINGS")" "/h/homelab-model-key claude-code"
 check "sync: context windows from /model/info" \
-  eq "$(jq -c '.modelSettings | map_values(.autoCompactWindow)' "$HL_CLAUDE_SETTINGS")" '{"flint-nvfp4":491520,"qwen3.8-27b":229376}'
-check "sync: windows recorded as ours" json_eq "$(hl_state_get claude_windows)" '{"flint-nvfp4":491520,"qwen3.8-27b":229376}' 
+  eq "$(jq -c '.modelSettings | map_values(.autoCompactWindow)' "$HL_CLAUDE_SETTINGS")" '{"flint-nvfp4":524288,"qwen3.8-27b":262144}'
+check "sync: windows recorded as ours" json_eq "$(hl_state_get claude_windows)" '{"flint-nvfp4":524288,"qwen3.8-27b":262144}' 
 check "sync: gone Codex model reset" eq "$(hl_codex_managed_model "$HL_CODEX_CONFIG")" qwen3.8-27b
 check "sync: Codex base URL kept" eq "$(hl_codex_base)" https://model.nghodki.ai
 check "sync: model cache" eq "$(tr '\n' ' ' <"$HL_MODELS_CACHE")" "flint-nvfp4 qwen3.8-27b qwen3.8-27b-nothink twil-8b "
